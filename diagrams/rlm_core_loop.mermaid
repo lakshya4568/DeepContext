@@ -1,0 +1,19 @@
+%% RLM engine core loop — rendered version of docs/ARCHITECTURE.md §5.2
+%% and workflows/03_rlm_recursion_pipeline.md
+
+flowchart LR
+    Task["Task + working context"] --> Parent["Parent model turn"]
+    Parent -->|"writes Python"| Kernel["Persistent kernel\n(corpus lives here as a variable)"]
+    Kernel <-->|"search / filter / transform"| Data["Loaded corpus\n(files, DB rows, repo tree)"]
+    Kernel -->|"await rlm_spawn(subtask)"| Spawn["Admission handle\nreturned immediately"]
+    Spawn -.->|"async, non-blocking"| Children["Child sessions\nrun independently"]
+    Children -->|"agent_message.send(...)"| Parent
+    Kernel -->|"REPL stdout, capped at 8,192 chars/turn"| Parent
+    Parent -->|"writes to"| Answer["answer = {content, ready}"]
+    Answer -->|"ready == True"| Final["Return content as the answer"]
+    Answer -->|"ready == False"| Parent
+
+    classDef kernel fill:#1e1e2e,stroke:#a6e3a1,color:#a6e3a1;
+    classDef answer fill:#313244,stroke:#f9e2af,color:#f9e2af;
+    class Kernel,Spawn,Children kernel;
+    class Answer,Final answer;

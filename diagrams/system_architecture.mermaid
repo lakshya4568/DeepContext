@@ -1,0 +1,45 @@
+%% Deep Context Platform — system at a glance
+%% Rendered version of docs/ARCHITECTURE.md §2. Render with the Mermaid CLI, mermaid.live,
+%% or any Markdown viewer with Mermaid support.
+
+flowchart TD
+    Client["Client\n(LangGraph graph, Claude Code / MCP,\nPrime-Agent-style harness, plain HTTP)"]
+    Ingress["FastAPI ingress (FR22)"]
+    Classifier["Query & Task Classifier\n(routes on shape, not on hype)"]
+
+    Hybrid["Simple QA path\nHybrid Retrieval\nBM25 + vector + RRF\n+ cross-encoder rerank"]
+    Agentic["Multi-step task path\nAgentic Planner\ntool selection, iteration limits, multi-hop loop"]
+    RLM["Global-analysis path\nRLM Engine\nHost + Kernel (see §4, §5)"]
+
+    Gate{"Evidence-Sufficiency Check\n(shared gate, §7)"}
+    Retry["Rewrite query / widen filters / escalate mechanism\n(max 1 retry before 'insufficient evidence' is a valid answer)"]
+    Generate["Generate answer + citations"]
+    MemExtract["Memory Extraction (background)"]
+    Gate2["Promotion Gate (§6)"]
+
+    Session["Short-term / session state\n(Redis or in-process)"]
+    LongTerm["Long-term typed memory\n(Postgres: policy / preference / fact)"]
+    Episodic["Episodic summary\n+ trace log (append-only)"]
+
+    Client --> Ingress --> Classifier
+    Classifier --> Hybrid
+    Classifier --> Agentic
+    Classifier --> RLM
+
+    Hybrid --> Gate
+    Agentic --> Gate
+    RLM --> Gate
+
+    Gate -- "No" --> Retry
+    Retry -.-> Classifier
+    Gate -- "Yes" --> Generate
+
+    Generate --> MemExtract --> Gate2
+    Gate2 --> Session
+    Gate2 --> LongTerm
+    Gate2 --> Episodic
+
+    classDef path fill:#1e1e2e,stroke:#89b4fa,color:#cdd6f4;
+    classDef gate fill:#313244,stroke:#f9e2af,color:#f9e2af;
+    class Hybrid,Agentic,RLM path;
+    class Gate,Gate2 gate;
