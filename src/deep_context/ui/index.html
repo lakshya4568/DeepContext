@@ -1,0 +1,2109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Deep Context Platform — Hybrid RAG & RLM Studio</title>
+  
+  <!-- Fonts: Plus Jakarta Sans & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    :root {
+      /* Clean Light & White Palette */
+      --bg: #f8fafc;
+      --bg-surface: #ffffff;
+      --bg-card: #ffffff;
+      --bg-subtle: #f1f5f9;
+      --bg-hover: #f8fafc;
+      --bg-elevated: #ffffff;
+      
+      --border: #e2e8f0;
+      --border-subtle: #edf2f7;
+      --border-focus: #0f172a;
+
+      --text: #0f172a;
+      --text-secondary: #334155;
+      --text-muted: #64748b;
+      --text-dim: #94a3b8;
+
+      /* Refined Minimal & Color Accents */
+      --primary: #0f172a;
+      --primary-hover: #1e293b;
+      
+      --emerald: #059669;
+      --emerald-bg: #ecfdf5;
+      --emerald-border: #a7f3d0;
+
+      --amber: #d97706;
+      --amber-bg: #fffbeb;
+      --amber-border: #fde68a;
+
+      --blue: #2563eb;
+      --blue-bg: #eff6ff;
+      --blue-border: #bfdbfe;
+
+      --purple: #7c3aed;
+      --purple-bg: #f5f3ff;
+      --purple-border: #ddd6fe;
+
+      --rose: #e11d48;
+      --rose-bg: #fff1f2;
+      --rose-border: #fecdd3;
+
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --radius-xl: 20px;
+
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+
+      --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Layout Containers */
+    .container {
+      max-width: 1480px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 0 32px;
+    }
+
+    /* Header */
+    header {
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 0;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-badge {
+      background: var(--primary);
+      color: #ffffff;
+      width: 38px;
+      height: 38px;
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .brand-title {
+      font-size: 19px;
+      font-weight: 800;
+      letter-spacing: -0.4px;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .version-tag {
+      font-size: 11px;
+      font-family: var(--font-mono);
+      background: var(--bg-subtle);
+      color: var(--text-secondary);
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-weight: 600;
+      border: 1px solid var(--border);
+    }
+
+    .system-status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .pill-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+    }
+
+    .dot.emerald { background: var(--emerald); }
+    .dot.amber { background: var(--amber); }
+    .dot.blue { background: var(--blue); }
+
+    /* Navigation Bar */
+    nav {
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border);
+      padding: 8px 0;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+    }
+
+    .nav-tab {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-muted);
+      font-family: var(--font-sans);
+      font-size: 13.5px;
+      font-weight: 600;
+      padding: 9px 18px;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.15s ease;
+    }
+
+    .nav-tab:hover {
+      background: var(--bg-subtle);
+      color: var(--text);
+    }
+
+    .nav-tab.active {
+      background: var(--bg-subtle);
+      border-color: var(--border);
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    .nav-tab.active svg {
+      stroke: var(--primary);
+    }
+
+    /* Main Area */
+    main {
+      flex: 1;
+      padding: 32px 0 60px 0;
+    }
+
+    .tab-pane {
+      display: none;
+      animation: fadeIn 0.2s ease-in-out;
+    }
+
+    .tab-pane.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Cards & Grids */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 28px;
+    }
+
+    @media (max-width: 1080px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 26px;
+      box-shadow: var(--shadow-md);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .card-title-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .card-icon-wrap {
+      width: 36px;
+      height: 36px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .card-icon-wrap.dark { background: var(--bg-subtle); color: var(--primary); }
+    .card-icon-wrap.emerald { background: var(--emerald-bg); color: var(--emerald); }
+    .card-icon-wrap.amber { background: var(--amber-bg); color: var(--amber); }
+    .card-icon-wrap.purple { background: var(--purple-bg); color: var(--purple); }
+
+    .card-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .card-subtitle {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 1px;
+    }
+
+    /* Form Controls */
+    .form-group {
+      margin-bottom: 18px;
+    }
+
+    label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      margin-bottom: 7px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    select,
+    textarea {
+      width: 100%;
+      background: #ffffff;
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      padding: 12px 16px;
+      border-radius: var(--radius-md);
+      outline: none;
+      transition: all 0.15s;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.08);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 120px;
+      line-height: 1.6;
+    }
+
+    /* Buttons */
+    .btn {
+      background: var(--primary);
+      color: #ffffff;
+      border: 1px solid var(--primary);
+      padding: 12px 22px;
+      font-family: var(--font-sans);
+      font-size: 13.5px;
+      font-weight: 700;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.15s ease;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .btn:hover {
+      background: var(--primary-hover);
+      box-shadow: var(--shadow-md);
+    }
+
+    .btn:active {
+      transform: translateY(1px);
+    }
+
+    .btn-secondary {
+      background: var(--bg-surface);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-subtle);
+      color: var(--text);
+      border-color: #cbd5e1;
+    }
+
+    .btn-danger {
+      background: var(--rose-bg);
+      color: var(--rose);
+      border: 1px solid var(--rose-border);
+      box-shadow: none;
+    }
+
+    .btn-danger:hover {
+      background: var(--rose);
+      color: #ffffff;
+    }
+
+    .btn-sm {
+      padding: 7px 12px;
+      font-size: 12px;
+      border-radius: var(--radius-sm);
+    }
+
+    /* Presets Chips */
+    .presets-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .preset-chip {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-weight: 500;
+      padding: 5px 12px;
+      border-radius: 18px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .preset-chip:hover {
+      background: #e2e8f0;
+      color: var(--text);
+    }
+
+    /* Thinking Drawer */
+    .thinking-card {
+      background: var(--amber-bg);
+      border: 1px solid var(--amber-border);
+      border-left: 4px solid var(--amber);
+      border-radius: var(--radius-md);
+      padding: 14px 18px;
+      margin-bottom: 20px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .thinking-card.is-streaming {
+      border-color: var(--amber);
+      box-shadow: 0 0 18px rgba(245, 158, 11, 0.15);
+    }
+
+    .thinking-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      color: var(--amber);
+      font-weight: 700;
+      font-size: 13px;
+    }
+
+    .thinking-badge-live {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(245, 158, 11, 0.18);
+      color: var(--amber);
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .thinking-content {
+      margin-top: 10px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: #78350f;
+      max-height: 220px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      line-height: 1.6;
+      padding-top: 10px;
+      border-top: 1px dashed rgba(217, 119, 6, 0.25);
+      scroll-behavior: smooth;
+    }
+
+    /* Live Pipeline Status & Real-Time Cursor */
+    .stream-status-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      border-radius: var(--radius-md);
+      background: rgba(14, 165, 233, 0.08);
+      border: 1px solid rgba(14, 165, 233, 0.25);
+      color: var(--primary);
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 18px;
+      transition: all 0.3s ease;
+    }
+
+    .stream-status-bar.complete {
+      background: rgba(16, 185, 129, 0.08);
+      border-color: rgba(16, 185, 129, 0.25);
+      color: var(--emerald);
+    }
+
+    .stream-status-bar.rate-limited {
+      background: rgba(239, 68, 68, 0.08);
+      border-color: rgba(239, 68, 68, 0.35);
+      color: var(--rose);
+    }
+
+    .pulse-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: currentColor;
+      box-shadow: 0 0 8px currentColor;
+      animation: pulseAnim 1.4s infinite ease-in-out;
+      flex-shrink: 0;
+    }
+
+    @keyframes pulseAnim {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.35; transform: scale(0.8); }
+    }
+
+    .streaming-cursor {
+      display: inline-block;
+      width: 8px;
+      height: 16px;
+      background: var(--primary);
+      margin-left: 3px;
+      vertical-align: middle;
+      border-radius: 2px;
+      animation: cursorBlink 0.85s infinite;
+    }
+
+    @keyframes cursorBlink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    /* Rate Limit Banner & Quota Badges */
+    .rate-limit-banner {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 14px 18px;
+      border-radius: var(--radius-md);
+      background: rgba(239, 68, 68, 0.06);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-left: 4px solid var(--rose);
+      margin-bottom: 20px;
+      animation: slideDown 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .rate-limit-icon {
+      color: var(--rose);
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .rate-limit-content {
+      flex: 1;
+    }
+
+    .rate-limit-title {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: #991b1b;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .rate-limit-desc {
+      font-size: 12.5px;
+      color: #7f1d1d;
+      line-height: 1.5;
+    }
+
+    .rate-limit-desc code {
+      background: rgba(239, 68, 68, 0.12);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      color: #991b1b;
+    }
+
+    .rate-limit-close {
+      background: transparent;
+      border: none;
+      color: #991b1b;
+      font-size: 16px;
+      cursor: pointer;
+      padding: 0 4px;
+      opacity: 0.6;
+    }
+
+    .rate-limit-close:hover {
+      opacity: 1;
+    }
+
+    .quota-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11.5px;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .quota-pill.normal {
+      background: rgba(16, 185, 129, 0.1);
+      color: var(--emerald);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+    }
+
+    .quota-pill.limited {
+      background: rgba(239, 68, 68, 0.12);
+      color: var(--rose);
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      animation: quotaPulse 2s infinite;
+    }
+
+    @keyframes quotaPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.2); }
+      50% { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.1); }
+    }
+
+    /* Grounded Output Box */
+    .answer-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 22px;
+      font-size: 14.5px;
+      line-height: 1.75;
+      color: var(--text);
+      margin-bottom: 22px;
+      position: relative;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .copy-btn {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      padding: 5px 10px;
+      border-radius: var(--radius-sm);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .copy-btn:hover {
+      background: #e2e8f0;
+      color: var(--text);
+    }
+
+    /* Citation Cards */
+    .citations-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 14px;
+      margin-top: 12px;
+    }
+
+    .citation-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 14px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .citation-card:hover {
+      border-color: #cbd5e1;
+    }
+
+    .citation-title {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+
+    .citation-badge {
+      font-size: 11px;
+      font-family: var(--font-mono);
+      background: var(--bg-subtle);
+      color: var(--text-secondary);
+      padding: 2px 7px;
+      border-radius: 4px;
+      display: inline-block;
+      margin-bottom: 8px;
+    }
+
+    .citation-snippet {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      background: var(--bg-subtle);
+      padding: 8px 10px;
+      border-radius: var(--radius-sm);
+      max-height: 90px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+
+    /* Big Upload Zone */
+    .big-drop-zone {
+      border: 2px dashed #cbd5e1;
+      background: var(--bg-surface);
+      border-radius: var(--radius-lg);
+      padding: 44px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .big-drop-zone:hover {
+      border-color: var(--primary);
+      background: var(--bg-subtle);
+    }
+
+    .upload-icon-circle {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: var(--bg-subtle);
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 14px auto;
+    }
+
+    .drop-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .drop-sub {
+      font-size: 13px;
+      color: var(--text-muted);
+      max-width: 440px;
+      margin: 0 auto;
+    }
+
+    /* File Queue List */
+    .file-queue {
+      margin-top: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .file-queue-item {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+    }
+
+    /* Tables */
+    .table-container {
+      overflow-x: auto;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      text-align: left;
+    }
+
+    th {
+      background: var(--bg-subtle);
+      padding: 12px 16px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-size: 11px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-subtle);
+      background: #ffffff;
+      color: var(--text);
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:hover td {
+      background: var(--bg-subtle);
+    }
+
+    /* 5-Stage Diagnostic Stepper */
+    .diagnostic-stepper {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .diagnostic-step {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 16px 20px;
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .diagnostic-step.pass {
+      border-left: 4px solid var(--emerald);
+    }
+
+    .diagnostic-step.miss {
+      border-left: 4px solid var(--rose);
+    }
+
+    .step-badge {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: 6px;
+      text-align: center;
+      min-width: 75px;
+    }
+
+    .step-badge.pass {
+      background: var(--emerald-bg);
+      color: var(--emerald);
+      border: 1px solid var(--emerald-border);
+    }
+
+    .step-badge.miss {
+      background: var(--rose-bg);
+      color: var(--rose);
+      border: 1px solid var(--rose-border);
+    }
+
+    .step-body {
+      flex: 1;
+    }
+
+    .step-name {
+      font-size: 14.5px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 3px;
+    }
+
+    .step-desc {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    /* Spinner */
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top-color: #ffffff;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="container header-inner">
+      <div class="brand">
+        <div class="logo-badge">
+          <i data-lucide="layers" style="width: 20px; height: 20px;"></i>
+        </div>
+        <div>
+          <div class="brand-title">
+            Deep Context Studio
+            <span class="version-tag">Groq Qwen 3.6 + NV-EmbedQA</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="system-status">
+        <div id="header-quota-pill" class="quota-pill normal" title="Groq daily quota status">
+          <span class="dot emerald" id="quota-dot"></span>
+          <span id="header-quota-text">Groq API Active</span>
+        </div>
+        <div class="pill-tag"><span class="dot emerald"></span> PostgreSQL + pgvector (HNSW)</div>
+        <div class="pill-tag"><span class="dot emerald"></span> NV-EmbedQA (1024-dim)</div>
+        <div class="pill-tag"><span class="dot blue"></span> <span id="doc-counter">0</span> Ingested Docs</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Navigation Tabs -->
+  <nav>
+    <div class="container">
+      <div class="nav-tabs">
+        <button class="nav-tab active" onclick="switchTab('query-tab')">
+          <i data-lucide="sparkles" style="width: 16px; height: 16px;"></i>
+          Grounded Query Studio
+        </button>
+        <button class="nav-tab" onclick="switchTab('ingest-tab')">
+          <i data-lucide="file-up" style="width: 16px; height: 16px;"></i>
+          1000-Page PDF & Doc Hub
+        </button>
+        <button class="nav-tab" onclick="switchTab('haystack-tab')">
+          <i data-lucide="search-check" style="width: 16px; height: 16px;"></i>
+          Needle-in-a-Haystack 5-Stage Lab
+        </button>
+        <button class="nav-tab" onclick="switchTab('memory-tab')">
+          <i data-lucide="brain-circuit" style="width: 16px; height: 16px;"></i>
+          Typed Memory & Telemetry
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="container">
+
+    <!-- ============================================================= -->
+    <!-- TAB 1: Grounded Query Studio                                   -->
+    <!-- ============================================================= -->
+    <section id="query-tab" class="tab-pane active">
+
+      <!-- Rate Limit Alert Banner -->
+      <div id="rate-limit-banner" class="rate-limit-banner" style="display: none;">
+        <div class="rate-limit-icon"><i data-lucide="alert-triangle" style="width: 20px; height: 20px;"></i></div>
+        <div class="rate-limit-content">
+          <div class="rate-limit-title">
+            <span>Groq API Rate Limit Reached (429)</span>
+            <span id="rate-limit-model-badge" class="version-tag" style="background: rgba(239, 68, 68, 0.15); color: #991b1b;">qwen/qwen3.6-27b</span>
+          </div>
+          <div class="rate-limit-desc" id="rate-limit-desc-text">
+            Daily token quota (200,000 TPD) reached. Reset in <strong id="rate-limit-countdown">--</strong>. The system is retrieving and displaying grounded document excerpts directly.
+          </div>
+        </div>
+        <button class="rate-limit-close" onclick="dismissRateLimitBanner()" title="Dismiss">✕</button>
+      </div>
+
+      <div class="grid-2">
+        
+        <!-- Left: Question & Routing Controls -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title-group">
+              <div class="card-icon-wrap dark"><i data-lucide="help-circle" style="width: 18px; height: 18px;"></i></div>
+              <div>
+                <div class="card-title">Ask & Ground Question</div>
+                <div class="card-subtitle">Intelligent multi-stage RAG with verification gate</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label><i data-lucide="message-square" style="width: 13px; height: 13px;"></i> Question / Specification</label>
+            <textarea id="query-input" placeholder="Type your question about the ingested PDFs or documents...">What is the role of Recursive Language Models vs Hybrid RAG in this architecture?</textarea>
+            
+            <div class="presets-wrap">
+              <span class="preset-chip" onclick="setQuery('What are the four typed memory stores and their scopes?')">Memory Stores</span>
+              <span class="preset-chip" onclick="setQuery('How does parent-child chunk resolution work?')">Parent-Child Resolution</span>
+              <span class="preset-chip" onclick="setQuery('Explain the 8-layer prompt assembler sequence.')">8-Layer Prompt</span>
+              <span class="preset-chip" onclick="setQuery('Read the entire document corpus and extract all security risks')">RLM Global Aggregation</span>
+            </div>
+          </div>
+
+          <div class="grid-2" style="margin-bottom: 18px;">
+            <div>
+              <label><i data-lucide="cpu" style="width: 13px; height: 13px;"></i> Reasoning Model</label>
+              <select id="query-model-select">
+                <option value="qwen/qwen3.6-27b" selected>Qwen 3.6 27B (Groq Fast Reasoning)</option>
+                <option value="meta/llama-3.1-8b-instruct">Llama 3.1 8B Instruct (NVIDIA NIM Ultra-Fast)</option>
+                <option value="meta/llama-3.3-70b-instruct">Llama 3.3 70B Instruct (NVIDIA NIM)</option>
+                <option value="llama-3.3-70b-versatile">Llama 3.3 70B Versatile (Groq)</option>
+                <option value="llama-3.1-8b-instant">Llama 3.1 8B Instant (Groq High Speed)</option>
+                <option value="openai/gpt-oss-120b">GPT-OSS 120B (Groq Ultra)</option>
+                <option value="openai/gpt-oss-20b">GPT-OSS 20B (Groq Sub-Second)</option>
+                <option value="z-ai/glm-5.2">GLM-5.2 (NVIDIA NIM Reasoning)</option>
+              </select>
+            </div>
+            <div>
+              <label><i data-lucide="git-branch" style="width: 13px; height: 13px;"></i> Routing Strategy</label>
+              <select id="routing-mode">
+                <option value="">Auto Router (Shape & Token Budget)</option>
+                <option value="hybrid_rag">Hybrid RAG (BM25 + Vector + RRF)</option>
+                <option value="agentic_planner">Agentic Planner (Multi-Hop)</option>
+                <option value="rlm_engine">RLM Engine (Recursive REPL)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid-2" style="margin-bottom: 18px;">
+            <div>
+              <label><i data-lucide="user" style="width: 13px; height: 13px;"></i> User Scope</label>
+              <input type="text" id="user-id-input" value="test_user" />
+            </div>
+            <div>
+              <label><i data-lucide="filter" style="width: 13px; height: 13px;"></i> Filter by Document</label>
+              <select id="query-doc-select">
+                <option value="">All Ingested Documents</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 8px;">
+            <button class="btn" id="run-query-btn" style="flex: 1;" onclick="runQuery()">
+              <span id="query-spinner" class="spinner hidden"></span>
+              <i data-lucide="send" style="width: 15px; height: 15px;"></i>
+              Run Grounded Query
+            </button>
+            <button class="btn" id="stop-query-btn" style="display: none; background: rgba(239, 68, 68, 0.1); color: var(--rose); border: 1px solid rgba(239, 68, 68, 0.3);" onclick="stopQuery()">
+              <i data-lucide="square" style="width: 14px; height: 14px;"></i>
+              Stop
+            </button>
+          </div>
+        </div>
+
+        <!-- Right: Grounded Synthesis & Citations -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title-group">
+              <div class="card-icon-wrap emerald"><i data-lucide="check-circle-2" style="width: 18px; height: 18px;"></i></div>
+              <div>
+                <div class="card-title">Verified Synthesis</div>
+                <div class="card-subtitle">Real-time reasoning & grounded token stream</div>
+              </div>
+            </div>
+            <div id="query-meta-badges" style="display: flex; gap: 6px; align-items: center;">
+              <span id="path-badge" class="pill-tag" style="display: none; color: var(--primary);">Path</span>
+              <span id="verified-badge" class="pill-tag" style="display: none; color: var(--emerald); background: rgba(16, 185, 129, 0.1);">Verified ✓</span>
+              <span id="latency-badge" class="pill-tag" style="display: none;">0 ms</span>
+            </div>
+          </div>
+
+          <!-- Live Pipeline Status Progress Bar -->
+          <div id="stream-status-bar" class="stream-status-bar" style="display: none;">
+            <span class="pulse-dot"></span>
+            <span id="stream-status-text">Routing query...</span>
+          </div>
+
+          <!-- Thinking Box -->
+          <div id="thinking-drawer" class="thinking-card" style="display: none;">
+            <div class="thinking-header" onclick="toggleThinking()">
+              <span style="display: flex; align-items: center; gap: 6px;">
+                <i data-lucide="brain" style="width: 15px; height: 15px;"></i>
+                <span id="thinking-title-text">Reasoning & Planning Stream</span>
+                <span id="thinking-live-badge" class="thinking-badge-live">LIVE</span>
+              </span>
+              <span id="thinking-toggle-icon" style="font-size: 11px;">▼ COLLAPSE</span>
+            </div>
+            <div id="thinking-content-text" class="thinking-content"></div>
+          </div>
+
+          <!-- Answer Box -->
+          <div class="answer-card">
+            <button class="copy-btn" onclick="copyAnswer()"><i data-lucide="copy" style="width: 12px; height: 12px;"></i> Copy</button>
+            <div id="answer-content-text">Ask any question on the left to stream the real-time reasoning process, grounded answer tokens, and traceable citations.</div>
+          </div>
+
+          <!-- Citations -->
+          <div>
+            <label><i data-lucide="bookmark" style="width: 13px; height: 13px;"></i> Source Citations & Resolved Context</label>
+            <div id="citations-container" class="citations-grid">
+              <div style="color: var(--text-dim); font-size: 13px;">No citations active.</div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+
+    <!-- ============================================================= -->
+    <!-- TAB 2: Document & 1000-Page PDF Ingester                       -->
+    <!-- ============================================================= -->
+    <section id="ingest-tab" class="tab-pane">
+      <div class="grid-2">
+        
+        <!-- Left: Universal Ingest Drop Box -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title-group">
+              <div class="card-icon-wrap dark"><i data-lucide="upload" style="width: 18px; height: 18px;"></i></div>
+              <div>
+                <div class="card-title">Upload & Ingest Any File</div>
+                <div class="card-subtitle">PDFs (1-1000+ pages), Markdown, TXT, Code</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="big-drop-zone" onclick="document.getElementById('multi-file-input').click()">
+            <input type="file" id="multi-file-input" multiple style="display: none;" onchange="handleFilesSelected(event)" />
+            <div class="upload-icon-circle">
+              <i data-lucide="folder-up" style="width: 26px; height: 26px;"></i>
+            </div>
+            <div class="drop-title" id="drop-zone-text">Click or Drag & Drop Documents</div>
+            <div class="drop-sub">Supports multi-file batch upload & 1000-page PDF streaming extraction</div>
+          </div>
+
+          <div id="file-queue-box" class="file-queue"></div>
+
+          <div class="form-group" style="margin-top: 18px;">
+            <label><i data-lucide="settings" style="width: 13px; height: 13px;"></i> Retrieval Strategy</label>
+            <select id="upload-mode-select">
+              <option value="hybrid">Hybrid RAG (pgvector Dense Cosine + BM25 Full-Text)</option>
+              <option value="vectorless">Vectorless PageIndex (Hierarchical Table of Contents)</option>
+            </select>
+          </div>
+
+          <div style="display: flex; gap: 10px; margin-top: 10px;">
+            <button class="btn" id="upload-action-btn" style="flex: 1;" onclick="submitBatchUpload()">
+              <span id="upload-action-spinner" class="spinner hidden"></span>
+              <i data-lucide="zap" style="width: 15px; height: 15px;"></i>
+              Ingest & Embed Files
+            </button>
+            <button class="btn btn-secondary" onclick="syncDocumentsFolder()">
+              <i data-lucide="folder-sync" style="width: 15px; height: 15px;"></i>
+              Sync ./documents/
+            </button>
+          </div>
+        </div>
+
+        <!-- Right: Ingested Document Library Table -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title-group">
+              <div class="card-icon-wrap dark"><i data-lucide="library" style="width: 18px; height: 18px;"></i></div>
+              <div>
+                <div class="card-title">Document Library</div>
+                <div class="card-subtitle">Active chunks and embeddings</div>
+              </div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-secondary btn-sm" onclick="loadDocuments()"><i data-lucide="refresh-cw" style="width: 13px; height: 13px;"></i> Refresh</button>
+              <button class="btn btn-danger btn-sm" onclick="clearAllDocuments()"><i data-lucide="trash-2" style="width: 13px; height: 13px;"></i> Clear All</button>
+            </div>
+          </div>
+
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Type</th>
+                  <th>Mode</th>
+                  <th>Parents</th>
+                  <th>Children</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="doc-library-tbody">
+                <tr><td colspan="6" style="color: var(--text-dim); text-align: center;">No documents in library.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+
+    <!-- ============================================================= -->
+    <!-- TAB 3: Needle-in-a-Haystack 5-Stage Diagnostic Lab           -->
+    <!-- ============================================================= -->
+    <section id="haystack-tab" class="tab-pane">
+      <div class="grid-2">
+        
+        <!-- Left: Needle Benchmark Setup -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title-group">
+              <div class="card-icon-wrap amber"><i data-lucide="crosshair" style="width: 18px; height: 18px;"></i></div>
+              <div>
+                <div class="card-title">Needle-in-a-Haystack Probe</div>
+                <div class="card-subtitle">Test needle retrieval up to 1000-page density</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label><i data-lucide="sliders" style="width: 13px; height: 13px;"></i> Corpus Benchmark Source</label>
+            <select id="haystack-source-mode" onchange="toggleHaystackSource()">
+              <option value="synthetic">Generate Synthetic Haystack (Configurable Words & Depth)</option>
+              <option value="existing">Benchmark on Uploaded 1000-Page PDF</option>
+            </select>
+          </div>
+
+          <div id="synthetic-block">
+            <div class="grid-2">
+              <div class="form-group">
+                <label>Corpus Size (Words)</label>
+                <input type="number" id="haystack-word-count" value="25000" step="5000" />
+                <span style="font-size: 11px; color: var(--text-muted);">25k words ≈ 75 pages | 300k words ≈ 1000 pages</span>
+              </div>
+              <div class="form-group">
+                <label>Needle Insertion Depth</label>
+                <select id="haystack-depth-select">
+                  <option value="0">0% (Top of Document)</option>
+                  <option value="25">25% (Upper Quarter)</option>
+                  <option value="50" selected>50% (Exact Middle)</option>
+                  <option value="75">75% (Lower Quarter)</option>
+                  <option value="100">100% (Bottom of Document)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Corpus Topic</label>
+              <input type="text" id="haystack-topic-input" value="High-Throughput Distributed Cloud Systems" />
+            </div>
+          </div>
+
+          <div id="existing-doc-block" style="display: none;" class="form-group">
+            <label>Select Target Ingested Document</label>
+            <select id="haystack-doc-picker"></select>
+          </div>
+
+          <div class="form-group">
+            <label><i data-lucide="key" style="width: 13px; height: 13px;"></i> Secret Needle (Fact to Find)</label>
+            <input type="text" id="needle-input" value="SECRET_PASSCODE_APOLLO_7722" />
+          </div>
+
+          <div class="form-group">
+            <label><i data-lucide="search" style="width: 13px; height: 13px;"></i> Probe Query</label>
+            <input type="text" id="needle-query-input" value="What is the secret passcode for Apollo?" />
+          </div>
+
+          <button class="btn" id="run-haystack-btn" style="width: 100%;" onclick="runHaystackBenchmark()">
+            <span id="haystack-spinner" class="spinner hidden"></span>
+            <i data-lucide="play-circle" style="width: 15px; height: 15px;"></i>
+            Run 5-Stage Diagnostic Benchmark
+          </button>
+        </div>
+
+        <!-- Right: 5-Stage Visual Stepper -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title-group">
+              <div class="card-icon-wrap emerald"><i data-lucide="radar" style="width: 18px; height: 18px;"></i></div>
+              <div>
+                <div class="card-title">5-Stage Diagnostic Tracer</div>
+                <div class="card-subtitle">What it uses to get the context</div>
+              </div>
+            </div>
+            <span id="haystack-status-pill" class="pill-tag" style="display: none;">READY</span>
+          </div>
+
+          <div id="diagnostic-stepper-box" class="diagnostic-stepper">
+            <div style="color: var(--text-muted); font-size: 13px; text-align: center; padding: 36px 0;">
+              <i data-lucide="git-commit" style="width: 28px; height: 28px; margin-bottom: 6px; color: var(--text-dim);"></i>
+              <div>Run the benchmark on the left to trace the needle across BM25, PostgreSQL pgvector HNSW, RRF, Reranker, and Parent Resolution.</div>
+            </div>
+          </div>
+
+          <div id="haystack-answer-panel" style="margin-top: 20px; display: none;">
+            <label><i data-lucide="check" style="width: 13px; height: 13px;"></i> Final Answer & Grounded Verification</label>
+            <div id="haystack-answer-body" class="answer-card"></div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+
+    <!-- ============================================================= -->
+    <!-- TAB 4: Typed Memory & Telemetry                               -->
+    <!-- ============================================================= -->
+    <section id="memory-tab" class="tab-pane">
+      <div class="grid-2">
+        
+        <!-- Left: Promotion Gate -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title-group">
+              <div class="card-icon-wrap purple"><i data-lucide="shield-check" style="width: 18px; height: 18px;"></i></div>
+              <div>
+                <div class="card-title">Memory Promotion Gate</div>
+                <div class="card-subtitle">Evaluate observations into durable memory</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Observation Content</label>
+            <textarea id="mem-text" placeholder="e.g., 'User prefers concise responses with bullet points and no boilerplate code.'"></textarea>
+          </div>
+
+          <div class="grid-2">
+            <div class="form-group">
+              <label>Source</label>
+              <select id="mem-src">
+                <option value="user_stated">User Stated (Direct Preference)</option>
+                <option value="operator">Operator (Policy Admin)</option>
+                <option value="tool_output">Tool Output</option>
+                <option value="inferred">Inferred (Requires Corroboration)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>User ID</label>
+              <input type="text" id="mem-uid" value="test_user" />
+            </div>
+          </div>
+
+          <button class="btn" onclick="submitMemory()"><i data-lucide="cpu" style="width: 15px; height: 15px;"></i> Evaluate Through Promotion Gate</button>
+          
+          <div id="mem-gate-result" style="margin-top: 16px; display: none;" class="answer-card"></div>
+        </div>
+
+        <!-- Right: Telemetry Traces -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title-group">
+              <div class="card-icon-wrap dark"><i data-lucide="activity" style="width: 18px; height: 18px;"></i></div>
+              <div>
+                <div class="card-title">Live System Telemetry</div>
+                <div class="card-subtitle">Latency metrics & event traces</div>
+              </div>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="loadTelemetry()"><i data-lucide="refresh-cw" style="width: 13px; height: 13px;"></i> Refresh</button>
+          </div>
+
+          <div id="telemetry-summary" style="font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); margin-bottom: 12px;"></div>
+
+          <div class="table-container" style="max-height: 380px;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Event</th>
+                  <th>Latency</th>
+                  <th>Payload Trace</th>
+                </tr>
+              </thead>
+              <tbody id="telemetry-tbody">
+                <tr><td colspan="3" style="color: var(--text-dim); text-align: center;">Loading telemetry...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    let activeTabId = 'query-tab';
+    let selectedBatchFiles = [];
+
+    // Initialize Lucide Icons
+    function refreshIcons() {
+      if (window.lucide) {
+        lucide.createIcons();
+      }
+    }
+
+    function switchTab(tabId) {
+      activeTabId = tabId;
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+
+      const btn = Array.from(document.querySelectorAll('.nav-tab')).find(b => b.getAttribute('onclick')?.includes(tabId));
+      if (btn) btn.classList.add('active');
+
+      const pane = document.getElementById(tabId);
+      if (pane) pane.classList.add('active');
+
+      refreshIcons();
+
+      if (tabId === 'ingest-tab' || tabId === 'haystack-tab') loadDocuments();
+      if (tabId === 'memory-tab') loadTelemetry();
+    }
+
+    function setQuery(q) {
+      document.getElementById('query-input').value = q;
+    }
+
+    // -----------------------------------------------------------------------
+    // Query Execution (Real-Time SSE Stream with Thinking & Markdown)
+    // -----------------------------------------------------------------------
+    let queryAbortController = null;
+    let thinkingStartTime = null;
+
+    function stopQuery() {
+      if (queryAbortController) {
+        queryAbortController.abort();
+        queryAbortController = null;
+      }
+      const btn = document.getElementById('run-query-btn');
+      const stopBtn = document.getElementById('stop-query-btn');
+      const spinner = document.getElementById('query-spinner');
+      btn.disabled = false;
+      stopBtn.style.display = 'none';
+      spinner.classList.add('hidden');
+
+      const statusBar = document.getElementById('stream-status-bar');
+      document.getElementById('stream-status-text').textContent = 'Stream cancelled.';
+      statusBar.classList.remove('complete');
+
+      const liveBadge = document.getElementById('thinking-live-badge');
+      if (liveBadge) liveBadge.style.display = 'none';
+      document.getElementById('thinking-drawer').classList.remove('is-streaming');
+    }
+
+    async function runQuery() {
+      const q = document.getElementById('query-input').value.trim();
+      if (!q) return;
+
+      const btn = document.getElementById('run-query-btn');
+      const stopBtn = document.getElementById('stop-query-btn');
+      const spinner = document.getElementById('query-spinner');
+      const mode = document.getElementById('routing-mode').value;
+      const uid = document.getElementById('user-id-input').value;
+      const docId = document.getElementById('query-doc-select').value;
+      const selectedModel = document.getElementById('query-model-select').value;
+
+      btn.disabled = true;
+      stopBtn.style.display = 'inline-flex';
+      spinner.classList.remove('hidden');
+
+      // Reset badges and status
+      const pathBadge = document.getElementById('path-badge');
+      const verifiedBadge = document.getElementById('verified-badge');
+      const latBadge = document.getElementById('latency-badge');
+      const statusBar = document.getElementById('stream-status-bar');
+      const statusText = document.getElementById('stream-status-text');
+      const thinkDrawer = document.getElementById('thinking-drawer');
+      const thinkText = document.getElementById('thinking-content-text');
+      const thinkBadge = document.getElementById('thinking-live-badge');
+      const thinkTitle = document.getElementById('thinking-title-text');
+      const answerBox = document.getElementById('answer-content-text');
+      const citBox = document.getElementById('citations-container');
+
+      pathBadge.style.display = 'none';
+      verifiedBadge.style.display = 'none';
+      latBadge.style.display = 'none';
+
+      statusBar.style.display = 'flex';
+      statusBar.className = 'stream-status-bar';
+      statusText.innerHTML = '🔍 Classifying query and routing execution path...';
+
+      thinkDrawer.style.display = 'none';
+      thinkDrawer.classList.remove('is-streaming');
+      thinkText.textContent = '';
+      thinkText.style.display = 'block';
+      document.getElementById('thinking-toggle-icon').textContent = '▼ COLLAPSE';
+      thinkTitle.textContent = 'Reasoning & Planning Stream';
+      if (thinkBadge) thinkBadge.style.display = 'inline-flex';
+
+      answerBox.innerHTML = '<span class="streaming-cursor"></span>';
+      citBox.innerHTML = '<div style="color: var(--text-dim); font-size: 13px;">Retrieving citations...</div>';
+
+      queryAbortController = new AbortController();
+      let rawReasoning = '';
+      let rawContent = '';
+      thinkingStartTime = Date.now();
+
+      try {
+        const response = await fetch('/v1/query/stream', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: q,
+            user_id: uid || 'test_user',
+            force_path: mode || null,
+            document_ids: docId ? [docId] : null,
+            model: selectedModel || null
+          }),
+          signal: queryAbortController.signal
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const parts = buffer.split('\n\n');
+          buffer = parts.pop();
+
+          for (const part of parts) {
+            const line = part.trim();
+            if (!line.startsWith('data: ')) continue;
+
+            try {
+              const event = JSON.parse(line.slice(6));
+
+              if (event.type === 'rate_limit') {
+                showRateLimitBanner(event.notice || event);
+              } else if (event.type === 'status') {
+                statusText.innerHTML = event.message || 'Processing...';
+                if (event.stage === 'rate_limit') {
+                  statusBar.classList.add('rate-limited');
+                }
+              } else if (event.type === 'citations') {
+                citBox.innerHTML = '';
+                const citations = event.citations || [];
+                if (citations.length > 0) {
+                  citations.forEach((c, i) => {
+                    const card = document.createElement('div');
+                    card.className = 'citation-card';
+                    card.innerHTML = `
+                      <div class="citation-title"><i data-lucide="file-text" style="width: 14px; height: 14px;"></i> [${i+1}] ${c.title || 'Document'}</div>
+                      <div class="citation-badge">Section: ${c.section_path || 'Main'} ${c.page_number ? ' | Page ' + c.page_number : ''}</div>
+                      <div class="citation-snippet">${c.source_uri || c.chunk_id || 'Retrieved Context'}</div>
+                    `;
+                    citBox.appendChild(card);
+                  });
+                } else {
+                  citBox.innerHTML = '<div style="color: var(--text-dim); font-size: 13px;">No citations active.</div>';
+                }
+                refreshIcons();
+              } else if (event.type === 'reasoning') {
+                rawReasoning += event.delta;
+                thinkDrawer.style.display = 'block';
+                thinkDrawer.classList.add('is-streaming');
+                thinkText.textContent = rawReasoning;
+                thinkText.scrollTop = thinkText.scrollHeight;
+              } else if (event.type === 'content') {
+                if (thinkDrawer.classList.contains('is-streaming')) {
+                  thinkDrawer.classList.remove('is-streaming');
+                  const elapsedSec = ((Date.now() - thinkingStartTime) / 1000).toFixed(1);
+                  thinkTitle.textContent = `Thought Process (${elapsedSec}s)`;
+                  if (thinkBadge) thinkBadge.style.display = 'none';
+                }
+                rawContent += event.delta;
+                answerBox.innerHTML = formatMarkdown(rawContent) + '<span class="streaming-cursor"></span>';
+              } else if (event.type === 'done') {
+                pathBadge.style.display = 'inline-flex';
+                pathBadge.textContent = `Path: ${event.path_taken || 'hybrid_rag'}`;
+
+                latBadge.style.display = 'inline-flex';
+                latBadge.textContent = `${event.latency_ms || 0} ms`;
+
+                if (event.support_check_passed) {
+                  verifiedBadge.style.display = 'inline-flex';
+                  verifiedBadge.textContent = 'Grounded & Verified ✓';
+                }
+
+                statusBar.classList.add('complete');
+                const totalSec = ((event.latency_ms || 0) / 1000).toFixed(2);
+                statusText.innerHTML = `✓ <strong>Synthesis Complete</strong> &nbsp;|&nbsp; ${totalSec}s &nbsp;|&nbsp; Grounded & Verified`;
+
+                // If content was empty because reasoning model drafted answer inside thinking block
+                if (!rawContent.trim() && rawReasoning.trim()) {
+                  let extracted = rawReasoning.trim();
+                  if (extracted.includes('**Draft Response')) {
+                    extracted = extracted.split('**Draft Response')[1].replace(/^[^a-zA-Z0-9#*"]+/, '').trim();
+                  } else if (extracted.includes('ANSWER:')) {
+                    extracted = extracted.split('ANSWER:')[1].trim();
+                  } else {
+                    const paras = extracted.split('\n\n').map(p => p.trim()).filter(p => p);
+                    if (paras.length >= 2) {
+                      extracted = paras.slice(-2).join('\n\n');
+                    }
+                  }
+                  rawContent = extracted;
+                }
+
+                answerBox.innerHTML = formatMarkdown(rawContent);
+                if (thinkBadge) thinkBadge.style.display = 'none';
+                thinkDrawer.classList.remove('is-streaming');
+              } else if (event.type === 'error') {
+                alert('Streaming Error: ' + event.message);
+                statusText.textContent = 'Error: ' + event.message;
+              }
+            } catch (jsonErr) {
+              console.warn('Failed to parse SSE line:', line, jsonErr);
+            }
+          }
+        }
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          alert('Query failed: ' + err.message);
+          statusText.textContent = 'Error: ' + err.message;
+        }
+      } finally {
+        btn.disabled = false;
+        stopBtn.style.display = 'none';
+        spinner.classList.add('hidden');
+        queryAbortController = null;
+        refreshIcons();
+      }
+    }
+
+    function toggleThinking() {
+      const box = document.getElementById('thinking-content-text');
+      const icon = document.getElementById('thinking-toggle-icon');
+      if (box.style.display === 'none') {
+        box.style.display = 'block';
+        icon.textContent = '▼ COLLAPSE';
+      } else {
+        box.style.display = 'none';
+        icon.textContent = '▶ EXPAND';
+      }
+    }
+
+    function copyAnswer() {
+      const text = document.getElementById('answer-content-text').innerText;
+      navigator.clipboard.writeText(text);
+      alert('Answer copied to clipboard!');
+    }
+
+    // -----------------------------------------------------------------------
+    // Ingest & Document Library
+    // -----------------------------------------------------------------------
+    function handleFilesSelected(e) {
+      if (e.target.files && e.target.files.length > 0) {
+        selectedBatchFiles = Array.from(e.target.files);
+        const queueBox = document.getElementById('file-queue-box');
+        queueBox.innerHTML = '';
+
+        selectedBatchFiles.forEach(f => {
+          const item = document.createElement('div');
+          item.className = 'file-queue-item';
+          item.innerHTML = `
+            <span style="font-weight: 600; display: flex; align-items: center; gap: 8px;">
+              <i data-lucide="file" style="width: 15px; height: 15px; color: var(--primary);"></i>
+              ${f.name}
+            </span>
+            <span class="version-tag">${(f.size / 1024).toFixed(1)} KB</span>
+          `;
+          queueBox.appendChild(item);
+        });
+
+        document.getElementById('drop-zone-text').textContent = `${selectedBatchFiles.length} file(s) selected`;
+        refreshIcons();
+      }
+    }
+
+    async function submitBatchUpload() {
+      if (!selectedBatchFiles || selectedBatchFiles.length === 0) {
+        alert('Please select one or more files to ingest.');
+        return;
+      }
+
+      const btn = document.getElementById('upload-action-btn');
+      const spinner = document.getElementById('upload-action-spinner');
+      const mode = document.getElementById('upload-mode-select').value;
+
+      btn.disabled = true;
+      spinner.classList.remove('hidden');
+
+      const formData = new FormData();
+      selectedBatchFiles.forEach(f => formData.append('files', f));
+      formData.append('vectorless', mode === 'vectorless' ? 'true' : 'false');
+
+      try {
+        const res = await fetch('/v1/upload-batch', {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json();
+        alert(`Successfully ingested ${data.length} document(s) into PostgreSQL with pgvector embeddings!`);
+        selectedBatchFiles = [];
+        document.getElementById('file-queue-box').innerHTML = '';
+        document.getElementById('drop-zone-text').textContent = 'Click or Drag & Drop Documents';
+        loadDocuments();
+      } catch (err) {
+        alert('Ingest failed: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        spinner.classList.add('hidden');
+      }
+    }
+
+    async function syncDocumentsFolder() {
+      try {
+        const res = await fetch('/v1/sync-folder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ folder_path: 'documents' })
+        });
+        const data = await res.json();
+        alert(`Synced ${data.length} document(s) from './documents/' folder!`);
+        loadDocuments();
+      } catch (e) {
+        alert('Sync error: ' + e.message);
+      }
+    }
+
+    async function loadDocuments() {
+      try {
+        const res = await fetch('/v1/documents');
+        const docs = await res.json();
+
+        document.getElementById('doc-counter').textContent = docs.length;
+        const tbody = document.getElementById('doc-library-tbody');
+        tbody.innerHTML = '';
+
+        const qSelect = document.getElementById('query-doc-select');
+        const hSelect = document.getElementById('haystack-doc-picker');
+
+        qSelect.innerHTML = '<option value="">All Ingested Documents</option>';
+        hSelect.innerHTML = '';
+
+        if (docs.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" style="color: var(--text-dim); text-align: center;">No documents in database. Upload a file or sync ./documents/</td></tr>';
+          return;
+        }
+
+        docs.forEach(d => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td style="font-weight: 700; color: var(--text);">${d.title}</td>
+            <td><span class="version-tag">${d.doc_type.toUpperCase()}</span></td>
+            <td><span class="version-tag">${d.retrieval_mode}</span></td>
+            <td style="color: var(--emerald); font-weight: 600;">${d.parent_chunks_count}</td>
+            <td style="color: var(--amber); font-weight: 600;">${d.child_chunks_count}</td>
+            <td>
+              <button class="btn btn-danger btn-sm" onclick="deleteDoc('${d.id}')">
+                <i data-lucide="trash" style="width: 12px; height: 12px;"></i>
+              </button>
+            </td>
+          `;
+          tbody.appendChild(row);
+
+          const opt = document.createElement('option');
+          opt.value = d.id;
+          opt.textContent = `${d.title} (${d.child_chunks_count} chunks)`;
+          qSelect.appendChild(opt);
+
+          const opt2 = document.createElement('option');
+          opt2.value = d.id;
+          opt2.textContent = `${d.title} (${d.child_chunks_count} chunks)`;
+          hSelect.appendChild(opt2);
+        });
+
+        refreshIcons();
+      } catch (e) {
+        console.error('Failed to load documents', e);
+      }
+    }
+
+    async function deleteDoc(id) {
+      if (!confirm('Are you sure you want to remove this document?')) return;
+      try {
+        await fetch(`/v1/documents/${id}`, { method: 'DELETE' });
+        loadDocuments();
+      } catch (e) {
+        alert('Delete failed: ' + e.message);
+      }
+    }
+
+    async function clearAllDocuments() {
+      if (!confirm('Are you sure you want to remove ALL ingested documents and reset the database?')) return;
+      try {
+        await fetch('/v1/documents', { method: 'DELETE' });
+        alert('Database cleared successfully!');
+        loadDocuments();
+      } catch (e) {
+        alert('Clear failed: ' + e.message);
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Needle in a Haystack Diagnostic Benchmark
+    // -----------------------------------------------------------------------
+    function toggleHaystackSource() {
+      const mode = document.getElementById('haystack-source-mode').value;
+      if (mode === 'synthetic') {
+        document.getElementById('synthetic-block').style.display = 'block';
+        document.getElementById('existing-doc-block').style.display = 'none';
+      } else {
+        document.getElementById('synthetic-block').style.display = 'none';
+        document.getElementById('existing-doc-block').style.display = 'block';
+      }
+    }
+
+    async function runHaystackBenchmark() {
+      const mode = document.getElementById('haystack-source-mode').value;
+      const needle = document.getElementById('needle-input').value.trim();
+      const query = document.getElementById('needle-query-input').value.trim();
+
+      const btn = document.getElementById('run-haystack-btn');
+      const spinner = document.getElementById('haystack-spinner');
+      btn.disabled = true;
+      spinner.classList.remove('hidden');
+
+      try {
+        let docId = null;
+
+        if (mode === 'synthetic') {
+          const words = parseInt(document.getElementById('haystack-word-count').value) || 25000;
+          const depth = parseFloat(document.getElementById('haystack-depth-select').value) || 50.0;
+          const topic = document.getElementById('haystack-topic-input').value;
+
+          const genRes = await fetch('/v1/haystack/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              needle: needle,
+              needle_query: query,
+              total_words: words,
+              depth_percent: depth,
+              topic: topic
+            })
+          });
+          const genData = await genRes.json();
+          docId = genData.document_id;
+        } else {
+          docId = document.getElementById('haystack-doc-picker').value;
+        }
+
+        const benchRes = await fetch('/v1/haystack/benchmark', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            document_id: docId,
+            needle: needle,
+            query: query,
+            top_k: 6
+          })
+        });
+        const benchData = await benchRes.json();
+
+        // Status pill
+        const statusPill = document.getElementById('haystack-status-pill');
+        statusPill.style.display = 'inline-flex';
+        if (benchData.passed) {
+          statusPill.textContent = `NEEDLE FOUND (${benchData.latency_ms}ms)`;
+          statusPill.style.color = 'var(--emerald)';
+          statusPill.style.borderColor = 'var(--emerald-border)';
+          statusPill.style.backgroundColor = 'var(--emerald-bg)';
+        } else {
+          statusPill.textContent = `NEEDLE MISSED (${benchData.latency_ms}ms)`;
+          statusPill.style.color = 'var(--rose)';
+          statusPill.style.borderColor = 'var(--rose-border)';
+          statusPill.style.backgroundColor = 'var(--rose-bg)';
+        }
+
+        // Stepper
+        const stepper = document.getElementById('diagnostic-stepper-box');
+        stepper.innerHTML = '';
+
+        benchData.stages.forEach(st => {
+          const item = document.createElement('div');
+          item.className = `diagnostic-step ${st.needle_found ? 'pass' : 'miss'}`;
+          item.innerHTML = `
+            <div class="step-badge ${st.needle_found ? 'pass' : 'miss'}">${st.needle_found ? 'PASSED' : 'MISSED'}</div>
+            <div class="step-body">
+              <div class="step-name">${st.stage_name}</div>
+              <div class="step-desc">${st.details}</div>
+            </div>
+          `;
+          stepper.appendChild(item);
+        });
+
+        // Answer Panel
+        document.getElementById('haystack-answer-panel').style.display = 'block';
+        document.getElementById('haystack-answer-body').innerHTML = `
+          <strong>Answer:</strong> ${formatMarkdown(benchData.answer)}
+          ${benchData.retrieved_parent_chunk ? `<br/><br/><strong>Resolved Parent Context:</strong><div class="citation-snippet">${benchData.retrieved_parent_chunk.content}</div>` : ''}
+        `;
+
+        loadDocuments();
+      } catch (err) {
+        alert('Benchmark error: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        spinner.classList.add('hidden');
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Memory & Telemetry
+    // -----------------------------------------------------------------------
+    async function submitMemory() {
+      const text = document.getElementById('mem-text').value.trim();
+      const source = document.getElementById('mem-src').value;
+      const uid = document.getElementById('mem-uid').value;
+      if (!text) return;
+
+      try {
+        const res = await fetch('/v1/memory/observe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, source, user_id: uid })
+        });
+        const data = await res.json();
+        const box = document.getElementById('mem-gate-result');
+        box.style.display = 'block';
+        box.innerHTML = `
+          <strong>Promotion Gate Result:</strong> <span class="version-tag" style="color: ${data.decision === 'write' ? 'var(--emerald)' : 'var(--rose)'}; font-weight: 800;">${data.decision.toUpperCase()}</span><br/>
+          <strong>Memory Store:</strong> ${data.memory_type}<br/>
+          <strong>Confidence:</strong> ${data.confidence !== null ? Math.round(data.confidence * 100) + '%' : 'N/A'}<br/>
+          <strong>Expiry:</strong> ${data.expires_at || 'Durable (Never)'}<br/>
+          ${data.reject_reason ? `<strong>Rejection Rationale:</strong> ${data.reject_reason}` : ''}
+        `;
+      } catch (e) {
+        alert('Memory evaluation error: ' + e.message);
+      }
+    }
+
+    async function loadTelemetry() {
+      try {
+        const res = await fetch('/v1/metrics?limit=30');
+        const data = await res.json();
+        document.getElementById('telemetry-summary').textContent = `Total Recorded Events: ${data.total_traces_logged} | Avg Latency: ${data.average_latency_ms} ms`;
+
+        const tbody = document.getElementById('telemetry-tbody');
+        tbody.innerHTML = '';
+        if (!data.recent_traces || data.recent_traces.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="3" style="color: var(--text-dim); text-align: center;">No traces logged yet.</td></tr>';
+          return;
+        }
+
+        data.recent_traces.forEach(t => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td><span class="version-tag">${t.event_type}</span></td>
+            <td style="color: var(--blue); font-family: var(--font-mono); font-weight: 600;">${t.latency_ms} ms</td>
+            <td style="font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary);">${JSON.stringify(t.payload).slice(0, 100)}...</td>
+          `;
+          tbody.appendChild(row);
+        });
+      } catch (e) {
+        console.error('Failed to load telemetry', e);
+      }
+    }
+
+    function formatMarkdown(text) {
+      if (!text) return '';
+      let html = text;
+
+      // Code blocks
+      html = html.replace(/```([\w-]*)\n([\s\S]*?)```/g, (match, lang, code) => {
+        return `<pre style="background: #0f172a; color: #f8fafc; padding: 12px 16px; border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 12px; overflow-x: auto; margin: 12px 0; line-height: 1.5;"><code>${escapeHtml(code.trim())}</code></pre>`;
+      });
+
+      // Headers
+      html = html
+        .replace(/^### (.*$)/gim, '<h3 style="font-size: 15px; font-weight: 700; margin: 12px 0 6px 0; color: var(--text);">$1</h3>')
+        .replace(/^## (.*$)/gim, '<h2 style="font-size: 16px; font-weight: 700; margin: 14px 0 8px 0; color: var(--text);">$1</h2>')
+        .replace(/^# (.*$)/gim, '<h1 style="font-size: 18px; font-weight: 800; margin: 16px 0 10px 0; color: var(--text);">$1</h1>');
+
+      // Bold & Italic
+      html = html
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>');
+
+      // Inline code
+      html = html.replace(/`([^`]+)`/g, '<code style="background: var(--bg-subtle); padding: 2px 6px; border-radius: 4px; font-family: var(--font-mono); font-size: 12px; color: var(--primary);">$1</code>');
+
+      // Blockquotes
+      html = html.replace(/^\> (.*$)/gim, '<blockquote style="border-left: 3px solid var(--primary); padding-left: 12px; margin: 8px 0; color: var(--text-secondary); font-style: italic;">$1</blockquote>');
+
+      // Lists
+      html = html.replace(/^\s*[\-\*]\s+(.*$)/gim, '<li style="margin-left: 18px; margin-bottom: 4px;">$1</li>');
+      html = html.replace(/^\s*(\d+)\.\s+(.*$)/gim, '<li style="margin-left: 18px; margin-bottom: 4px;" value="$1">$2</li>');
+
+      // Line breaks
+      html = html.replace(/\n/g, '<br/>');
+      return html;
+    }
+
+    function escapeHtml(str) {
+      return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function showRateLimitBanner(notice) {
+      const banner = document.getElementById('rate-limit-banner');
+      if (!banner) return;
+      const modelBadge = document.getElementById('rate-limit-model-badge');
+      const descText = document.getElementById('rate-limit-desc-text');
+      const countdown = document.getElementById('rate-limit-countdown');
+      const headerPill = document.getElementById('header-quota-pill');
+      const headerText = document.getElementById('header-quota-text');
+      const quotaDot = document.getElementById('quota-dot');
+      const statusBar = document.getElementById('stream-status-bar');
+
+      const model = notice.model || 'qwen/qwen3.6-27b';
+      const retryAfter = notice.retry_after || 'a few minutes';
+      const limit = notice.limit || '200,000';
+      const used = notice.used || '200,000';
+
+      if (modelBadge) modelBadge.textContent = model;
+      if (countdown) countdown.textContent = retryAfter;
+      if (descText) {
+        descText.innerHTML = `Daily token quota (<code>${used} / ${limit} TPD</code>) reached on Groq for <code>${model}</code>. Reset in <strong>${retryAfter}</strong>. The system is retrieving and displaying grounded document excerpts directly.`;
+      }
+      banner.style.display = 'flex';
+
+      if (headerPill) {
+        headerPill.className = 'quota-pill limited';
+        if (headerText) headerText.textContent = `Groq Limit (${retryAfter})`;
+        if (quotaDot) quotaDot.className = 'dot rose';
+      }
+
+      if (statusBar) {
+        statusBar.classList.add('rate-limited');
+      }
+      refreshIcons();
+    }
+
+    async function dismissRateLimitBanner() {
+      const banner = document.getElementById('rate-limit-banner');
+      if (banner) banner.style.display = 'none';
+      try {
+        await fetch('/v1/quota/reset', { method: 'POST' });
+        await checkQuotaStatus();
+      } catch (e) {
+        console.warn('Quota reset failed:', e);
+      }
+    }
+
+    async function checkQuotaStatus() {
+      try {
+        const res = await fetch('/v1/quota/status');
+        if (!res.ok) return;
+        const data = await res.json();
+        const groq = data.groq;
+        const headerPill = document.getElementById('header-quota-pill');
+        const headerText = document.getElementById('header-quota-text');
+        const quotaDot = document.getElementById('quota-dot');
+        const banner = document.getElementById('rate-limit-banner');
+
+        if (groq && groq.is_rate_limited) {
+          showRateLimitBanner(groq);
+        } else {
+          if (banner) banner.style.display = 'none';
+          if (headerPill && headerText) {
+            headerPill.className = 'quota-pill normal';
+            headerText.textContent = 'Groq API Active';
+            if (quotaDot) quotaDot.className = 'dot emerald';
+          }
+        }
+      } catch (err) {
+        console.warn('Quota check error:', err);
+      }
+    }
+
+    // Auto-init on page load
+    window.addEventListener('DOMContentLoaded', () => {
+      loadDocuments();
+      refreshIcons();
+      checkQuotaStatus();
+      setInterval(checkQuotaStatus, 30000);
+    });
+  </script>
+</body>
+</html>
