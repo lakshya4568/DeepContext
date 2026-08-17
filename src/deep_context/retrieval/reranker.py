@@ -11,6 +11,7 @@ import numpy as np
 from deep_context.core.config import settings
 from deep_context.core.llm_client import llm_client
 from deep_context.core.logging import logger
+from deep_context.retrieval.quality_gates import protect_consensus
 
 
 STOPWORDS = {
@@ -24,12 +25,34 @@ STOPWORDS = {
     "should", "so", "some", "such", "than", "that", "the", "their", "theirs", "them", "themselves",
     "then", "there", "these", "they", "this", "those", "through", "to", "too", "under", "until",
     "up", "very", "was", "we", "were", "what", "when", "where", "which", "while", "who", "whom",
-    "why", "with", "would", "you", "your", "yours", "yourself", "yourselves"
+    "why", "with", "would", "you", "your", "yours", "yourself", "yourselves",
 }
 
 
+def _blend_with_rrf(candidates: list[dict[str, Any]], raw_scores: list[float]) -> list[tuple[float, dict[str, Any]]]:
+    rrf_scores = [float(c.get("rrf_score", 0.0)) for c in candidates]
+    min_rrf = min(rrf_scores) if rrf_scores else 0.0
+    max_rrf = max(rrf_scores) if rrf_scores else 1.0
+    rrf_range = max_rrf - min_rrf if max_rrf > min_rrf else 1.0
+    min_raw = min(raw_scores) if raw_scores else 0.0
+    max_raw = max(raw_scores) if raw_scores else 1.0
+    raw_range = max_raw - min_raw if max_raw > min_raw else 1.0
+
+    scored: list[tuple[float, dict[str, Any]]] = []
+    for idx, (candidate, raw) in enumerate(zip(candidates, raw_scores)):
+        norm_rrf = (float(candidate.get("rrf_score", 0.0)) - min_rrf) / rrf_range
+        norm_raw = (raw - min_raw) / raw_range
+        consensus_boost = 0.15 if idx < 3 else 0.0
+        blended = 0.60 * norm_rrf + 0.40 * norm_raw + consensus_boost
+        copy = dict(candidate)
+        copy["rerank_score"] = float(blended)
+        scored.append((blended, copy))
+    scored.sort(key=lambda item: item[0], reverse=True)
+    return scored
+
+
 class CrossEncoderReranker:
-    """Scores query-document pairs to produce high-precision top-k candidates using multi-factor heuristics."""
+    """Scores query-document pairs using n-grams, overlap, and blended RRF consensus."""
 
     @classmethod
     async def rerank(
@@ -38,91 +61,41 @@ class CrossEncoderReranker:
         candidates: list[dict[str, Any]],
         top_k: int = 8,
     ) -> list[dict[str, Any]]:
-        """
-        Rerank candidates using multi-factor relevance scoring:
-        1. Exact content phrases & n-gram containment
-        2. Filtered lexical token overlap ratio (ignoring stopwords)
-        3. RRF / first-stage consensus rank
-        4. Density and position preservation
-        """
         if not candidates:
             return []
-
         if len(candidates) <= top_k:
             return candidates
 
-        # Normalize and extract meaningful content words (excluding stopwords)
         clean_query = query.strip().strip('"').strip("'").strip("“").strip("”")
         q_lower = clean_query.lower()
         all_words = [w for w in re.findall(r"\w+", q_lower) if len(w) > 1]
-        content_words = [w for w in all_words if w not in STOPWORDS and len(w) > 2]
-        if not content_words:
-            content_words = all_words
+        content_words = [w for w in all_words if w not in STOPWORDS and len(w) > 2] or all_words
         q_word_set = set(content_words)
-
-        # Build n-grams from meaningful content words
-        n_grams: list[str] = []
-        if len(content_words) >= 2:
-            for i in range(len(content_words) - 1):
-                n_grams.append(f"{content_words[i]} {content_words[i+1]}")
-
-        # Extract RRF scores for min-max normalization
-        rrf_scores = [float(c.get("rrf_score", 0.0)) for c in candidates]
-        min_rrf = min(rrf_scores) if rrf_scores else 0.0
-        max_rrf = max(rrf_scores) if rrf_scores else 1.0
-        rrf_range = max_rrf - min_rrf if max_rrf > min_rrf else 1.0
+        n_grams = [
+            f"{content_words[i]} {content_words[i + 1]}"
+            for i in range(len(content_words) - 1)
+        ] if len(content_words) >= 2 else []
 
         raw_scores: list[float] = []
-        for idx, c in enumerate(candidates):
-            content = c.get("content", "")
-            content_lower = content.lower()
-            content_words_in_doc = set(re.findall(r"\w+", content_lower))
-
-            # 1. Exact phrase / n-gram match bonus (0 to 1)
+        for idx, candidate in enumerate(candidates):
+            content_lower = candidate.get("content", "").lower()
+            content_tokens = set(re.findall(r"\w+", content_lower))
             exact_bonus = 0.0
             if clean_query.lower() in content_lower:
                 exact_bonus = 1.0
             elif n_grams:
-                ngram_hits = sum(1 for ng in n_grams if ng in content_lower)
-                exact_bonus = min(1.0, (ngram_hits / len(n_grams)) * 0.9)
-
-            # 2. Meaningful token overlap ratio (0 to 1)
-            overlap_count = sum(1 for w in q_word_set if w in content_words_in_doc)
-            overlap_ratio = overlap_count / max(1, len(q_word_set))
-
-            # 3. Position decay
+                hits = sum(1 for ng in n_grams if ng in content_lower)
+                exact_bonus = min(1.0, (hits / len(n_grams)) * 0.9)
+            overlap_ratio = sum(1 for w in q_word_set if w in content_tokens) / max(1, len(q_word_set))
             position_score = 1.0 / (1.0 + idx * 0.05)
+            raw_scores.append(0.40 * exact_bonus + 0.40 * overlap_ratio + 0.20 * position_score)
 
-            # Heuristic rerank score
-            heur_score = 0.40 * exact_bonus + 0.40 * overlap_ratio + 0.20 * position_score
-            raw_scores.append(heur_score)
-
-        min_heur = min(raw_scores) if raw_scores else 0.0
-        max_heur = max(raw_scores) if raw_scores else 1.0
-        heur_range = max_heur - min_heur if max_heur > min_heur else 1.0
-
-        scored_candidates: list[tuple[float, dict[str, Any]]] = []
-        for idx, (c, raw_heur) in enumerate(zip(candidates, raw_scores)):
-            rrf_val = float(c.get("rrf_score", 0.0))
-            norm_rrf = (rrf_val - min_rrf) / rrf_range
-            norm_heur = (raw_heur - min_heur) / heur_range
-
-            # Blended consensus: 60% Hybrid RRF rank consensus + 40% Heuristic Reranker
-            # Guaranteed protection: top-3 RRF consensus items receive rank preservation
-            consensus_boost = 0.15 if idx < 3 else 0.0
-            blended_score = 0.60 * norm_rrf + 0.40 * norm_heur + consensus_boost
-
-            c_copy = dict(c)
-            c_copy["rerank_score"] = float(blended_score)
-            scored_candidates.append((blended_score, c_copy))
-
-        # Sort descending by blended relevance
-        scored_candidates.sort(key=lambda x: x[0], reverse=True)
-        return [c for _, c in scored_candidates[:top_k]]
+        scored = _blend_with_rrf(candidates, raw_scores)
+        return [item for _, item in scored[:top_k]]
 
 
 class GeminiSemanticReranker:
-    """Reranker that scores candidates using Gemini embedding cosine similarity combined with phrase signals."""
+    """Reranker that blends retrieval-task embeddings with RRF instead of replacing ranks."""
 
     @classmethod
     async def rerank(
@@ -135,61 +108,36 @@ class GeminiSemanticReranker:
     ) -> list[dict[str, Any]]:
         if not candidates:
             return []
-
         if len(candidates) <= top_k:
             return candidates
 
         model = embedding_model or "gemini-embedding-2"
         dim = embedding_dim or 768
-
         try:
-            # 1. Embed query in symmetric / similarity mode
             q_vec = await llm_client.get_embedding(
-                query, model=model, dim=dim, task_type="sentence similarity", is_query=True
+                query, model=model, dim=dim, task_type="search result", is_query=True
             )
             q_arr = np.array(q_vec, dtype=np.float32)
             q_norm = np.linalg.norm(q_arr)
             if q_norm > 0:
                 q_arr = q_arr / q_norm
 
-            # 2. Embed candidates
-            candidate_texts = [c.get("content", "")[:1000] for c in candidates]
             c_vecs = await llm_client.get_embeddings(
-                candidate_texts, model=model, dim=dim, is_query=False
+                [c.get("content", "")[:1000] for c in candidates],
+                model=model,
+                dim=dim,
+                is_query=False,
             )
-
-            clean_query = query.strip().strip('"').strip("'").strip("“").strip("”").lower()
-            q_words = [w for w in re.findall(r"\w+", clean_query) if len(w) > 1]
-            q_word_set = set(q_words)
-
-            scored_candidates: list[tuple[float, dict[str, Any]]] = []
-
-            for idx, (c, c_vec) in enumerate(zip(candidates, c_vecs)):
+            raw_scores: list[float] = []
+            for candidate, c_vec in zip(candidates, c_vecs):
                 c_arr = np.array(c_vec, dtype=np.float32)
                 c_norm = np.linalg.norm(c_arr)
                 if c_norm > 0:
                     c_arr = c_arr / c_norm
-
-                cos_sim = float(np.dot(q_arr, c_arr))
-
-                # Boost with exact match and overlap
-                content_lower = c.get("content", "").lower()
-                content_words = set(re.findall(r"\w+", content_lower))
-                exact_bonus = 1.0 if clean_query and clean_query in content_lower else 0.0
-                overlap_ratio = sum(1 for w in q_word_set if w in content_words) / max(
-                    1, len(q_word_set)
-                )
-
-                # Weighted hybrid score (70% Gemini semantic similarity + 20% exact match + 10% overlap)
-                final_score = 0.70 * max(0.0, cos_sim) + 0.20 * exact_bonus + 0.10 * overlap_ratio
-
-                c_copy = dict(c)
-                c_copy["rerank_score"] = float(final_score)
-                c_copy["gemini_cos_sim"] = float(cos_sim)
-                scored_candidates.append((final_score, c_copy))
-
-            scored_candidates.sort(key=lambda x: x[0], reverse=True)
-            return [c for _, c in scored_candidates[:top_k]]
+                raw_scores.append(max(0.0, float(np.dot(q_arr, c_arr))))
+                candidate = dict(candidate)
+            scored = _blend_with_rrf(candidates, raw_scores)
+            return [item for _, item in scored[:top_k]]
         except Exception as e:
             logger.warning(
                 "GeminiSemanticReranker failed (%s). Falling back to CrossEncoderReranker.", e
@@ -198,7 +146,7 @@ class GeminiSemanticReranker:
 
 
 class GeminiLLMReranker:
-    """Reranker that uses LLM reasoning to evaluate candidate relevance."""
+    """Reranker that uses LLM reasoning, then blends scores with RRF."""
 
     @classmethod
     async def rerank(
@@ -210,72 +158,51 @@ class GeminiLLMReranker:
     ) -> list[dict[str, Any]]:
         if not candidates:
             return []
-
         if len(candidates) <= top_k:
             return candidates
-
-        # Fast heuristic pass if pool is very large to narrow to top 15
         if len(candidates) > 15:
             candidates = await CrossEncoderReranker.rerank(query, candidates, top_k=15)
 
         llm_target_model = model or (
             "gemini-2.5-flash" if settings.has_gemini_key else settings.llm_model
         )
-
         try:
             snippets_text = "\n\n".join(
                 f"[Chunk {idx}]: {c.get('content', '')[:400]}" for idx, c in enumerate(candidates)
             )
-
             prompt = (
                 f"You are a precision search relevance evaluator.\n"
                 f'Query: "{query}"\n\n'
                 f"Evaluate each chunk's direct relevance to answering the query.\n"
                 f"Candidate Chunks:\n{snippets_text}\n\n"
-                f"Return a JSON array of objects with 'chunk_index' (int) and 'relevance_score' (0.0 to 1.0, where 1.0 is direct answer).\n"
-                f'Example: [{{"chunk_index": 0, "relevance_score": 0.95}}, ...]\n'
+                f"Return a JSON array of objects with 'chunk_index' (int) and 'relevance_score' (0.0 to 1.0).\n"
                 f"Respond ONLY with valid JSON."
             )
-
-            messages = [
-                {
-                    "role": "system",
-                    "content": "You are a ranking assistant. Respond with JSON only.",
-                },
-                {"role": "user", "content": prompt},
-            ]
-
             answer, _ = await llm_client.complete(
-                messages, model=llm_target_model, temperature=0.0, timeout=10.0
+                [
+                    {"role": "system", "content": "You are a ranking assistant. Respond with JSON only."},
+                    {"role": "user", "content": prompt},
+                ],
+                model=llm_target_model,
+                temperature=0.0,
+                timeout=10.0,
             )
-
             clean_json = answer.strip()
             if "```json" in clean_json:
                 clean_json = clean_json.split("```json")[1].split("```")[0].strip()
             elif "```" in clean_json:
                 clean_json = clean_json.split("```")[1].split("```")[0].strip()
-
             scores_data = json.loads(clean_json)
-            score_map: dict[int, float] = {}
-            for item in scores_data:
-                idx = item.get("chunk_index")
-                score = float(item.get("relevance_score", 0.5))
-                if idx is not None and isinstance(idx, int):
-                    score_map[idx] = score
-
-            scored_candidates: list[tuple[float, dict[str, Any]]] = []
-            for idx, c in enumerate(candidates):
-                llm_score = score_map.get(idx, 0.5)
-                c_copy = dict(c)
-                c_copy["rerank_score"] = llm_score
-                scored_candidates.append((llm_score, c_copy))
-
-            scored_candidates.sort(key=lambda x: x[0], reverse=True)
-            return [c for _, c in scored_candidates[:top_k]]
+            score_map = {
+                int(item.get("chunk_index")): float(item.get("relevance_score", 0.5))
+                for item in scores_data
+                if isinstance(item.get("chunk_index"), int)
+            }
+            raw_scores = [score_map.get(idx, 0.5) for idx in range(len(candidates))]
+            scored = _blend_with_rrf(candidates, raw_scores)
+            return [item for _, item in scored[:top_k]]
         except Exception as e:
-            logger.warning(
-                "GeminiLLMReranker failed (%s). Falling back to CrossEncoderReranker.", e
-            )
+            logger.warning("GeminiLLMReranker failed (%s). Falling back to CrossEncoderReranker.", e)
             return await CrossEncoderReranker.rerank(query, candidates, top_k=top_k)
 
 
@@ -295,11 +222,10 @@ class Reranker:
         active_strategy = (
             (strategy or settings.reranker_strategy or "cross_encoder").lower().replace("-", "_")
         )
-
         if active_strategy in ("none", "bypass", "rrf", "hybrid", "disabled"):
-            return candidates[:top_k]
+            ranked = candidates[:top_k]
         elif active_strategy in ("gemini", "gemini_semantic", "gemini_embeddings"):
-            return await GeminiSemanticReranker.rerank(
+            ranked = await GeminiSemanticReranker.rerank(
                 query=query,
                 candidates=candidates,
                 top_k=top_k,
@@ -307,14 +233,15 @@ class Reranker:
                 embedding_dim=embedding_dim,
             )
         elif active_strategy in ("gemini_llm", "llm_reranker", "llm"):
-            return await GeminiLLMReranker.rerank(
+            ranked = await GeminiLLMReranker.rerank(
                 query=query,
                 candidates=candidates,
                 top_k=top_k,
             )
         else:
-            return await CrossEncoderReranker.rerank(
+            ranked = await CrossEncoderReranker.rerank(
                 query=query,
                 candidates=candidates,
                 top_k=top_k,
             )
+        return protect_consensus(candidates, ranked, top_k=top_k)

@@ -29,7 +29,6 @@ class EvidenceVerifier:
             return SupportCheckResult(passed=False, failure_reasons=["Empty draft answer."])
 
         if not evidence:
-            # Check if answer honestly admits lack of evidence
             if any(
                 w in draft_answer.lower()
                 for w in (
@@ -46,7 +45,6 @@ class EvidenceVerifier:
                 failure_reasons=["No retrieved evidence provided to support factual claims."],
             )
 
-        # 1. Split into discrete claims
         claims_text = [
             s.strip()
             for s in re.split(r"(?<=[.?!])\s+", draft_answer)
@@ -69,7 +67,6 @@ class EvidenceVerifier:
                 + "; ".join(c.text[:80] for c in unsupported[:2])
             )
 
-        # 2. Aggregation coverage check
         coverage_ratio = None
         if is_aggregation and total_candidate_count and total_candidate_count > 0:
             covered_evidence = len({c.evidence_id for c in claims if c.evidence_id})
@@ -103,7 +100,6 @@ class EvidenceVerifier:
     def _link_claim_to_evidence(cls, claim_text: str, evidence: list[dict[str, Any]]) -> Claim:
         claim_lower = claim_text.lower()
 
-        # Check for explicit inference markers
         if any(
             marker in claim_lower
             for marker in (
@@ -117,7 +113,6 @@ class EvidenceVerifier:
         ):
             return Claim(text=claim_text, support=ClaimSupport.INFERENCE)
 
-        # Check for computational markers
         if any(
             marker in claim_lower
             for marker in ("calculated", "sum is", "total of", "computed", "count is")
@@ -128,12 +123,11 @@ class EvidenceVerifier:
         if not words:
             return Claim(text=claim_text, support=ClaimSupport.UNSUPPORTED)
 
-        # Check overlap against each evidence passage
         for item in evidence:
             content = item.get("content", "").lower()
             overlap_count = sum(1 for w in words if w in content)
             overlap_ratio = overlap_count / len(words)
-            if overlap_ratio >= 0.35 or overlap_count >= 4:
+            if overlap_ratio >= 0.50 or overlap_count >= 4:
                 return Claim(
                     text=claim_text,
                     support=ClaimSupport.RETRIEVED,
