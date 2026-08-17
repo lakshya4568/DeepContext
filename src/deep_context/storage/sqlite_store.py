@@ -616,6 +616,8 @@ class SQLiteStore(StorageInterface):
 
                 emb = json.loads(r["embedding"])
                 c_vec = np.array(emb, dtype=np.float32)
+                if len(c_vec) != len(q_vec):
+                    continue
                 c_norm = np.linalg.norm(c_vec)
                 if c_norm == 0:
                     continue

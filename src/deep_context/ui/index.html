@@ -929,18 +929,19 @@
         <div>
           <div class="brand-title">
             Deep Context Studio
-            <span class="version-tag">Groq Qwen 3.6 + NV-EmbedQA</span>
+            <span class="version-tag">Gemini 2 + Groq Qwen + Multi-Reranker</span>
           </div>
         </div>
       </div>
       
       <div class="system-status">
-        <div id="header-quota-pill" class="quota-pill normal" title="Groq daily quota status">
+        <div id="header-quota-pill" class="quota-pill normal" title="Model provider status">
           <span class="dot emerald" id="quota-dot"></span>
-          <span id="header-quota-text">Groq API Active</span>
+          <span id="header-quota-text">LLM Client Active</span>
         </div>
-        <div class="pill-tag"><span class="dot emerald"></span> PostgreSQL + pgvector (HNSW)</div>
-        <div class="pill-tag"><span class="dot emerald"></span> NV-EmbedQA (1024-dim)</div>
+        <div class="pill-tag"><span class="dot emerald"></span> PostgreSQL / SQLite</div>
+        <div class="pill-tag" id="header-emb-pill"><span class="dot emerald"></span> <span id="header-emb-badge">gemini-embedding-2 (768d)</span></div>
+        <div class="pill-tag" id="header-reranker-pill"><span class="dot emerald"></span> <span id="header-reranker-badge">Cross-Encoder</span></div>
         <div class="pill-tag"><span class="dot blue"></span> <span id="doc-counter">0</span> Ingested Docs</div>
       </div>
     </div>
@@ -983,11 +984,11 @@
         <div class="rate-limit-icon"><i data-lucide="alert-triangle" style="width: 20px; height: 20px;"></i></div>
         <div class="rate-limit-content">
           <div class="rate-limit-title">
-            <span>Groq API Rate Limit Reached (429)</span>
+            <span>API Rate Limit Reached (429)</span>
             <span id="rate-limit-model-badge" class="version-tag" style="background: rgba(239, 68, 68, 0.15); color: #991b1b;">qwen/qwen3.6-27b</span>
           </div>
           <div class="rate-limit-desc" id="rate-limit-desc-text">
-            Daily token quota (200,000 TPD) reached. Reset in <strong id="rate-limit-countdown">--</strong>. The system is retrieving and displaying grounded document excerpts directly.
+            Token quota reached. Reset in <strong id="rate-limit-countdown">--</strong>. The system is retrieving and displaying grounded document excerpts directly.
           </div>
         </div>
         <button class="rate-limit-close" onclick="dismissRateLimitBanner()" title="Dismiss">✕</button>
@@ -1002,7 +1003,7 @@
               <div class="card-icon-wrap dark"><i data-lucide="help-circle" style="width: 18px; height: 18px;"></i></div>
               <div>
                 <div class="card-title">Ask & Ground Question</div>
-                <div class="card-subtitle">Intelligent multi-stage RAG with verification gate</div>
+                <div class="card-subtitle">Intelligent multi-stage RAG with Gemini embeddings & verification gate</div>
               </div>
             </div>
           </div>
@@ -1019,17 +1020,18 @@
             </div>
           </div>
 
-          <div class="grid-2" style="margin-bottom: 18px;">
+          <!-- Model & Routing Selectors -->
+          <div class="grid-2" style="margin-bottom: 14px;">
             <div>
               <label><i data-lucide="cpu" style="width: 13px; height: 13px;"></i> Reasoning Model</label>
               <select id="query-model-select">
                 <option value="qwen/qwen3.6-27b" selected>Qwen 3.6 27B (Groq Fast Reasoning)</option>
-                <option value="meta/llama-3.1-8b-instruct">Llama 3.1 8B Instruct (NVIDIA NIM Ultra-Fast)</option>
+                <option value="gemini-2.5-flash">Gemini 2.5 Flash (Google GenAI Ultra-Fast)</option>
+                <option value="gemini-2.5-pro">Gemini 2.5 Pro (Google GenAI Reasoning)</option>
+                <option value="meta/llama-3.1-8b-instruct">Llama 3.1 8B Instruct (NVIDIA NIM)</option>
                 <option value="meta/llama-3.3-70b-instruct">Llama 3.3 70B Instruct (NVIDIA NIM)</option>
                 <option value="llama-3.3-70b-versatile">Llama 3.3 70B Versatile (Groq)</option>
                 <option value="llama-3.1-8b-instant">Llama 3.1 8B Instant (Groq High Speed)</option>
-                <option value="openai/gpt-oss-120b">GPT-OSS 120B (Groq Ultra)</option>
-                <option value="openai/gpt-oss-20b">GPT-OSS 20B (Groq Sub-Second)</option>
                 <option value="z-ai/glm-5.2">GLM-5.2 (NVIDIA NIM Reasoning)</option>
               </select>
             </div>
@@ -1044,10 +1046,46 @@
             </div>
           </div>
 
+          <!-- Embeddings & Reranker Selectors -->
+          <div class="grid-3" style="display: grid; grid-template-columns: 1.2fr 1fr 1.2fr; gap: 12px; margin-bottom: 14px;">
+            <div>
+              <label><i data-lucide="layers" style="width: 13px; height: 13px;"></i> Embedding Model</label>
+              <select id="query-embedding-select" onchange="onEmbeddingModelChange()">
+                <option value="gemini-embedding-2" selected>Gemini Embedding 2 (MRL)</option>
+                <option value="gemini-embedding-001">Gemini Embedding 001</option>
+                <option value="nvidia/nv-embedqa-e5-v5">NVIDIA E5-v5 (1024d)</option>
+                <option value="baai/bge-m3">BAAI BGE-M3 (1024d)</option>
+              </select>
+            </div>
+            <div>
+              <label><i data-lucide="maximize-2" style="width: 13px; height: 13px;"></i> Dimensions</label>
+              <select id="query-dim-select">
+                <option value="768" selected>768d (MRL 75% save)</option>
+                <option value="1536">1536d (High Fid)</option>
+                <option value="3072">3072d (Full MRL)</option>
+                <option value="1024">1024d (NIM)</option>
+              </select>
+            </div>
+            <div>
+              <label><i data-lucide="arrow-up-down" style="width: 13px; height: 13px;"></i> Reranker</label>
+              <select id="query-reranker-select">
+                <option value="cross_encoder" selected>Cross-Encoder (Exact+Overlap)</option>
+                <option value="gemini_semantic">Gemini Semantic (Embeddings)</option>
+                <option value="gemini_llm">Gemini LLM (Reasoning)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- User Scope & Save Preferences -->
           <div class="grid-2" style="margin-bottom: 18px;">
             <div>
-              <label><i data-lucide="user" style="width: 13px; height: 13px;"></i> User Scope</label>
-              <input type="text" id="user-id-input" value="test_user" />
+              <label><i data-lucide="user" style="width: 13px; height: 13px;"></i> User Scope & Preferences</label>
+              <div style="display: flex; gap: 8px;">
+                <input type="text" id="user-id-input" value="default_user" style="flex: 1;" onchange="loadUserPreferences()" />
+                <button type="button" class="btn btn-secondary" style="padding: 0 12px; font-size: 12px; white-space: nowrap;" onclick="saveUserPreferences()" title="Save current embedding and reranker preferences to durable memory">
+                  <i data-lucide="save" style="width: 13px; height: 13px;"></i> Save Prefs
+                </button>
+              </div>
             </div>
             <div>
               <label><i data-lucide="filter" style="width: 13px; height: 13px;"></i> Filter by Document</label>
@@ -1155,12 +1193,23 @@
 
           <div id="file-queue-box" class="file-queue"></div>
 
-          <div class="form-group" style="margin-top: 18px;">
-            <label><i data-lucide="settings" style="width: 13px; height: 13px;"></i> Retrieval Strategy</label>
-            <select id="upload-mode-select">
-              <option value="hybrid">Hybrid RAG (pgvector Dense Cosine + BM25 Full-Text)</option>
-              <option value="vectorless">Vectorless PageIndex (Hierarchical Table of Contents)</option>
-            </select>
+          <div class="grid-2" style="margin-top: 16px; margin-bottom: 8px;">
+            <div>
+              <label><i data-lucide="settings" style="width: 13px; height: 13px;"></i> Retrieval Strategy</label>
+              <select id="upload-mode-select">
+                <option value="hybrid">Hybrid RAG (Dense Vector + BM25 Full-Text)</option>
+                <option value="vectorless">Vectorless PageIndex (Hierarchical Tree)</option>
+              </select>
+            </div>
+            <div>
+              <label><i data-lucide="layers" style="width: 13px; height: 13px;"></i> Ingest Embedding Model</label>
+              <select id="upload-embedding-select">
+                <option value="gemini-embedding-2" selected>Gemini Embedding 2 (768d MRL)</option>
+                <option value="gemini-embedding-001">Gemini Embedding 001</option>
+                <option value="nvidia/nv-embedqa-e5-v5">NVIDIA NV-EmbedQA E5-v5 (1024d)</option>
+                <option value="baai/bge-m3">NVIDIA BGE-M3 (1024d)</option>
+              </select>
+            </div>
           </div>
 
           <div style="display: flex; gap: 10px; margin-top: 10px;">
@@ -1457,6 +1506,86 @@
       document.getElementById('thinking-drawer').classList.remove('is-streaming');
     }
 
+    function onEmbeddingModelChange() {
+      const model = document.getElementById('query-embedding-select')?.value || '';
+      const dimSelect = document.getElementById('query-dim-select');
+      if (!dimSelect) return;
+      if (model.includes('gemini')) {
+        dimSelect.value = '768';
+      } else {
+        dimSelect.value = '1024';
+      }
+      const badge = document.getElementById('header-emb-badge');
+      if (badge) badge.textContent = `${model} (${dimSelect.value}d)`;
+    }
+
+    async function loadUserPreferences() {
+      const uid = document.getElementById('user-id-input')?.value || 'default_user';
+      try {
+        const res = await fetch(`/v1/preferences?user_id=${encodeURIComponent(uid)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.embedding_model) {
+            const embSel = document.getElementById('query-embedding-select');
+            if (embSel) embSel.value = data.embedding_model;
+            const upEmbSel = document.getElementById('upload-embedding-select');
+            if (upEmbSel) upEmbSel.value = data.embedding_model;
+            const badge = document.getElementById('header-emb-badge');
+            if (badge) badge.textContent = `${data.embedding_model} (${data.embedding_dim || 768}d)`;
+          }
+          if (data.embedding_dim) {
+            const dimSel = document.getElementById('query-dim-select');
+            if (dimSel) dimSel.value = String(data.embedding_dim);
+          }
+          if (data.reranker) {
+            const rerankSel = document.getElementById('query-reranker-select');
+            if (rerankSel) rerankSel.value = data.reranker;
+            const badge = document.getElementById('header-reranker-badge');
+            if (badge) badge.textContent = data.reranker.replace('_', ' ');
+          }
+          if (data.llm_model) {
+            const modelSel = document.getElementById('query-model-select');
+            if (modelSel && [...modelSel.options].some(o => o.value === data.llm_model)) {
+              modelSel.value = data.llm_model;
+            }
+          }
+        }
+      } catch (e) {
+        console.debug('No user preferences loaded:', e);
+      }
+    }
+
+    async function saveUserPreferences() {
+      const uid = document.getElementById('user-id-input')?.value || 'default_user';
+      const embModel = document.getElementById('query-embedding-select')?.value;
+      const embDim = parseInt(document.getElementById('query-dim-select')?.value, 10);
+      const reranker = document.getElementById('query-reranker-select')?.value;
+      const llmModel = document.getElementById('query-model-select')?.value;
+
+      try {
+        const res = await fetch('/v1/preferences', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: uid,
+            embedding_model: embModel,
+            embedding_dim: embDim,
+            reranker: reranker,
+            llm_model: llmModel
+          })
+        });
+        if (res.ok) {
+          const badge = document.getElementById('header-emb-badge');
+          if (badge) badge.textContent = `${embModel} (${embDim}d)`;
+          const rBadge = document.getElementById('header-reranker-badge');
+          if (rBadge) rBadge.textContent = reranker.replace('_', ' ');
+          alert(`Preferences saved successfully for '${uid}' in durable typed memory!`);
+        }
+      } catch (e) {
+        alert('Failed to save preferences: ' + e);
+      }
+    }
+
     async function runQuery() {
       const q = document.getElementById('query-input').value.trim();
       if (!q) return;
@@ -1468,6 +1597,9 @@
       const uid = document.getElementById('user-id-input').value;
       const docId = document.getElementById('query-doc-select').value;
       const selectedModel = document.getElementById('query-model-select').value;
+      const embModel = document.getElementById('query-embedding-select')?.value;
+      const embDim = parseInt(document.getElementById('query-dim-select')?.value, 10);
+      const reranker = document.getElementById('query-reranker-select')?.value;
 
       btn.disabled = true;
       stopBtn.style.display = 'inline-flex';
@@ -1492,7 +1624,7 @@
 
       statusBar.style.display = 'flex';
       statusBar.className = 'stream-status-bar';
-      statusText.innerHTML = '🔍 Classifying query and routing execution path...';
+      statusText.innerHTML = `🔍 Running retrieval with ${embModel || 'Gemini'} and ${reranker || 'Cross-Encoder'}...`;
 
       thinkDrawer.style.display = 'none';
       thinkDrawer.classList.remove('is-streaming');
@@ -1516,10 +1648,13 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             query: q,
-            user_id: uid || 'test_user',
+            user_id: uid || 'default_user',
             force_path: mode || null,
             document_ids: docId ? [docId] : null,
-            model: selectedModel || null
+            model: selectedModel || null,
+            embedding_model: embModel || null,
+            embedding_dim: embDim || null,
+            reranker: reranker || null
           }),
           signal: queryAbortController.signal
         });
@@ -1603,7 +1738,6 @@
                 const totalSec = ((event.latency_ms || 0) / 1000).toFixed(2);
                 statusText.innerHTML = `✓ <strong>Synthesis Complete</strong> &nbsp;|&nbsp; ${totalSec}s &nbsp;|&nbsp; Grounded & Verified`;
 
-                // If content was empty because reasoning model drafted answer inside thinking block
                 if (!rawContent.trim() && rawReasoning.trim()) {
                   let extracted = rawReasoning.trim();
                   if (extracted.includes('**Draft Response')) {
@@ -1699,6 +1833,8 @@
       const btn = document.getElementById('upload-action-btn');
       const spinner = document.getElementById('upload-action-spinner');
       const mode = document.getElementById('upload-mode-select').value;
+      const embModel = document.getElementById('upload-embedding-select')?.value || 'gemini-embedding-2';
+      const embDim = embModel.includes('gemini') ? 768 : 1024;
 
       btn.disabled = true;
       spinner.classList.remove('hidden');
@@ -1706,6 +1842,8 @@
       const formData = new FormData();
       selectedBatchFiles.forEach(f => formData.append('files', f));
       formData.append('vectorless', mode === 'vectorless' ? 'true' : 'false');
+      formData.append('embedding_model', embModel);
+      formData.append('embedding_dim', String(embDim));
 
       try {
         const res = await fetch('/v1/upload-batch', {
@@ -1713,7 +1851,7 @@
           body: formData
         });
         const data = await res.json();
-        alert(`Successfully ingested ${data.length} document(s) into PostgreSQL with pgvector embeddings!`);
+        alert(`Successfully ingested ${data.length} document(s) using ${embModel} (${embDim}d)!`);
         selectedBatchFiles = [];
         document.getElementById('file-queue-box').innerHTML = '';
         document.getElementById('drop-zone-text').textContent = 'Click or Drag & Drop Documents';
@@ -1727,14 +1865,20 @@
     }
 
     async function syncDocumentsFolder() {
+      const embModel = document.getElementById('upload-embedding-select')?.value || 'gemini-embedding-2';
+      const embDim = embModel.includes('gemini') ? 768 : 1024;
       try {
         const res = await fetch('/v1/sync-folder', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ folder_path: 'documents' })
+          body: JSON.stringify({
+            folder_path: 'documents',
+            embedding_model: embModel,
+            embedding_dim: embDim
+          })
         });
         const data = await res.json();
-        alert(`Synced ${data.length} document(s) from './documents/' folder!`);
+        alert(`Synced ${data.length} document(s) from './documents/' folder using ${embModel}!`);
         loadDocuments();
       } catch (e) {
         alert('Sync error: ' + e.message);
@@ -2100,6 +2244,7 @@
     // Auto-init on page load
     window.addEventListener('DOMContentLoaded', () => {
       loadDocuments();
+      loadUserPreferences();
       refreshIcons();
       checkQuotaStatus();
       setInterval(checkQuotaStatus, 30000);

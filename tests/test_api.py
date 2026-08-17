@@ -7,6 +7,21 @@ from deep_context.api.app import app
 
 
 @pytest.mark.asyncio
+async def test_ui_index_served() -> None:
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        response = await ac.get("/")
+        assert response.status_code == 200
+        html = response.text
+        assert "Deep Context Studio" in html
+        assert "query-embedding-select" in html
+        assert "query-dim-select" in html
+        assert "query-reranker-select" in html
+        assert "gemini-embedding-2" in html
+        assert "Save Prefs" in html
+
+
+@pytest.mark.asyncio
 async def test_health_endpoint() -> None:
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:

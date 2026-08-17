@@ -282,6 +282,8 @@ class IngestRequest(BaseModel):
     permission_scope: list[str] = Field(default_factory=lambda: ["default"])
     retrieval_mode: RetrievalMode = RetrievalMode.HYBRID
     metadata: dict[str, Any] = Field(default_factory=dict)
+    embedding_model: str | None = None
+    embedding_dim: int | None = None
 
 
 class IngestResponse(BaseModel):
@@ -291,14 +293,20 @@ class IngestResponse(BaseModel):
     child_chunks_count: int
     retrieval_mode: RetrievalMode
     tree_nodes_count: int = 0
+    embedding_model: str | None = None
+    embedding_dim: int | None = None
 
 
 class RetrieveRequest(BaseModel):
     query: str
     tenant_id: str = "default"
+    user_id: str | None = None
     permission_scope: list[str] = Field(default_factory=lambda: ["default"])
     document_ids: list[str] | None = None
     top_k: int = 8
+    embedding_model: str | None = None
+    embedding_dim: int | None = None
+    reranker: str | None = None
 
 
 class RetrieveResponse(BaseModel):
@@ -308,6 +316,8 @@ class RetrieveResponse(BaseModel):
     query_shape: QueryShape
     retry_count: int
     insufficiency_reason: str | None = None
+    embedding_model: str | None = None
+    reranker: str | None = None
 
 
 class QueryRequest(BaseModel):
@@ -318,7 +328,27 @@ class QueryRequest(BaseModel):
     document_ids: list[str] | None = None
     force_path: RoutingPath | None = None
     model: str | None = None
+    embedding_model: str | None = None
+    embedding_dim: int | None = None
+    reranker: str | None = None
     stream: bool = False
+
+
+class UserPreferenceRequest(BaseModel):
+    user_id: str = "default"
+    embedding_model: str | None = None
+    embedding_dim: int | None = None
+    reranker: str | None = None
+    llm_model: str | None = None
+
+
+class UserPreferenceResponse(BaseModel):
+    user_id: str
+    embedding_model: str
+    embedding_dim: int
+    reranker: str
+    llm_model: str
+    preferences: dict[str, Any] = Field(default_factory=dict)
 
 
 class QueryResponse(BaseModel):

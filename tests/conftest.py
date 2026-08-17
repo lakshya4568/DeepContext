@@ -21,6 +21,8 @@ def mock_live_llm_client(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(llm_client, "_has_live_client", lambda: False)
     monkeypatch.setattr(llm_client, "_client", None)
     monkeypatch.setattr(llm_client, "_groq_client", None)
+    monkeypatch.setattr(llm_client, "_gemini_client", None)
+    monkeypatch.setattr(llm_client, "_refresh_gemini_client", lambda: None)
 
 
 @pytest.fixture(autouse=True)

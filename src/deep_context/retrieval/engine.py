@@ -16,7 +16,7 @@ from deep_context.core.types import (
 )
 from deep_context.retrieval.classifier import QueryClassifier
 from deep_context.retrieval.hybrid import HybridRetriever
-from deep_context.retrieval.reranker import CrossEncoderReranker
+from deep_context.retrieval.reranker import Reranker
 from deep_context.retrieval.rewriter import QueryRewriter
 from deep_context.retrieval.tree_navigator import TreeNavigator
 from deep_context.storage import get_storage
@@ -35,22 +35,60 @@ class RetrievalEngine:
         *,
         filters: RetrievalFilters | None = None,
         top_k: int | None = None,
+        embedding_model: str | None = None,
+        embedding_dim: int | None = None,
+        reranker: str | None = None,
+        user_id: str | None = None,
     ) -> RetrievalResult:
         """
         Executes the full retrieval pipeline:
-        1. Classify query shape
-        2. Rewrite / decompose into sub-queries
-        3. Parallel BM25 + Vector recall (or tree navigation if vectorless)
-        4. Reciprocal Rank Fusion & deduplication
-        5. Cross-encoder reranking
-        6. Child -> Parent chunk resolution
-        7. Evidence sufficiency check (max 1 retry)
+        1. Resolve active embedding model and reranker from user preferences or arguments
+        2. Classify query shape
+        3. Rewrite / decompose into sub-queries
+        4. Parallel BM25 + Vector recall (or tree navigation if vectorless)
+        5. Reciprocal Rank Fusion & deduplication
+        6. Multi-strategy reranking (Cross-Encoder / Gemini Semantic / Gemini LLM)
+        7. Child -> Parent chunk resolution
+        8. Evidence sufficiency check (max 1 retry)
         """
         t0 = time.time()
         storage = await get_storage()
         filters = filters or RetrievalFilters()
         target_top_k = top_k or settings.default_top_k
         max_retries = settings.max_retrieval_retries
+
+        # Resolve user preferences if user_id is provided
+        active_emb_model = embedding_model
+        active_emb_dim = embedding_dim
+        active_reranker = reranker
+
+        if user_id:
+            try:
+                emb_pref = await storage.get_preference(user_id, "embedding_model")
+                if emb_pref and not active_emb_model:
+                    val = emb_pref.get("preference_value")
+                    if isinstance(val, dict):
+                        active_emb_model = val.get("model")
+                        if not active_emb_dim:
+                            active_emb_dim = val.get("dim")
+                    elif isinstance(val, str):
+                        active_emb_model = val
+
+                rerank_pref = await storage.get_preference(user_id, "reranker")
+                if rerank_pref and not active_reranker:
+                    val_r = rerank_pref.get("preference_value")
+                    if isinstance(val_r, dict):
+                        active_reranker = val_r.get("strategy")
+                    elif isinstance(val_r, str):
+                        active_reranker = val_r
+            except Exception as e:
+                logger.debug("Failed to load user preferences for %s: %s", user_id, e)
+
+        active_emb_model = active_emb_model or settings.embedding_model
+        active_emb_dim = active_emb_dim or (
+            768 if "gemini" in active_emb_model.lower() else settings.embedding_dim
+        )
+        active_reranker = active_reranker or settings.reranker_strategy
 
         shape = await self.classifier.classify(query)
         current_query = query
@@ -95,13 +133,18 @@ class RetrievalEngine:
                     sub_queries=sub_queries,
                     filters=filters,
                     limit=settings.first_stage_limit,
+                    embedding_model=active_emb_model,
+                    embedding_dim=active_emb_dim,
                 )
 
-            # Rerank candidates
-            reranked_children = await CrossEncoderReranker.rerank(
+            # Multi-strategy Reranker (Cross-Encoder / Gemini Semantic / Gemini LLM)
+            reranked_children = await Reranker.rerank(
                 query=current_query,
                 candidates=candidates,
                 top_k=target_top_k,
+                strategy=active_reranker,
+                embedding_model=active_emb_model,
+                embedding_dim=active_emb_dim,
             )
 
             # Resolve Child -> Parent chunks (FR2)

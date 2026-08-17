@@ -1,0 +1,467 @@
+[
+  {
+    "id": "q01_fact",
+    "category": "direct_factual",
+    "question": "What is the name of Ned Stark's ancestral greatsword, what is it made of, and how old is it?",
+    "ground_truth": "The ancestral greatsword of House Stark is named Ice. It is forged of dark Valyrian steel with spells and hammers, and is four hundred years old.",
+    "expected_facts": [
+      "The sword is called Ice",
+      "Made of Valyrian steel",
+      "Four hundred years old"
+    ],
+    "expected_pages": [17, 27],
+    "is_unanswerable": false
+  },
+  {
+    "id": "q02_fact",
+    "category": "direct_factual",
+    "question": "Who gave Daenerys Targaryen the three dragon eggs as a wedding gift, and what colors were they?",
+    "ground_truth": "Magister Illyrio Mopatis gave Daenerys the three dragon eggs from the Shadow Lands beyond Asshai as a bride gift. One was deep green with bronze flecks, another pale cream streaked with gold, and the third black with scarlet ripples and swirls.",
+    "expected_facts": [
+      "Given by Magister Illyrio Mopatis",
+      "Deep green with bronze flecks",
+      "Pale cream with gold",
+      "Black with scarlet swirls / ripples"
+    ],
+    "expected_pages": [101],
+    "is_unanswerable": false
+  },
+  {
+    "id": "q03_fact",
+    "category": "direct_factual",
+    "question": "What were Jon Arryn's dying words according to Grand Maester Pycelle?",
+    "ground_truth": "Jon Arryn's final words before he died were 'The seed is strong.'",
+    "expected_facts": [
+      "The seed is strong"
+    ],
+    "expected_pages": [236, 346, 446],
+    "is_unanswerable": false
+  },
+  {
+    "id": "q04_fact",
+    "category": "direct_factual",
+    "question": "What sword did Jon Snow give to Arya before leaving for the Wall, and what was his first lesson to her?",
+    "ground_truth": "Jon gave Arya a slender castle-forged blade crafted by Mikken, which Arya named Needle. His first lesson was 'Stick them with the pointy end.'",
+    "expected_facts": [
+      "Named Needle",
+      "Crafted by Mikken",
+      "Stick them with the pointy end"
+    ],
+    "expected_pages": [94, 95],
+    "is_unanswerable": false
+  },
+  {
+    "id": "q05_fact",
+    "category": "direct_factual",
+    "question": "How did Khal Drogo execute Viserys Targaryen in Vaes Dothrak without shedding blood?",
+    "ground_truth": "Khal Drogo melted down the pure gold medallions from his belt in an iron cooking pot and poured the molten gold over Viserys's head, giving him a golden crown without shedding a drop of blood in the sacred city.",
+    "expected_facts": [
+      "Melted golden medallions from his belt in an iron pot",
+      "Poured molten gold over Viserys's head",
+      "No blood was shed in the sacred city"
+    ],
+    "expected_pages": [458],
+    "is_unanswerable": false
+  },
+  {
+    "id": "q06_fact",
+    "category": "direct_factual",
+    "question": "What sword did Lord Commander Mormont give to Jon Snow, and what change was made to its pommel?",
+    "ground_truth": "Lord Commander Jeor Mormont gave Jon his ancestral Valyrian steel bastard sword named Longclaw. The original worn silver bear's head pommel was replaced with a carved pale stone pommel in the likeness of a white wolf with garnet eyes.",
+    "expected_facts": [
+      "Sword is Longclaw, ancestral Valyrian steel of House Mormont",
+      "Original bear pommel replaced with a white wolf with garnet eyes"
+    ],
+    "expected_pages": [595, 596],
+    "is_unanswerable": false
+  },
+  {
+    "id": "q07_fact",
+    "category": "direct_factual",
+    "question": "What is the true identity of Maester Aemon at Castle Black?",
+    "ground_truth": "Maester Aemon is Aemon Targaryen, son of King Maekar I and brother to King Aegon V (Aegon the Unlikely).",
+    "expected_facts": [
+      "Aemon Targaryen",
+      "Son of King Maekar I",
+      "Brother to Aegon V"
+    ],
+    "expected_pages": [604],
+    "is_unanswerable": false
+  },
+  {
+    "id": "q08_fact",
+    "category": "direct_factual",
+    "question": "Who was the first knight dismissed from the Kingsguard in recorded history, and who replaced him as Lord Commander?",
+    "ground_truth": "Ser Barristan Selmy was dismissed from the Kingsguard by King Joffrey and Queen Cersei. Ser Jaime Lannister was appointed to replace him as Lord Commander, and Sandor Clegane (the Hound) took his open seat.",
+    "expected_facts": [
+      "Ser Barristan Selmy was dismissed",
+      "Jaime Lannister named Lord Commander",
+      "Sandor Clegane took the vacant White Sword seat"
+    ],
+    "expected_pages": [565, 566, 567, 568],
+    "is_unanswerable": false
+  },
+  {
+    "id": "q09_multihop",
+    "category": "multi_hop",
+    "question": "Why did Catelyn Stark seize Tyrion Lannister at the Crossroads Inn, and what specific claim made by Littlefinger motivated her accusation?",
+    "ground_truth": "Catelyn seized Tyrion because an assassin had attempted to murder her comatose son Bran with a Valyrian steel dagger. In King's Landing, Littlefinger falsely claimed that he had owned the dagger and lost it in a tourney wager to Tyrion Lannister when Loras Tyrell unhorsed Jaime.",
+    "expected_facts": [
+      "Assassin tried to kill Bran with a Valyrian steel dagger",
+      "Littlefinger claimed he lost the dagger to Tyrion in a tourney bet",
+      "Catelyn believed Tyrion sent the assassin"
+    ],
+    "expected_pages": [130, 165, 166, 271, 301, 306],
+    "is_unanswerable": false
+  },
+  {
+    "id": "q10_multihop",
+    "category": "multi_hop",
+    "question": "How did Tyrion win his freedom at the Eyrie, who championed him, and what happened during the trial by combat?",
+    "ground_truth": "Tyrion demanded a trial by combat in the High Hall of the Arryns. The sellsword Bronn volunteered to champion him against Lysa's champion, Ser Vardis Egen. Bronn wore light armor and made the heavily armored knight tire himself out, eventually wounding Ser Vardis, toppling the statue of the weeping woman onto him, and stabbing him through the weak spot under his arm.",
+    "expected_facts": [
+      "Tyrion demanded trial by combat",
+      "Bronn fought as Tyrion's champion against Ser Vardis Egen",
+      "Bronn used agility and speed against heavy armor",
+      "Bronn toppled Alyssa's statue and killed Ser Vardis"
+    ],
+    "expected_pages": [386, 387, 401, 402, 403, 404, 405, 406],
+    "is_unanswerable": false
+  },
+  {
+    "id": "q11_multihop",
+    "category": "multi_hop",
+    "question": "What led Ned Stark to realize that Joffrey, Myrcella, and Tommen were not Robert Baratheon's biological children?",
+    "ground_truth": "Ned studied Grand Maester Malleon's genealogy book recording Baratheon and Lannister lineages, noting that Baratheon black hair always dominated. After meeting Robert's dark-haired bastards (Gendry and Barra) and hearing Sansa state that Joffrey is nothing like the drunken king but a golden lion, Ned realized that Robert fathered none of Cersei's blonde children and all three were Jaime's.",
+    "expected_facts": [
+      "Reading Grand Maester Malleon's lineage book",
+      "Examining Robert's black-haired bastards (Gendry, Barra)",
+      "Sansa remarked Joffrey was not like Robert",
+      "Realization that the seed is strong and Cersei's children were fathered by Jaime"
+    ],
+    "expected_pages": [237, 256, 262, 349, 439, 446],
+    "is_unanswerable": false
+  },
+  {
+    "id": "q12_multihop",
+    "category": "multi_hop",
+    "question": "What agreements did Catelyn Stark negotiate with Lord Walder Frey in order for Robb's army to cross the Green Fork at the Twins?",
+    "ground_truth": "In exchange for crossing the bridge and receiving 4,000 Frey levies, Catelyn agreed that Robb would take two Frey grandsons as wards to Winterfell, accept Olyvar Frey as his personal squire, marry Arya to Lord Walder's son Elmar when of age, and Robb would wed a Frey daughter of his choice after the war.",
+    "expected_facts": [
+      "Take two Frey grandsons as wards to Winterfell",
+      "Olyvar Frey becomes Robb's squire",
+      "Arya to marry Elmar Frey",
+      "Robb to marry a Frey daughter"
+    ],
+    "expected_pages": [590, 591],
+    "is_unanswerable": false
+  },
+  {
+    "id": "q13_multihop",
+    "category": "multi_hop",
+    "question": "How did Jon Snow save Lord Commander Mormont's life from the wight, and what were the consequences of his actions?",
+    "ground_truth": "When the reanimated corpse of Othor attacked Mormont in his solar, Jon fought the wight with his sword and Ghost's help, then grabbed Mormont's oil lamp and threw burning drapes onto the wight to incinerate it. Consequently, Jon suffered severe burns on his hand, the Lord Commander's tower was gutted by fire, and Mormont rewarded Jon with the Valyrian steel sword Longclaw.",
+    "expected_facts": [
+      "Wight Othor attacked Mormont in his tower",
+      "Jon threw burning oil drapes onto the wight to incinerate it",
+      "Jon burned his sword hand",
+      "Mormont gave Jon Longclaw as a reward"
+    ],
+    "expected_pages": [518, 519, 593, 595, 596],
+    "is_unanswerable": false
+  },
+  {
+    "id": "q14_multihop",
+    "category": "multi_hop",
+    "question": "How did Robb Stark win the battle of the Whispering Wood, and which notable prisoner did he capture?",
+    "ground_truth": "Robb split his host at the Twins, sending Roose Bolton south with the foot to distract Tywin, while Robb marched his cavalry west. Screened by Brynden Blackfish's scouts, Robb baited Jaime Lannister into a narrow valley with a small raiding force, ambushed his army from both ridges, and captured Jaime Lannister.",
+    "expected_facts": [
+      "Robb split his forces, using Roose Bolton's foot as a decoy against Tywin",
+      "Lured Jaime into a valley ambush in the Whispering Wood",
+      "Captured Ser Jaime Lannister"
+    ],
+    "expected_pages": [551, 630, 634, 635, 636],
+    "is_unanswerable": false
+  },
+  {
+    "id": "q15_multihop",
+    "category": "multi_hop",
+    "question": "What secret conversation did Arya overhear while trapped beneath the Red Keep among the dragon skulls?",
+    "ground_truth": "Arya overheard Varys and Magister Illyrio Mopatis discussing the impending conflict between Stark and Lannister, noting that Ned had the bastard and the book, that Daenerys was pregnant with Khal Drogo's child, that war was coming too soon, and debating whether to kill another Hand.",
+    "expected_facts": [
+      "Overheard Varys and Illyrio Mopatis",
+      "Discussed Ned discovering the truth with the bastard and book",
+      "Discussed Dany's pregnancy and delaying war until the Dothraki are ready",
+      "Discussed whether another Hand must die"
+    ],
+    "expected_pages": [317, 318, 319, 320],
+    "is_unanswerable": false
+  },
+  {
+    "id": "q16_multihop",
+    "category": "multi_hop",
+    "question": "How was Ned Stark betrayed in the throne room after King Robert's death, and who held a blade to his throat?",
+    "ground_truth": "Ned presented Robert's signed decree naming him Lord Regent, but Queen Cersei tore it up. Ned commanded Janos Slynt and the City Watch to arrest the queen, but the Gold Cloaks betrayed Ned and slaughtered his household guards. Littlefinger drew Ned's own dagger and held it to his chin, stating 'I did warn you not to trust me, you know.'",
+    "expected_facts": [
+      "Cersei ripped up Robert's will",
+      "Janos Slynt and the City Watch betrayed Ned and killed his guards",
+      "Littlefinger held Ned's dagger under his chin"
+    ],
+    "expected_pages": [484, 485],
+    "is_unanswerable": false
+  },
+  {
+    "id": "q17_paraphrase",
+    "category": "paraphrased",
+    "question": "What bizarre beast was discovered frozen in the snow with horn fragments embedded in its neck?",
+    "ground_truth": "A dead female direwolf was discovered in the snow with a foot of shattered antler embedded beneath her jaw in her throat, having given birth to pups before dying.",
+    "expected_facts": [
+      "A dead direwolf",
+      "Shattered antler in its throat / jaw"
+    ],
+    "expected_pages": [20, 21],
+    "is_unanswerable": false
+  },
+  {
+    "id": "q18_paraphrase",
+    "category": "paraphrased",
+    "question": "What weapon did the Braavosi instructor give the young Stark girl to practice her footwork and balance?",
+    "ground_truth": "Syrio Forel gave Arya a slender wooden practice sword weighted with lead for balance to teach her the water dance.",
+    "expected_facts": [
+      "Wooden sword / practice blade",
+      "Weighted with lead inside"
+    ],
+    "expected_pages": [210, 211],
+    "is_unanswerable": false
+  },
+  {
+    "id": "q19_paraphrase",
+    "category": "paraphrased",
+    "question": "How was the master of Winterfell's household guard slain in the capital during the rainy street ambush?",
+    "ground_truth": "Jory Cassel was killed during Jaime Lannister's street ambush in King's Landing when the Hound (Sandor Clegane) cut off his sword hand and drove a sword from shoulder to breastbone.",
+    "expected_facts": [
+      "Jory Cassel was killed in the street ambush",
+      "Killed by Sandor Clegane / the Hound after his horse was brought down"
+    ],
+    "expected_pages": [352, 353],
+    "is_unanswerable": false
+  },
+  {
+    "id": "q20_paraphrase",
+    "category": "paraphrased",
+    "question": "What beverage was served to the dying monarch during his hunt that dulled his senses before the wild pig struck?",
+    "ground_truth": "King Robert was given fortified, potent wine from his own wineskin by his squire Lancel Lannister, which caused him to be heavily intoxicated and miss his thrust with the boar.",
+    "expected_facts": [
+      "Fortified wine",
+      "Supplied by squire Lancel Lannister on Cersei's instruction"
+    ],
+    "expected_pages": [460, 465, 576],
+    "is_unanswerable": false
+  },
+  {
+    "id": "q21_paraphrase",
+    "category": "paraphrased",
+    "question": "What title was proclaimed for the young Stark leader by his assembled bannermen at the war council in Riverrun?",
+    "ground_truth": "The lords of the North and the Riverlands proclaimed Robb Stark 'The King in the North' and 'The King of Winter'.",
+    "expected_facts": [
+      "The King in the North",
+      "The King of Winter"
+    ],
+    "expected_pages": [723],
+    "is_unanswerable": false
+  },
+  {
+    "id": "q22_paraphrase",
+    "category": "paraphrased",
+    "question": "What creature hatched from the stone relics amidst the funeral pyre at the edge of the red wasteland?",
+    "ground_truth": "Three baby living dragons (cream-and-gold, green-and-bronze, and black-and-scarlet) hatched from the stone dragon eggs amidst the flames of Khal Drogo's funeral pyre.",
+    "expected_facts": [
+      "Three living dragons hatched",
+      "Hatched from stone eggs in Drogo's funeral pyre"
+    ],
+    "expected_pages": [730, 731],
+    "is_unanswerable": false
+  },
+  {
+    "id": "q23_ambiguous",
+    "category": "ambiguous_noise",
+    "question": "Which tournament took place in King's Landing, who won the champion's purse, and what was the controversy regarding the horse?",
+    "ground_truth": "At the Hand's Tourney, Sandor Clegane (the Hound) won the champion's purse after Loras Tyrell conceded the victory. In the semifinal tilt, Loras Tyrell had ridden a mare in heat to distract Gregor Clegane's fierce stallion, causing Gregor to lose control and be unhorsed.",
+    "expected_facts": [
+      "Hand's Tourney",
+      "Loras Tyrell rode a mare in heat to unseat Gregor Clegane",
+      "Sandor Clegane won the championship"
+    ],
+    "expected_pages": [273, 275, 291, 292],
+    "is_unanswerable": false
+  },
+  {
+    "id": "q24_ambiguous",
+    "category": "ambiguous_noise",
+    "question": "Who was Brandon Stark in the history of House Stark, and which ones are mentioned?",
+    "ground_truth": "Multiple Brandons are mentioned: Brandon the Builder who raised Winterfell and the Wall, Brandon the Shipwright who was lost sailing the Sunset Sea, Brandon the Burner who burned his father's fleet, Brandon Stark (Ned's older brother strangled by Aerys II), and young Bran (Brandon) Stark who fell from the tower.",
+    "expected_facts": [
+      "Brandon the Builder",
+      "Brandon the Shipwright",
+      "Brandon the Burner",
+      "Brandon Stark (Ned's deceased brother)",
+      "Bran (Brandon) Stark (Ned's son)"
+    ],
+    "expected_pages": [43, 666, 735],
+    "is_unanswerable": false
+  },
+  {
+    "id": "q25_ambiguous",
+    "category": "ambiguous_noise",
+    "question": "How did Sandor Clegane acquire the horrific facial burns on the left side of his head?",
+    "ground_truth": "When Sandor was six or seven, his older brother Gregor caught him playing with a painted wooden knight toy Gregor owned. Gregor picked up Sandor and shoved his face into a burning brazier of hot coals and held it there until three men pulled him off.",
+    "expected_facts": [
+      "Gregor Clegane shoved Sandor's face into hot coals in a brazier",
+      "Because Sandor took Gregor's wooden knight toy",
+      "Occurred when Sandor was six or seven years old"
+    ],
+    "expected_pages": [281],
+    "is_unanswerable": false
+  },
+  {
+    "id": "q26_ambiguous",
+    "category": "ambiguous_noise",
+    "question": "What is the background of the black gatehouse fortress of Moat Cailin and why is it considered a deathtrap?",
+    "ground_truth": "Moat Cailin was an ancient stronghold of the First Men with only three surviving towers (Gatehouse, Drunkard's, and Children's Tower). It is a deathtrap because an invading army must navigate narrow causeways surrounded by impassable bogs, quicksand, and lizard-lions while being exposed to archer fire from all three towers.",
+    "expected_facts": [
+      "Three surviving towers: Gatehouse, Drunkard's, Children's",
+      "Surrounded by impassable bogs, quicksand, lizard-lions",
+      "Archers command the narrow causeway from all sides"
+    ],
+    "expected_pages": [544, 545],
+    "is_unanswerable": false
+  },
+  {
+    "id": "q27_ambiguous",
+    "category": "ambiguous_noise",
+    "question": "What was the role of Mirri Maz Duur and why did her healing result in Khal Drogo's vegetative state and Rhaego's death?",
+    "ground_truth": "Mirri Maz Duur was a Lhazareen godswife and maegi whose temple was burned by Drogo's khalasar. When Dany asked her to save Drogo using bloodmagic ('death pays for life'), Mirri intentionally used the ritual to kill Dany's unborn son Rhaego and leave Drogo alive but brain-dead/catatonic as vengeance for the slaughter of her people.",
+    "expected_facts": [
+      "Lhazareen godswife / maegi seeking vengeance for her burned people",
+      "Used bloodmagic where life pays for death",
+      "Resulted in Rhaego's death and Drogo becoming catatonic"
+    ],
+    "expected_pages": [611, 646, 647, 687, 690],
+    "is_unanswerable": false
+  },
+  {
+    "id": "q28_unanswerable",
+    "category": "unanswerable_adversarial",
+    "question": "What was the registration number and nuclear output of the submarine docked at White Harbor?",
+    "ground_truth": "I could not find enough information in the provided documents to answer that reliably. The text is set in a medieval fantasy world (A Song of Ice and Fire) and contains no references to submarines or nuclear power.",
+    "expected_facts": [
+      "Abstention: not in text",
+      "Submarines / nuclear power do not exist in the corpus"
+    ],
+    "expected_pages": [],
+    "is_unanswerable": true
+  },
+  {
+    "id": "q29_unanswerable",
+    "category": "unanswerable_adversarial",
+    "question": "Which electric airplane did Tyrion Lannister fly across the Narrow Sea to reach Pentos?",
+    "ground_truth": "I could not find enough information in the provided documents to answer that reliably. Tyrion Lannister did not fly an airplane; modern aviation technology does not exist in the provided text.",
+    "expected_facts": [
+      "Abstention: not in text",
+      "Airplanes do not exist in the corpus"
+    ],
+    "expected_pages": [],
+    "is_unanswerable": true
+  },
+  {
+    "id": "q30_unanswerable",
+    "category": "unanswerable_adversarial",
+    "question": "What did Harry Potter and Hermione Granger tell Ned Stark when they met in the Winterfell library?",
+    "ground_truth": "I could not find enough information in the provided documents to answer that reliably. Harry Potter and Hermione Granger are characters from a different fictional universe and do not appear in the text.",
+    "expected_facts": [
+      "Abstention: not in text",
+      "Harry Potter / Hermione do not appear"
+    ],
+    "expected_pages": [],
+    "is_unanswerable": true
+  },
+  {
+    "id": "q31_unanswerable",
+    "category": "unanswerable_adversarial",
+    "question": "How did the 2024 United States presidential election affect King Robert's financial debt in King's Landing?",
+    "ground_truth": "I could not find enough information in the provided documents to answer that reliably. The text is a fantasy novel and contains no information regarding real-world US presidential elections.",
+    "expected_facts": [
+      "Abstention: not in text",
+      "No modern political elections in corpus"
+    ],
+    "expected_pages": [],
+    "is_unanswerable": true
+  },
+  {
+    "id": "q32_unanswerable",
+    "category": "unanswerable_adversarial",
+    "question": "What brand of smartphone did Sansa Stark use to send text messages to Robb from the Red Keep?",
+    "ground_truth": "I could not find enough information in the provided documents to answer that reliably. Sansa did not use a smartphone; messages in the Seven Kingdoms are sent via carrier ravens and parchment.",
+    "expected_facts": [
+      "Abstention: not in text",
+      "Smartphones do not exist in the corpus"
+    ],
+    "expected_pages": [],
+    "is_unanswerable": true
+  },
+  {
+    "id": "q33_citation",
+    "category": "citation_seeking",
+    "question": "According to the House Tully section in the appendix, what are the words and sigil of House Tully, and which lesser houses are sworn to them?",
+    "ground_truth": "According to House Tully's entry in the appendix, their words are 'Family, Duty, Honor' and their sigil is a leaping trout, silver, on a field of rippling blue and red. Lesser houses sworn to Riverrun include Darry, Frey, Mallister, Bracken, Blackwood, Whent, Ryger, Piper, and Vance.",
+    "expected_facts": [
+      "Words: Family, Duty, Honor",
+      "Sigil: leaping trout, silver, on rippling blue and red",
+      "Sworn houses: Darry, Frey, Mallister, Bracken, Blackwood, Whent, Ryger, Piper, Vance"
+    ],
+    "expected_pages": [743, 744],
+    "is_unanswerable": false
+  },
+  {
+    "id": "q34_citation",
+    "category": "citation_seeking",
+    "question": "According to the appendix, who was the first Targaryen king, how long did his reign last, and what were his sister-wives' names?",
+    "ground_truth": "Aegon I (Aegon the Conqueror, Aegon the Dragon) was the first Targaryen king, reigning from years 1 to 37 after Aegon's Landing. He took both his sisters, Visenya and Rhaenys, to wife.",
+    "expected_facts": [
+      "Aegon I / Aegon the Conqueror",
+      "Reign: 1-37 years after Aegon's Landing",
+      "Sisters: Visenya and Rhaenys"
+    ],
+    "expected_pages": [752],
+    "is_unanswerable": false
+  },
+  {
+    "id": "q35_citation",
+    "category": "citation_seeking",
+    "question": "In the House Stark appendix listing, who are named as Eddard Stark's trueborn children and how old are they?",
+    "ground_truth": "Eddard Stark's trueborn children listed are: Robb (14), Sansa (11), Arya (9), Brandon/Bran (7), and Rickon (3).",
+    "expected_facts": [
+      "Robb (14)",
+      "Sansa (11)",
+      "Arya (9)",
+      "Bran / Brandon (7)",
+      "Rickon (3)"
+    ],
+    "expected_pages": [735],
+    "is_unanswerable": false
+  },
+  {
+    "id": "q36_citation",
+    "category": "citation_seeking",
+    "question": "In the House Lannister appendix entry, who are Ser Kevan Lannister's wife and children?",
+    "ground_truth": "Ser Kevan Lannister is married to Dorna of House Swyft. Their children are eldest son Lancel (squire to the king), twin sons Willem and Martyn, and infant daughter Janei.",
+    "expected_facts": [
+      "Wife: Dorna of House Swyft",
+      "Eldest son: Lancel",
+      "Twin sons: Willem and Martyn",
+      "Infant daughter: Janei"
+    ],
+    "expected_pages": [738],
+    "is_unanswerable": false
+  }
+]

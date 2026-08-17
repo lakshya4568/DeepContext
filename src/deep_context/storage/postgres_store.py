@@ -54,7 +54,7 @@ class PostgresStore(StorageInterface):
             await conn.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto;")
             # Schema creation from docs/DATA_MODEL.sql
             await conn.execute(
-                f"""
+                """
                 CREATE TABLE IF NOT EXISTS documents (
                     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                     tenant_id TEXT NOT NULL DEFAULT 'default',
@@ -63,7 +63,7 @@ class PostgresStore(StorageInterface):
                     doc_type TEXT NOT NULL,
                     permission_scope TEXT[] NOT NULL DEFAULT ARRAY['default'],
                     retrieval_mode TEXT NOT NULL DEFAULT 'hybrid',
-                    metadata JSONB NOT NULL DEFAULT '{{}}',
+                    metadata JSONB NOT NULL DEFAULT '{}',
                     ingested_at TIMESTAMPTZ NOT NULL DEFAULT now(),
                     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
                 );
@@ -77,7 +77,7 @@ class PostgresStore(StorageInterface):
                     token_count INTEGER NOT NULL,
                     section_path TEXT,
                     page_number INTEGER,
-                    embedding VECTOR({settings.embedding_dim}),
+                    embedding VECTOR,
                     tsv TSVECTOR GENERATED ALWAYS AS (to_tsvector('english', content)) STORED,
                     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
                 );
@@ -120,7 +120,7 @@ class PostgresStore(StorageInterface):
                     tenant_id TEXT NOT NULL DEFAULT 'default',
                     user_id TEXT,
                     content TEXT NOT NULL,
-                    embedding VECTOR({settings.embedding_dim}),
+                    embedding VECTOR,
                     tsv TSVECTOR GENERATED ALWAYS AS (to_tsvector('english', content)) STORED,
                     source TEXT NOT NULL,
                     confidence REAL NOT NULL CHECK (confidence BETWEEN 0 AND 1),
@@ -132,19 +132,38 @@ class PostgresStore(StorageInterface):
                 CREATE TABLE IF NOT EXISTS memory_episode (
                     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                     user_id TEXT NOT NULL,
-                    session_id UUID,
+                    session_id TEXT,
                     task_type TEXT,
                     summary TEXT NOT NULL,
-                    outcome TEXT,
-                    embedding VECTOR({settings.embedding_dim}),
+                    outcome TEXT NOT NULL,
+                    embedding VECTOR,
                     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
                 );
+
+                DO $$
+                BEGIN
+                    BEGIN
+                        ALTER TABLE chunks ALTER COLUMN embedding TYPE VECTOR;
+                    EXCEPTION WHEN OTHERS THEN
+                        NULL;
+                    END;
+                    BEGIN
+                        ALTER TABLE memory_fact ALTER COLUMN embedding TYPE VECTOR;
+                    EXCEPTION WHEN OTHERS THEN
+                        NULL;
+                    END;
+                    BEGIN
+                        ALTER TABLE memory_episode ALTER COLUMN embedding TYPE VECTOR;
+                    EXCEPTION WHEN OTHERS THEN
+                        NULL;
+                    END;
+                END $$;
 
                 CREATE TABLE IF NOT EXISTS agents (
                     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                     owner TEXT NOT NULL,
                     status TEXT NOT NULL DEFAULT 'idle',
-                    budgets JSONB NOT NULL DEFAULT '{{"max_turns": 50, "max_tokens": 2000000, "max_wall_clock_seconds": 3600}}',
+                    budgets JSONB NOT NULL DEFAULT '{"max_turns": 50, "max_tokens": 2000000, "max_wall_clock_seconds": 3600}',
                     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
                     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
                 );
@@ -156,8 +175,8 @@ class PostgresStore(StorageInterface):
                     user_id TEXT NOT NULL,
                     project_root TEXT,
                     kernel_ref TEXT,
-                    state_snapshot JSONB NOT NULL DEFAULT '{{}}',
-                    budgets JSONB NOT NULL DEFAULT '{{}}',
+                    state_snapshot JSONB NOT NULL DEFAULT '{}',
+                    budgets JSONB NOT NULL DEFAULT '{}',
                     depth INTEGER NOT NULL DEFAULT 0,
                     status TEXT NOT NULL DEFAULT 'active',
                     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -620,7 +639,16 @@ class PostgresStore(StorageInterface):
                 WHERE {where_sql}
                 ORDER BY c.embedding <=> $1 ASC LIMIT {limit};
             """
-            rows = await conn.fetch(sql, *params)
+            try:
+                rows = await conn.fetch(sql, *params)
+            except Exception as e:
+                if (
+                    "different vector dimensions" in str(e).lower()
+                    or "dimension mismatch" in str(e).lower()
+                ):
+                    logger.warning("Vector search skipped due to dimension mismatch: %s", e)
+                    return []
+                raise
             return [
                 {
                     "id": str(r["id"]),

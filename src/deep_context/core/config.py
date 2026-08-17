@@ -36,10 +36,33 @@ class Settings(BaseSettings):
         alias="GROQ_BASE_URL",
     )
 
-    # Models
-    embedding_model: str = Field(default="nvidia/nv-embedqa-e5-v5", alias="EMBEDDING_MODEL")
-    embedding_dim: int = Field(default=1024, alias="EMBEDDING_DIM")
-    llm_provider: str = Field(default="groq", alias="LLM_PROVIDER")  # 'groq' | 'nvidia'
+    # Google Gemini API
+    gemini_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "GEMINI_API_KEY",
+            "GOOGLE_API_KEY",
+            "gemini_api_key",
+            "google_api_key",
+            "GEMINI_API",
+            "GOOGLE_API",
+        ),
+    )
+    gemini_base_url: str = Field(
+        default="",
+        alias="GEMINI_BASE_URL",
+    )
+
+    # Models & Embedding Configuration
+    embedding_provider: str = Field(
+        default="auto", alias="EMBEDDING_PROVIDER"
+    )  # 'auto' | 'gemini' | 'nvidia' | 'mock'
+    embedding_model: str = Field(default="gemini-embedding-2", alias="EMBEDDING_MODEL")
+    embedding_dim: int = Field(default=768, alias="EMBEDDING_DIM")  # 768 for gemini-embedding-2 MRL
+    reranker_strategy: str = Field(
+        default="cross_encoder", alias="RERANKER_STRATEGY"
+    )  # 'cross_encoder' | 'gemini_semantic' | 'gemini_llm'
+    llm_provider: str = Field(default="groq", alias="LLM_PROVIDER")  # 'groq' | 'nvidia' | 'gemini'
     llm_model: str = Field(default="qwen/qwen3.6-27b", alias="LLM_MODEL")
 
     # Database
@@ -82,6 +105,11 @@ class Settings(BaseSettings):
     allow_mock_fallback: bool = Field(default=True, alias="ALLOW_MOCK_FALLBACK")
 
     @property
+    def has_gemini_key(self) -> bool:
+        k = self.gemini_api_key.strip()
+        return bool(k and not k.startswith("AIzaSy-your-key") and len(k) > 10)
+
+    @property
     def has_groq_key(self) -> bool:
         k = self.groq_api_key.strip()
         return bool(k and not k.startswith("gsk_your_key") and len(k) > 10)
@@ -93,7 +121,7 @@ class Settings(BaseSettings):
 
     @property
     def has_valid_api_key(self) -> bool:
-        return self.has_groq_key or self.has_nvidia_key
+        return self.has_gemini_key or self.has_groq_key or self.has_nvidia_key
 
 
 settings = Settings()

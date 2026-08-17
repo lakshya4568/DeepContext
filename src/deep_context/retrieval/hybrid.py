@@ -65,12 +65,19 @@ class HybridRetriever:
         sub_queries: list[str],
         filters: RetrievalFilters,
         limit: int = 100,
+        embedding_model: str | None = None,
+        embedding_dim: int | None = None,
     ) -> list[dict[str, Any]]:
         """
         Runs BM25 and vector search in parallel across all sub-queries and returns fused candidate chunks.
         """
-        # 1. Generate query embeddings for all sub-queries
-        query_embeddings = await llm_client.get_embeddings(sub_queries)
+        # 1. Generate query embeddings for all sub-queries (asymmetric query format for Gemini)
+        query_embeddings = await llm_client.get_embeddings(
+            sub_queries,
+            model=embedding_model,
+            dim=embedding_dim,
+            is_query=True,
+        )
 
         bm25_tasks = [
             self.storage.search_bm25(sq, filters=filters, limit=limit) for sq in sub_queries

@@ -10,6 +10,8 @@ import time
 from typing import Any, AsyncIterator, cast
 
 import numpy as np
+from google import genai
+from google.genai import types as genai_types
 from openai import AsyncOpenAI
 
 from deep_context.core.config import settings
@@ -27,6 +29,7 @@ def parse_rate_limit_error(
         or "too many requests" in err_str.lower()
         or "quota" in err_str.lower()
         or "tokens per day" in err_str.lower()
+        or "resource_exhausted" in err_str.lower()
     )
     if not is_rate_limit:
         return {}
@@ -45,9 +48,9 @@ def parse_rate_limit_error(
         quota_desc = "requests per minute (RPM)"
 
     friendly_msg = (
-        f"Groq daily limit reached for model `{model}` ({used}/{limit} tokens). Reset in {retry_after}."
+        f"{provider.capitalize()} daily limit reached for model `{model}` ({used}/{limit} tokens). Reset in {retry_after}."
         if limit and used
-        else f"Groq rate limit reached for model `{model}`. Please try again in {retry_after}."
+        else f"{provider.capitalize()} rate limit reached for model `{model}`. Please try again in {retry_after}."
     )
 
     return {
@@ -65,7 +68,7 @@ def parse_rate_limit_error(
 
 
 class LLMClient:
-    """Unified client for Groq and NVIDIA NIM APIs (fast reasoning LLMs and dense embeddings)."""
+    """Unified client for Google Gemini, Groq, and NVIDIA NIM APIs (fast reasoning LLMs and dense embeddings)."""
 
     # Global rate limit state accessible across threads/requests
     global_rate_limit: dict[str, Any] | None = None
@@ -81,6 +84,16 @@ class LLMClient:
         self.llm_model = llm_model or settings.llm_model
         self.last_rate_limit: dict[str, Any] | None = None
         self._current_groq_key: str | None = settings.groq_api_key
+        self._current_gemini_key: str | None = settings.gemini_api_key
+
+        # Google GenAI client (Gemini embeddings & reasoning)
+        self._gemini_client: genai.Client | None = None
+        if settings.has_gemini_key:
+            try:
+                self._gemini_client = genai.Client(api_key=settings.gemini_api_key)
+            except Exception as e:
+                logger.warning("Failed to initialize Google GenAI client: %s", e)
+                self._gemini_client = None
 
         # Groq client (primary ultra-fast reasoning LLM)
         self._groq_client: AsyncOpenAI | None
@@ -103,6 +116,39 @@ class LLMClient:
             )
         else:
             self._client = None
+
+    def _refresh_gemini_client(self) -> genai.Client | None:
+        """Dynamically check .env and reload Gemini API key if changed."""
+        import os
+
+        current_key = settings.gemini_api_key
+        if os.path.exists(".env"):
+            try:
+                with open(".env", "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line.startswith("GEMINI_API_KEY=") or line.startswith("GOOGLE_API_KEY="):
+                            val = line.split("=", 1)[1].strip().strip('"').strip("'")
+                            if val:
+                                current_key = val
+                                settings.gemini_api_key = val
+            except Exception:
+                pass
+
+        if not current_key or current_key.startswith("AIzaSy-your-key") or len(current_key) < 10:
+            self._gemini_client = None
+            self._current_gemini_key = None
+            return None
+
+        if getattr(self, "_current_gemini_key", None) != current_key or self._gemini_client is None:
+            self._current_gemini_key = current_key
+            try:
+                self._gemini_client = genai.Client(api_key=current_key)
+            except Exception as e:
+                logger.warning("Failed to reload Gemini client: %s", e)
+                self._gemini_client = None
+
+        return self._gemini_client
 
     def _refresh_groq_client(self) -> AsyncOpenAI | None:
         """Dynamically check .env and reload Groq API key if changed."""
@@ -152,38 +198,150 @@ class LLMClient:
         return notice
 
     def _has_live_client(self) -> bool:
-        return bool(self._groq_client or (self._client and settings.has_nvidia_key))
+        return bool(
+            self._gemini_client or self._groq_client or (self._client and settings.has_nvidia_key)
+        )
 
     # -----------------------------------------------------------------------
-    # Embeddings (baai/bge-m3)
+    # Embeddings (Google Gemini & NVIDIA NIM)
     # -----------------------------------------------------------------------
 
-    async def get_embeddings(self, texts: list[str]) -> list[list[float]]:
-        """Generate 1024-dim dense embeddings using NVIDIA NIM baai/bge-m3."""
+    async def get_embeddings(
+        self,
+        texts: list[str],
+        model: str | None = None,
+        dim: int | None = None,
+        task_type: str | None = None,
+        title: str | None = None,
+        is_query: bool = False,
+    ) -> list[list[float]]:
+        """
+        Generate dense embeddings using Google Gemini (gemini-embedding-2 / gemini-embedding-001) or NVIDIA NIM.
+
+        Supports Matryoshka Representation Learning (MRL) dimensions: 768, 1536, 3072, 1024.
+        """
         if not texts:
             return []
 
         # Sanitize texts
         cleaned_texts = [t.strip() if t.strip() else " " for t in texts]
+        target_model = model or self.embedding_model or settings.embedding_model
+
+        # Determine target dimension
+        if dim:
+            target_dim = dim
+        elif "gemini" in target_model.lower():
+            target_dim = settings.embedding_dim or 768
+        else:
+            target_dim = settings.embedding_dim or 1024
 
         import asyncio
 
-        if self._client and settings.has_nvidia_key:
-            # Batch in slices of 32 to avoid HTTP timeout/payload limit
-            all_embeddings: list[list[float]] = []
+        is_gemini = (
+            "gemini" in target_model.lower()
+            or target_model.startswith("models/gemini")
+            or target_model.startswith("text-embedding")
+        )
+
+        # --- Attempt 1: Google Gemini API (gemini-embedding-2 / gemini-embedding-001) ---
+        if is_gemini:
+            gemini_client = self._refresh_gemini_client()
+            if gemini_client:
+                all_embeddings: list[list[float]] = []
+                batch_size = 32
+                try:
+                    for i in range(0, len(cleaned_texts), batch_size):
+                        batch = cleaned_texts[i : i + batch_size]
+
+                        # Task-specific formatting for gemini-embedding-2 (multimodal & text MRL)
+                        if (
+                            "embedding-2" in target_model.lower()
+                            or "gemini-embedding-2" in target_model
+                        ):
+                            formatted_contents = []
+                            for t in batch:
+                                if is_query:
+                                    prefix_task = task_type or "search result"
+                                    text_val = f"task: {prefix_task} | query: {t}"
+                                else:
+                                    doc_title = title or "none"
+                                    text_val = f"title: {doc_title} | text: {t}"
+                                formatted_contents.append(
+                                    genai_types.Content(
+                                        parts=[genai_types.Part.from_text(text=text_val)]
+                                    )
+                                )
+                            config = genai_types.EmbedContentConfig(
+                                output_dimensionality=target_dim
+                            )
+                            resp = await asyncio.wait_for(
+                                gemini_client.aio.models.embed_content(
+                                    model=target_model,
+                                    contents=formatted_contents,
+                                    config=config,
+                                ),
+                                timeout=15.0,
+                            )
+                            if resp.embeddings:
+                                for emb in resp.embeddings:
+                                    all_embeddings.append(list(emb.values))
+                        else:
+                            # gemini-embedding-001 / text-embedding-004
+                            g_task_type = task_type or (
+                                "RETRIEVAL_QUERY" if is_query else "RETRIEVAL_DOCUMENT"
+                            )
+                            formatted_contents = [
+                                genai_types.Content(parts=[genai_types.Part.from_text(text=t)])
+                                for t in batch
+                            ]
+                            config = genai_types.EmbedContentConfig(
+                                task_type=g_task_type,
+                                output_dimensionality=target_dim
+                                if target_dim in (768, 1536, 3072)
+                                else None,
+                            )
+                            resp = await asyncio.wait_for(
+                                gemini_client.aio.models.embed_content(
+                                    model=target_model,
+                                    contents=formatted_contents,
+                                    config=config,
+                                ),
+                                timeout=15.0,
+                            )
+                            if resp.embeddings:
+                                for emb in resp.embeddings:
+                                    vals = np.array(emb.values, dtype=np.float32)
+                                    # Normalize if target_dim < 3072 on gemini-embedding-001
+                                    if target_dim < 3072:
+                                        n = np.linalg.norm(vals)
+                                        if n > 0:
+                                            vals = vals / n
+                                    all_embeddings.append(vals.tolist())
+
+                    if len(all_embeddings) == len(cleaned_texts):
+                        return all_embeddings
+                except Exception as e:
+                    logger.warning(
+                        "Gemini embedding model %s failed (%s). Checking fallbacks...",
+                        target_model,
+                        e,
+                    )
+                    if not settings.allow_mock_fallback and not settings.has_nvidia_key:
+                        raise
+
+        # --- Attempt 2: NVIDIA NIM API ---
+        if self._client and settings.has_nvidia_key and not is_gemini:
+            all_embeddings = []
             batch_size = 32
-
-            # Sanitize and bound text slice for embedding models
             bounded_texts = [t[:2500] if len(t) > 2500 else t for t in cleaned_texts]
-
-            # Primary attempt with configured embedding model
+            nim_model = target_model
             try:
                 for i in range(0, len(bounded_texts), batch_size):
                     batch = bounded_texts[i : i + batch_size]
                     response = await asyncio.wait_for(
                         self._client.embeddings.create(
                             input=batch,
-                            model=self.embedding_model,
+                            model=nim_model,
                             encoding_format="float",
                             extra_body={"input_type": "passage", "truncate": "END"},
                             timeout=8.0,
@@ -196,7 +354,7 @@ class LLMClient:
             except Exception as e:
                 logger.warning(
                     "NVIDIA NIM %s failed (%s). Retrying with nvidia/nv-embedqa-e5-v5...",
-                    self.embedding_model,
+                    nim_model,
                     e,
                 )
                 try:
@@ -221,15 +379,30 @@ class LLMClient:
                     if not settings.allow_mock_fallback:
                         raise
 
-        # Deterministic offline mock embedding fallback for local dev / tests
-        return [self._mock_embedding(t, dim=settings.embedding_dim) for t in cleaned_texts]
+        # --- Attempt 3: Deterministic offline mock embedding fallback ---
+        return [self._mock_embedding(t, dim=target_dim) for t in cleaned_texts]
 
-    async def get_embedding(self, text: str) -> list[float]:
+    async def get_embedding(
+        self,
+        text: str,
+        model: str | None = None,
+        dim: int | None = None,
+        task_type: str | None = None,
+        title: str | None = None,
+        is_query: bool = False,
+    ) -> list[float]:
         """Convenience method for a single text embedding."""
-        res = await self.get_embeddings([text])
+        res = await self.get_embeddings(
+            [text],
+            model=model,
+            dim=dim,
+            task_type=task_type,
+            title=title,
+            is_query=is_query,
+        )
         return res[0]
 
-    def _mock_embedding(self, text: str, dim: int = 1024) -> list[float]:
+    def _mock_embedding(self, text: str, dim: int = 768) -> list[float]:
         """Generate deterministic normalized pseudo-embedding based on sha256 + token hashes."""
         vec = np.zeros(dim, dtype=np.float32)
         words = text.lower().split()
@@ -288,8 +461,18 @@ class LLMClient:
         """
         import asyncio
 
+        is_gemini_model = bool(
+            model
+            and (
+                model.startswith("gemini-")
+                or model.startswith("models/gemini")
+                or model.startswith("google/gemini")
+            )
+        )
+
         is_nim_model = bool(
             model
+            and not is_gemini_model
             and any(
                 model.startswith(p)
                 for p in [
@@ -303,6 +486,52 @@ class LLMClient:
                 ]
             )
         )
+
+        # --- Attempt 0: Google Gemini API (When Gemini model requested) ---
+        if is_gemini_model:
+            gemini_client = self._refresh_gemini_client()
+            if gemini_client:
+                target_model = model or "gemini-2.5-flash"
+                system_prompt = ""
+                gemini_contents = []
+                for m_item in messages:
+                    if m_item.get("role") == "system":
+                        system_prompt += m_item.get("content", "") + "\n"
+                    else:
+                        r = "user" if m_item.get("role") == "user" else "model"
+                        c = m_item.get("content", "")
+                        if c:
+                            gemini_contents.append(
+                                genai_types.Content(
+                                    role=r, parts=[genai_types.Part.from_text(text=c)]
+                                )
+                            )
+                if not gemini_contents:
+                    gemini_contents.append(
+                        genai_types.Content(
+                            role="user", parts=[genai_types.Part.from_text(text="Hello")]
+                        )
+                    )
+
+                try:
+                    resp = await asyncio.wait_for(
+                        gemini_client.aio.models.generate_content(
+                            model=target_model,
+                            contents=gemini_contents,
+                            config=genai_types.GenerateContentConfig(
+                                system_instruction=system_prompt.strip() if system_prompt else None,
+                                temperature=temperature,
+                                top_p=top_p,
+                                max_output_tokens=min(max_tokens, 8192) if max_tokens else 8192,
+                            ),
+                        ),
+                        timeout=timeout,
+                    )
+                    raw_content = resp.text or ""
+                    content, reasoning = self._parse_think_tags(raw_content, None)
+                    return content, reasoning
+                except Exception as e:
+                    logger.warning("Gemini model %s complete failed: %s", target_model, e)
 
         # --- Attempt 1: NVIDIA NIM (When NIM model requested) ---
         if is_nim_model and self._client and settings.has_nvidia_key:
@@ -430,8 +659,18 @@ class LLMClient:
         Yields chunks of {"type": "reasoning" | "content", "text": "..."}
         """
 
+        is_gemini_model = bool(
+            model
+            and (
+                model.startswith("gemini-")
+                or model.startswith("models/gemini")
+                or model.startswith("google/gemini")
+            )
+        )
+
         is_nim_model = bool(
             model
+            and not is_gemini_model
             and any(
                 model.startswith(p)
                 for p in [
@@ -445,6 +684,56 @@ class LLMClient:
                 ]
             )
         )
+
+        # --- Attempt 0: Google Gemini API Streaming ---
+        if is_gemini_model:
+            gemini_client = self._refresh_gemini_client()
+            if gemini_client:
+                target_model = model or "gemini-2.5-flash"
+                system_prompt = ""
+                gemini_contents = []
+                for m_item in messages:
+                    if m_item.get("role") == "system":
+                        system_prompt += m_item.get("content", "") + "\n"
+                    else:
+                        r = "user" if m_item.get("role") == "user" else "model"
+                        c = m_item.get("content", "")
+                        if c:
+                            gemini_contents.append(
+                                genai_types.Content(
+                                    role=r, parts=[genai_types.Part.from_text(text=c)]
+                                )
+                            )
+                if not gemini_contents:
+                    gemini_contents.append(
+                        genai_types.Content(
+                            role="user", parts=[genai_types.Part.from_text(text="Hello")]
+                        )
+                    )
+
+                try:
+                    stream = await gemini_client.aio.models.generate_content_stream(
+                        model=target_model,
+                        contents=gemini_contents,
+                        config=genai_types.GenerateContentConfig(
+                            system_instruction=system_prompt.strip() if system_prompt else None,
+                            temperature=temperature,
+                            top_p=top_p,
+                            max_output_tokens=min(max_tokens, 8192) if max_tokens else 8192,
+                        ),
+                    )
+                    stream_emitted = False
+                    async for chunk in stream:
+                        text_val = chunk.text or ""
+                        if text_val:
+                            stream_emitted = True
+                            self.last_rate_limit = None
+                            LLMClient.global_rate_limit = None
+                            yield {"type": "content", "text": text_val}
+                    if stream_emitted:
+                        return
+                except Exception as e:
+                    logger.warning("Gemini model %s streaming failed: %s", target_model, e)
 
         # --- Attempt 1: NVIDIA NIM (When NIM model requested) ---
         if is_nim_model and self._client and settings.has_nvidia_key:

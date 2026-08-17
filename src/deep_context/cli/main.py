@@ -96,6 +96,18 @@ def ingest_cmd(
     vectorless: bool = typer.Option(
         False, "--vectorless", help="Enable vectorless tree navigation mode"
     ),
+    embedding_model: str = typer.Option(
+        "",
+        "--embedding-model",
+        "-e",
+        help="Embedding model (e.g. 'gemini-embedding-2', 'gemini-embedding-001', 'nvidia/nv-embedqa-e5-v5')",
+    ),
+    embedding_dim: int = typer.Option(
+        0,
+        "--embedding-dim",
+        "-d",
+        help="Embedding output dimensionality (e.g. 768, 1536, 3072, 1024)",
+    ),
 ) -> None:
     """Ingest any single PDF, TXT, MD, or Code file into the knowledge base."""
 
@@ -115,6 +127,10 @@ def ingest_cmd(
 
         doc_title = title or p.stem
         mode = RetrievalMode.VECTORLESS if vectorless else RetrievalMode.HYBRID
+        target_model = embedding_model or settings.embedding_model
+        target_dim = embedding_dim or (
+            768 if "gemini" in target_model.lower() else settings.embedding_dim
+        )
 
         req = IngestRequest(
             title=doc_title,
@@ -122,10 +138,12 @@ def ingest_cmd(
             doc_type=detected_type,
             source_uri=str(p.resolve()),
             retrieval_mode=mode,
+            embedding_model=target_model,
+            embedding_dim=target_dim,
         )
 
         with console.status(
-            f"[bold green]Ingesting {doc_title} (Embedding with {settings.embedding_model})..."
+            f"[bold green]Ingesting {doc_title} (Embedding with {target_model} [{target_dim}-dim])..."
         ):
             res = await ingestion_pipeline.ingest(req)
 
@@ -135,7 +153,8 @@ def ingest_cmd(
                 f"ID: [cyan]{res.document_id}[/cyan]\n"
                 f"Title: {res.title}\n"
                 f"Type: [magenta]{detected_type.upper()}[/magenta]\n"
-                f"Parent Chunks: {res.parent_chunks_count} | Child Chunks (BGE-M3): {res.child_chunks_count}\n"
+                f"Embedding: [yellow]{res.embedding_model or target_model} ({res.embedding_dim or target_dim}-dim)[/yellow]\n"
+                f"Parent Chunks: {res.parent_chunks_count} | Child Chunks: {res.child_chunks_count}\n"
                 f"Retrieval Mode: {res.retrieval_mode.value} | Tree Nodes: {res.tree_nodes_count}",
                 title="Ingestion Result",
             )
@@ -155,6 +174,15 @@ def ingest_all_cmd(
     vectorless: bool = typer.Option(
         False, "--vectorless", help="Enable vectorless tree navigation mode for all files"
     ),
+    embedding_model: str = typer.Option(
+        "", "--embedding-model", "-e", help="Embedding model (e.g. 'gemini-embedding-2')"
+    ),
+    embedding_dim: int = typer.Option(
+        0,
+        "--embedding-dim",
+        "-d",
+        help="Embedding output dimensionality (e.g. 768, 1536, 3072, 1024)",
+    ),
 ) -> None:
     """Batch ingest all PDFs, TXT, MD, and Code files in a folder without manual setup."""
 
@@ -163,7 +191,6 @@ def ingest_all_cmd(
         files_to_process: list[Path] = []
 
         if not p.exists():
-            # Try current directory if documents folder doesn't exist yet
             if target_path == "documents":
                 p.mkdir(parents=True, exist_ok=True)
                 console.print(
@@ -187,8 +214,13 @@ def ingest_all_cmd(
             console.print(f"[yellow]No supported documents found in '{target_path}'.[/yellow]")
             return
 
+        target_model = embedding_model or settings.embedding_model
+        target_dim = embedding_dim or (
+            768 if "gemini" in target_model.lower() else settings.embedding_dim
+        )
+
         console.print(
-            f"[bold green]Found {len(files_to_process)} document(s) to process in '{target_path}'[/bold green]"
+            f"[bold green]Found {len(files_to_process)} document(s) to process using {target_model} ({target_dim}-dim)[/bold green]"
         )
 
         table = Table(title="Batch Ingestion Summary")
@@ -196,7 +228,7 @@ def ingest_all_cmd(
         table.add_column("Type", style="magenta")
         table.add_column("Size", style="dim")
         table.add_column("Parents", style="green")
-        table.add_column("Children (BGE-M3)", style="yellow")
+        table.add_column("Children", style="yellow")
         table.add_column("Status", style="bold white")
 
         mode = RetrievalMode.VECTORLESS if vectorless else RetrievalMode.HYBRID
@@ -217,6 +249,8 @@ def ingest_all_cmd(
                 doc_type=detected_type,
                 source_uri=str(file_item.resolve()),
                 retrieval_mode=mode,
+                embedding_model=target_model,
+                embedding_dim=target_dim,
             )
 
             try:
@@ -249,13 +283,32 @@ def ingest_all_cmd(
 def retrieve_cmd(
     query: str = typer.Argument(..., help="Search query"),
     top_k: int = typer.Option(5, "--top-k", "-k", help="Number of chunks to return"),
+    user_id: str = typer.Option("", "--user", "-u", help="User ID for preference resolution"),
+    embedding_model: str = typer.Option(
+        "", "--embedding-model", "-e", help="Embedding model (e.g. 'gemini-embedding-2')"
+    ),
+    embedding_dim: int = typer.Option(0, "--embedding-dim", "-d", help="Embedding dimension"),
+    reranker: str = typer.Option(
+        "",
+        "--reranker",
+        "-r",
+        help="Reranker strategy ('cross_encoder', 'gemini_semantic', 'gemini_llm')",
+    ),
 ) -> None:
-    """Run hybrid retrieval (BM25 + Vector + RRF + Rerank)."""
+    """Run hybrid retrieval (BM25 + Vector + RRF + Multi-Strategy Rerank)."""
 
     async def _run() -> None:
         filters = RetrievalFilters()
         with console.status("[bold green]Executing Hybrid Retrieval..."):
-            res = await retrieval_engine.retrieve(query=query, filters=filters, top_k=top_k)
+            res = await retrieval_engine.retrieve(
+                query=query,
+                filters=filters,
+                top_k=top_k,
+                embedding_model=embedding_model if embedding_model else None,
+                embedding_dim=embedding_dim if embedding_dim else None,
+                reranker=reranker if reranker else None,
+                user_id=user_id if user_id else None,
+            )
 
         table = Table(title=f"Retrieval Results for: '{query}' (Sufficient: {res.sufficient})")
         table.add_column("Rank", style="cyan", width=6)
@@ -280,15 +333,32 @@ def retrieve_cmd(
 @app.command("query")
 def query_cmd(
     query: str = typer.Argument(..., help="User query"),
-    user_id: str = typer.Option("default_user", "--user", "-u", help="User ID for memory"),
+    user_id: str = typer.Option(
+        "default_user", "--user", "-u", help="User ID for memory & preferences"
+    ),
     model: str = typer.Option(
         "",
         "--model",
         "-m",
-        help="Model to use (e.g. 'auto', 'claude-sonnet-4-6', 'z-ai/glm-5.2')",
+        help="Reasoning model to use (e.g. 'qwen/qwen3.6-27b', 'gemini-2.5-flash', 'z-ai/glm-5.2')",
+    ),
+    embedding_model: str = typer.Option(
+        "",
+        "--embedding-model",
+        "-e",
+        help="Embedding model (e.g. 'gemini-embedding-2', 'gemini-embedding-001')",
+    ),
+    embedding_dim: int = typer.Option(
+        0, "--embedding-dim", "-d", help="Embedding dimension (e.g. 768, 1536, 3072)"
+    ),
+    reranker: str = typer.Option(
+        "",
+        "--reranker",
+        "-r",
+        help="Reranker strategy ('cross_encoder', 'gemini_semantic', 'gemini_llm')",
     ),
 ) -> None:
-    """Run full intelligent query answering."""
+    """Run full intelligent grounded query answering with preference resolution."""
 
     async def _run() -> None:
         storage = await get_storage()
@@ -302,7 +372,15 @@ def query_cmd(
         )
 
         with console.status("[bold green]Retrieving relevant chunks..."):
-            retrieval_res = await retrieval_engine.retrieve(query=query, filters=filters, top_k=6)
+            retrieval_res = await retrieval_engine.retrieve(
+                query=query,
+                filters=filters,
+                top_k=6,
+                embedding_model=embedding_model if embedding_model else None,
+                embedding_dim=embedding_dim if embedding_dim else None,
+                reranker=reranker if reranker else None,
+                user_id=user_id,
+            )
 
         console.print(
             f"[dim]Retrieved {len(retrieval_res.parent_chunks)} parent chunks (sufficient: {retrieval_res.sufficient})[/dim]"
@@ -334,7 +412,7 @@ def query_cmd(
         if active_notice:
             console.print(
                 Panel(
-                    f"[bold red]⚠️  GROQ API RATE LIMIT NOTICE[/bold red]\n"
+                    f"[bold red]⚠️  API RATE LIMIT NOTICE[/bold red]\n"
                     f"• Provider: [yellow]{active_notice.get('provider', 'Groq').upper()}[/yellow] | Model: [cyan]{active_notice.get('model', 'qwen/qwen3.6-27b')}[/cyan]\n"
                     f"• Quota: [bold]{active_notice.get('quota_type', 'Tokens Per Day')}[/bold] ({active_notice.get('used', '200k')}/{active_notice.get('limit', '200k')})\n"
                     f"• Quota Reset In: [bold green]{active_notice.get('retry_after', 'a few minutes')}[/bold green]\n"
@@ -345,6 +423,93 @@ def query_cmd(
             )
 
         console.print(Panel(answer, title="[bold green]Answer[/bold green]"))
+        await close_storage()
+
+    asyncio.run(_run())
+
+
+@app.command("preferences")
+def get_preferences_cmd(
+    user_id: str = typer.Argument("default_user", help="User ID to view preferences for"),
+) -> None:
+    """View saved embedding, reranker, and model preferences for a user."""
+
+    async def _run() -> None:
+        storage = await get_storage()
+        from deep_context.memory.stores import MemoryStoreManager
+
+        mgr = MemoryStoreManager(storage)
+        prefs = await mgr.get_embedding_preferences(user_id=user_id)
+
+        table = Table(title=f"User Preferences for: '{user_id}'")
+        table.add_column("Setting", style="cyan")
+        table.add_column("Value", style="green")
+
+        table.add_row("Embedding Model", str(prefs.get("embedding_model")))
+        table.add_row("Embedding Dimension", str(prefs.get("embedding_dim")))
+        table.add_row("Reranker Strategy", str(prefs.get("reranker")))
+        table.add_row("LLM Model", str(prefs.get("llm_model")))
+
+        console.print(table)
+        await close_storage()
+
+    asyncio.run(_run())
+
+
+@app.command("set-preference")
+def set_preference_cmd(
+    user_id: str = typer.Option("default_user", "--user", "-u", help="User ID"),
+    embedding_model: str = typer.Option(
+        "",
+        "--embedding-model",
+        "-e",
+        help="Preferred embedding model (e.g. 'gemini-embedding-2', 'gemini-embedding-001', 'nvidia/nv-embedqa-e5-v5')",
+    ),
+    embedding_dim: int = typer.Option(
+        0, "--embedding-dim", "-d", help="Preferred embedding dimension (e.g. 768, 1536, 3072)"
+    ),
+    reranker: str = typer.Option(
+        "",
+        "--reranker",
+        "-r",
+        help="Preferred reranker ('cross_encoder', 'gemini_semantic', 'gemini_llm')",
+    ),
+    llm_model: str = typer.Option(
+        "",
+        "--model",
+        "-m",
+        help="Preferred LLM model (e.g. 'qwen/qwen3.6-27b', 'gemini-2.5-flash')",
+    ),
+) -> None:
+    """Save user preferences for embeddings and rerankers into durable memory_preference store."""
+
+    async def _run() -> None:
+        storage = await get_storage()
+        from deep_context.memory.stores import MemoryStoreManager
+
+        mgr = MemoryStoreManager(storage)
+        await mgr.set_embedding_preferences(
+            user_id=user_id,
+            embedding_model=embedding_model if embedding_model else None,
+            embedding_dim=embedding_dim if embedding_dim else None,
+            reranker=reranker if reranker else None,
+            llm_model=llm_model if llm_model else None,
+        )
+
+        console.print(
+            Panel(
+                f"[bold green]Preferences Updated Successfully for User '{user_id}'![/bold green]\n"
+                + (
+                    f"• Embedding Model: [cyan]{embedding_model}[/cyan]\n"
+                    if embedding_model
+                    else ""
+                )
+                + (f"• Embedding Dim: [cyan]{embedding_dim}[/cyan]\n" if embedding_dim else "")
+                + (f"• Reranker Strategy: [magenta]{reranker}[/magenta]\n" if reranker else "")
+                + (f"• LLM Model: [yellow]{llm_model}[/yellow]\n" if llm_model else ""),
+                title="Preference Saved",
+            )
+        )
         await close_storage()
 
     asyncio.run(_run())

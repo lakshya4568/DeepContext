@@ -5,6 +5,7 @@ from __future__ import annotations
 import time
 import uuid
 
+from deep_context.core.config import settings
 from deep_context.core.llm_client import llm_client
 from deep_context.core.logging import logger
 from deep_context.core.types import (
@@ -37,14 +38,29 @@ class IngestionPipeline:
         # 2. Parent-child chunking
         parent_chunks, child_chunks = self.chunker.chunk_sections(doc_id, sections)
 
-        # 3. Generate dense embeddings for child chunks using NVIDIA NIM bge-m3
+        # 3. Generate dense embeddings for child chunks using Google Gemini or NVIDIA NIM
+        emb_model = request.embedding_model or settings.embedding_model
+        emb_dim = request.embedding_dim or (
+            768 if "gemini" in emb_model.lower() else settings.embedding_dim
+        )
+
         child_texts = [c.content for c in child_chunks]
         if child_texts:
-            embeddings = await llm_client.get_embeddings(child_texts)
+            embeddings = await llm_client.get_embeddings(
+                child_texts,
+                model=emb_model,
+                dim=emb_dim,
+                title=request.title,
+                is_query=False,
+            )
             for chunk, emb in zip(child_chunks, embeddings):
                 chunk.embedding = emb
 
         # 4. Create document record
+        doc_metadata = dict(request.metadata)
+        doc_metadata["embedding_model"] = emb_model
+        doc_metadata["embedding_dim"] = emb_dim
+
         doc = Document(
             id=doc_id,
             tenant_id=request.tenant_id,
@@ -53,7 +69,7 @@ class IngestionPipeline:
             doc_type=request.doc_type,
             permission_scope=request.permission_scope,
             retrieval_mode=request.retrieval_mode,
-            metadata=request.metadata,
+            metadata=doc_metadata,
         )
 
         # 5. Persist to storage (in order: document -> chunks -> optional tree nodes)
@@ -78,16 +94,20 @@ class IngestionPipeline:
                 "parent_chunks": len(parent_chunks),
                 "child_chunks": len(child_chunks),
                 "retrieval_mode": request.retrieval_mode.value,
+                "embedding_model": emb_model,
+                "embedding_dim": emb_dim,
             },
             latency_ms=latency_ms,
         )
 
         logger.info(
-            "Successfully ingested document %s (%s) with %d parents and %d children in %d ms",
+            "Successfully ingested document %s (%s) with %d parents and %d children using %s (%d-dim) in %d ms",
             doc_id,
             request.title,
             len(parent_chunks),
             len(child_chunks),
+            emb_model,
+            emb_dim,
             latency_ms,
         )
 
@@ -98,6 +118,8 @@ class IngestionPipeline:
             child_chunks_count=len(child_chunks),
             retrieval_mode=request.retrieval_mode,
             tree_nodes_count=tree_nodes_count,
+            embedding_model=emb_model,
+            embedding_dim=emb_dim,
         )
 
 

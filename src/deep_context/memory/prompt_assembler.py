@@ -30,13 +30,21 @@ class PromptAssembler:
         query: str,
         retrieved_chunks: list[dict[str, Any]],
         *,
-        system_instruction: str = "You are an intelligent, grounded AI assistant powered by the Deep Context Platform.",
+        system_instruction: str | None = None,
         tenant_id: str = "default",
         user_id: str | None = None,
         conversation_summary: str | None = None,
         task_state: str | None = None,
     ) -> list[dict[str, str]]:
-        sections: list[str] = [system_instruction]
+        default_inst = (
+            "You are an intelligent, strictly grounded AI assistant powered by the Deep Context Platform.\n\n"
+            "RULES OF RESPONSE:\n"
+            "1. Ground your answer strictly and completely in the provided Retrieved Evidence. Do not invent or assume unsupported facts.\n"
+            "2. If the retrieved evidence does not contain sufficient information or if the question asks about something absent from the text, state honestly: 'I could not find enough information in the provided documents to answer that reliably.'\n"
+            "3. Answer concisely and accurately, citing relevant context when appropriate."
+        )
+        base_instruction = system_instruction or default_inst
+        sections: list[str] = [base_instruction]
 
         # Layer 2: Active Policies (exact lookup)
         policies = await self.memory_manager.get_active_policies(

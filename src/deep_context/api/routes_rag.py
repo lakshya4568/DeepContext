@@ -15,6 +15,7 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 
 from deep_context.agentic.planner import AgenticPlanner
 from deep_context.agentic.router import QueryRouter
+from deep_context.core.config import settings
 from deep_context.core.llm_client import llm_client
 from deep_context.core.logging import logger
 from deep_context.core.types import (
@@ -33,13 +34,15 @@ from deep_context.core.types import (
     RetrieveResponse,
     RoutingPath,
     StageDiagnostic,
+    UserPreferenceRequest,
+    UserPreferenceResponse,
 )
 from deep_context.ingestion.pipeline import ingestion_pipeline
 from deep_context.memory.prompt_assembler import PromptAssembler
 from deep_context.memory.stores import MemoryStoreManager
 from deep_context.retrieval.engine import retrieval_engine
 from deep_context.retrieval.hybrid import HybridRetriever
-from deep_context.retrieval.reranker import CrossEncoderReranker
+from deep_context.retrieval.reranker import Reranker
 from deep_context.rlm.orchestrator import RLMOrchestrator
 from deep_context.storage import get_storage
 from deep_context.verification.checker import EvidenceVerifier
@@ -88,6 +91,8 @@ async def upload_file(
     title: str = Form(""),
     doc_type: str = Form("auto"),
     vectorless: bool = Form(False),
+    embedding_model: str = Form(""),
+    embedding_dim: int = Form(0),
 ) -> IngestResponse:
     """Upload and ingest a file (PDF up to 1000 pages, Markdown, Code, TXT)."""
     filename = file.filename or "uploaded_doc"
@@ -107,6 +112,10 @@ async def upload_file(
 
     doc_title = title.strip() or Path(filename).stem
     mode = RetrievalMode.VECTORLESS if vectorless else RetrievalMode.HYBRID
+    target_model = embedding_model or settings.embedding_model
+    target_dim = embedding_dim or (
+        768 if "gemini" in target_model.lower() else settings.embedding_dim
+    )
 
     # Save to temp file if PDF for streaming pypdf extraction
     if detected_type == "pdf":
@@ -123,6 +132,8 @@ async def upload_file(
                 doc_type="pdf",
                 source_uri=filename,
                 retrieval_mode=mode,
+                embedding_model=target_model,
+                embedding_dim=target_dim,
                 metadata={"filename": filename, "file_size": len(file_bytes)},
             )
             res = await ingestion_pipeline.ingest(req)
@@ -138,6 +149,8 @@ async def upload_file(
             doc_type=detected_type,
             source_uri=filename,
             retrieval_mode=mode,
+            embedding_model=target_model,
+            embedding_dim=target_dim,
             metadata={"filename": filename, "file_size": len(file_bytes)},
         )
         return await ingestion_pipeline.ingest(req)
@@ -147,9 +160,16 @@ async def upload_file(
 async def upload_batch_files(
     files: list[UploadFile] = File(...),
     vectorless: bool = Form(False),
+    embedding_model: str = Form(""),
+    embedding_dim: int = Form(0),
 ) -> list[IngestResponse]:
     """Upload and ingest multiple files at once (PDFs, TXT, MD, Code)."""
     results: list[IngestResponse] = []
+    target_model = embedding_model or settings.embedding_model
+    target_dim = embedding_dim or (
+        768 if "gemini" in target_model.lower() else settings.embedding_dim
+    )
+
     for file in files:
         filename = file.filename or "uploaded_doc"
         file_bytes = await file.read()
@@ -181,6 +201,8 @@ async def upload_batch_files(
                     doc_type="pdf",
                     source_uri=filename,
                     retrieval_mode=mode,
+                    embedding_model=target_model,
+                    embedding_dim=target_dim,
                     metadata={"filename": filename, "file_size": len(file_bytes)},
                 )
                 res = await ingestion_pipeline.ingest(req)
@@ -196,6 +218,8 @@ async def upload_batch_files(
                 doc_type=detected_type,
                 source_uri=filename,
                 retrieval_mode=mode,
+                embedding_model=target_model,
+                embedding_dim=target_dim,
                 metadata={"filename": filename, "file_size": len(file_bytes)},
             )
             res = await ingestion_pipeline.ingest(req)
@@ -204,10 +228,51 @@ async def upload_batch_files(
     return results
 
 
+@router.get("/v1/preferences", response_model=UserPreferenceResponse)
+async def get_user_preferences_api(user_id: str = "default") -> UserPreferenceResponse:
+    """Fetch stored user preferences for embedding models, dimensions, and rerankers."""
+    storage = await get_storage()
+    mgr = MemoryStoreManager(storage)
+    prefs = await mgr.get_embedding_preferences(user_id=user_id)
+    return UserPreferenceResponse(
+        user_id=user_id,
+        embedding_model=prefs.get("embedding_model", settings.embedding_model),
+        embedding_dim=prefs.get("embedding_dim", settings.embedding_dim),
+        reranker=prefs.get("reranker", settings.reranker_strategy),
+        llm_model=prefs.get("llm_model", settings.llm_model),
+        preferences=prefs,
+    )
+
+
+@router.post("/v1/preferences", response_model=UserPreferenceResponse)
+async def set_user_preferences_api(req: UserPreferenceRequest) -> UserPreferenceResponse:
+    """Persist user embedding and reranker preferences to durable memory."""
+    storage = await get_storage()
+    mgr = MemoryStoreManager(storage)
+    await mgr.set_embedding_preferences(
+        user_id=req.user_id,
+        embedding_model=req.embedding_model,
+        embedding_dim=req.embedding_dim,
+        reranker=req.reranker,
+        llm_model=req.llm_model,
+    )
+    prefs = await mgr.get_embedding_preferences(user_id=req.user_id)
+    return UserPreferenceResponse(
+        user_id=req.user_id,
+        embedding_model=prefs.get("embedding_model", settings.embedding_model),
+        embedding_dim=prefs.get("embedding_dim", settings.embedding_dim),
+        reranker=prefs.get("reranker", settings.reranker_strategy),
+        llm_model=prefs.get("llm_model", settings.llm_model),
+        preferences=prefs,
+    )
+
+
 @router.post("/v1/sync-folder", response_model=list[IngestResponse])
 async def sync_local_folder(
     folder_path: str = "documents",
     vectorless: bool = False,
+    embedding_model: str = "",
+    embedding_dim: int = 0,
 ) -> list[IngestResponse]:
     """Scan and ingest all supported files from a local directory (e.g. './documents')."""
     target_dir = Path(folder_path)
@@ -234,6 +299,10 @@ async def sync_local_folder(
 
     results: list[IngestResponse] = []
     mode = RetrievalMode.VECTORLESS if vectorless else RetrievalMode.HYBRID
+    target_model = embedding_model or settings.embedding_model
+    target_dim = embedding_dim or (
+        768 if "gemini" in target_model.lower() else settings.embedding_dim
+    )
 
     for p in target_dir.rglob("*"):
         if p.is_file() and not any(part in ignored for part in p.parts):
@@ -251,6 +320,8 @@ async def sync_local_folder(
                     doc_type=dtype,
                     source_uri=str(p.resolve()),
                     retrieval_mode=mode,
+                    embedding_model=target_model,
+                    embedding_dim=target_dim,
                 )
                 try:
                     res = await ingestion_pipeline.ingest(req)
@@ -263,7 +334,7 @@ async def sync_local_folder(
 
 @router.post("/v1/ingest", response_model=IngestResponse)
 async def ingest_document(req: IngestRequest) -> IngestResponse:
-    """Ingests a document, parses sections, creates parent-child chunks & bge-m3 embeddings."""
+    """Ingests a document, parses sections, creates parent-child chunks & embeddings."""
     return await ingestion_pipeline.ingest(req)
 
 
@@ -275,7 +346,15 @@ async def retrieve_knowledge(req: RetrieveRequest) -> RetrieveResponse:
         permission_scope=req.permission_scope,
         document_ids=req.document_ids,
     )
-    res = await retrieval_engine.retrieve(query=req.query, filters=filters, top_k=req.top_k)
+    res = await retrieval_engine.retrieve(
+        query=req.query,
+        filters=filters,
+        top_k=req.top_k,
+        embedding_model=req.embedding_model,
+        embedding_dim=req.embedding_dim,
+        reranker=req.reranker,
+        user_id=req.user_id,
+    )
     return RetrieveResponse(
         sufficient=res.sufficient,
         parent_chunks=res.parent_chunks,
@@ -309,7 +388,15 @@ async def query_platform(req: QueryRequest, background_tasks: BackgroundTasks) -
     support_confidence = 1.0
 
     if decision.path == RoutingPath.HYBRID_RAG:
-        retrieval_res = await retrieval_engine.retrieve(query=req.query, filters=filters, top_k=6)
+        retrieval_res = await retrieval_engine.retrieve(
+            query=req.query,
+            filters=filters,
+            top_k=6,
+            embedding_model=req.embedding_model,
+            embedding_dim=req.embedding_dim,
+            reranker=req.reranker,
+            user_id=req.user_id,
+        )
         citations_list = [c.to_dict() for c in retrieval_res.citations]
 
         assembler = PromptAssembler(storage)
@@ -418,7 +505,13 @@ async def query_platform_stream(
                 # 2. Hybrid Retrieval Phase
                 yield f"data: {json.dumps({'type': 'status', 'stage': 'retrieval', 'message': '📚 Running BM25 + Dense Vector hybrid search & RRF ranking...'})}\n\n"
                 retrieval_res = await retrieval_engine.retrieve(
-                    query=req.query, filters=filters, top_k=6
+                    query=req.query,
+                    filters=filters,
+                    top_k=6,
+                    embedding_model=req.embedding_model,
+                    embedding_dim=req.embedding_dim,
+                    reranker=req.reranker,
+                    user_id=req.user_id,
                 )
                 citations_list = [c.to_dict() for c in retrieval_res.citations]
                 yield f"data: {json.dumps({'type': 'citations', 'citations': citations_list})}\n\n"
@@ -703,8 +796,12 @@ async def benchmark_haystack(
         )
     )
 
-    # Stage 2: BGE-M3 Dense Vector Search
-    q_emb = await llm_client.get_embedding(req.query)
+    # Stage 2: Dense Vector Search (Google Gemini / NVIDIA NIM)
+    active_emb = settings.embedding_model
+    active_dim = 768 if "gemini" in active_emb.lower() else settings.embedding_dim
+    q_emb = await llm_client.get_embedding(
+        req.query, model=active_emb, dim=active_dim, is_query=True
+    )
     vec_results = await storage.search_vector(query_embedding=q_emb, filters=filters, limit=100)
     vec_found = False
     vec_rank = None
@@ -718,12 +815,12 @@ async def benchmark_haystack(
 
     stages.append(
         StageDiagnostic(
-            stage_name="Stage 2: Dense Vector Search (PostgreSQL pgvector HNSW 1024-dim Cosine Sim)",
+            stage_name=f"Stage 2: Dense Vector Search ({active_emb} {active_dim}-dim Cosine Sim)",
             needle_found=vec_found,
             needle_rank=vec_rank,
             score=round(vec_sim, 4) if vec_sim is not None else None,
             details=(
-                "Scanned child vectors using 1024-dim BGE-M3 embeddings. "
+                f"Scanned child vectors using {active_dim}-dim {active_emb} embeddings. "
                 + (
                     f"Needle found at Vector rank #{vec_rank} (cosine similarity: {vec_sim:.4f})."
                     if vec_found
@@ -736,7 +833,11 @@ async def benchmark_haystack(
     # Stage 3: Reciprocal Rank Fusion (RRF k=60)
     hybrid_retriever = HybridRetriever(storage)
     rrf_candidates = await hybrid_retriever.retrieve_candidates(
-        sub_queries=[req.query], filters=filters, limit=100
+        sub_queries=[req.query],
+        filters=filters,
+        limit=100,
+        embedding_model=active_emb,
+        embedding_dim=active_dim,
     )
     rrf_found = False
     rrf_rank = None
@@ -765,9 +866,15 @@ async def benchmark_haystack(
         )
     )
 
-    # Stage 4: Cross-Encoder Reranking
-    reranked = await CrossEncoderReranker.rerank(
-        query=req.query, candidates=rrf_candidates, top_k=req.top_k
+    # Stage 4: Multi-Strategy Precision Reranking
+    active_rerank = settings.reranker_strategy
+    reranked = await Reranker.rerank(
+        query=req.query,
+        candidates=rrf_candidates,
+        top_k=req.top_k,
+        strategy=active_rerank,
+        embedding_model=active_emb,
+        embedding_dim=active_dim,
     )
     rerank_found = False
     rerank_rank = None
@@ -776,17 +883,17 @@ async def benchmark_haystack(
         if needle_clean in r["content"].lower():
             rerank_found = True
             rerank_rank = idx
-            rerank_score = r.get("score")
+            rerank_score = r.get("rerank_score") or r.get("score")
             break
 
     stages.append(
         StageDiagnostic(
-            stage_name="Stage 4: Cross-Encoder Precision Reranker",
+            stage_name=f"Stage 4: Precision Reranker ({active_rerank})",
             needle_found=rerank_found,
             needle_rank=rerank_rank,
             score=round(rerank_score, 4) if rerank_score is not None else None,
             details=(
-                f"Reranked top {len(rrf_candidates)} chunks to final top-{req.top_k}. "
+                f"Reranked top {len(rrf_candidates)} chunks using strategy '{active_rerank}' to final top-{req.top_k}. "
                 + (
                     f"Needle confirmed in final set at rank #{rerank_rank} (relevance score: {rerank_score:.3f})."
                     if rerank_found
