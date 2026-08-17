@@ -54,6 +54,16 @@ def deduplicate_candidates(
     return deduped
 
 
+def _best_rank(lists: list[list[dict[str, Any]]], cid: str) -> int:
+    best = 10_000
+    for ranked_list in lists:
+        for rank, item in enumerate(ranked_list, start=1):
+            if item.get("id") == cid:
+                best = min(best, rank)
+                break
+    return best
+
+
 class HybridRetriever:
     """Executes parallel BM25 and Dense Vector search, applies RRF, and deduplicates candidates."""
 
@@ -71,7 +81,6 @@ class HybridRetriever:
         """
         Runs BM25 and vector search in parallel across all sub-queries and returns fused candidate chunks.
         """
-        # 1. Generate query embeddings for all sub-queries (asymmetric query format for Gemini)
         query_embeddings = await llm_client.get_embeddings(
             sub_queries,
             model=embedding_model,
@@ -87,16 +96,16 @@ class HybridRetriever:
             for q_emb in query_embeddings
         ]
 
-        # 2. Run all recall legs in parallel
         all_results = await asyncio.gather(*(bm25_tasks + vector_tasks))
         ranked_lists: list[list[dict[str, Any]]] = list(all_results)
+        n_queries = len(sub_queries)
+        bm25_lists = ranked_lists[:n_queries]
+        vector_lists = ranked_lists[n_queries:]
 
-        # 3. Reciprocal Rank Fusion
         fused = reciprocal_rank_fusion(ranked_lists, k=settings.rrf_k)
         fused_score_map = {cid: score for cid, score in fused}
         fused_ids = [cid for cid, _ in fused[:limit]]
 
-        # Map candidate details
         id_to_candidate: dict[str, dict[str, Any]] = {}
         for r_list in ranked_lists:
             for item in r_list:
@@ -105,24 +114,27 @@ class HybridRetriever:
                     cand = dict(item)
                     cand["rrf_score"] = fused_score_map.get(cid, 0.0)
                     cand["score"] = cand["rrf_score"]
+                    cand["bm25_rank"] = _best_rank(bm25_lists, cid)
+                    cand["dense_rank"] = _best_rank(vector_lists, cid)
                     id_to_candidate[cid] = cand
 
-        # 4. Appendix / Metadata Intent Boosting
         is_appendix_intent = any(
-            any(w in sq.lower() for w in ("appendix", "words of house", "house words", "sigil", "sworn houses"))
+            any(
+                w in sq.lower()
+                for w in ("appendix", "words of house", "house words", "sigil", "sworn houses")
+            )
             for sq in sub_queries
         )
         if is_appendix_intent:
             for cid, cand in id_to_candidate.items():
-                p_num = cand.get("page_number") or 0
                 sec = (cand.get("section_path") or "").lower()
-                if p_num >= 730 or "appendix" in sec:
+                doc_type = str(cand.get("doc_type") or "").lower()
+                p_num = cand.get("page_number") or 0
+                if "appendix" in sec or doc_type == "appendix" or p_num >= 730:
                     fused_score_map[cid] = fused_score_map.get(cid, 0.0) + 0.05
                     cand["rrf_score"] = fused_score_map[cid]
                     cand["score"] = cand["rrf_score"]
             fused_ids = sorted(fused_ids, key=lambda cid: fused_score_map.get(cid, 0.0), reverse=True)
 
         ordered_candidates = [id_to_candidate[cid] for cid in fused_ids if cid in id_to_candidate]
-
-        # 5. Deduplicate
         return deduplicate_candidates(ordered_candidates, max_candidates=limit)

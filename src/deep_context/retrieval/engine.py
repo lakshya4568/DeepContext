@@ -16,6 +16,7 @@ from deep_context.core.types import (
 )
 from deep_context.retrieval.classifier import QueryClassifier
 from deep_context.retrieval.hybrid import HybridRetriever
+from deep_context.retrieval.quality_gates import hop_coverage, is_anachronism, protect_consensus
 from deep_context.retrieval.reranker import Reranker
 from deep_context.retrieval.rewriter import QueryRewriter
 from deep_context.retrieval.tree_navigator import TreeNavigator
@@ -47,9 +48,9 @@ class RetrievalEngine:
         3. Rewrite / decompose into sub-queries
         4. Parallel BM25 + Vector recall (or tree navigation if vectorless)
         5. Reciprocal Rank Fusion & deduplication
-        6. Multi-strategy reranking (Cross-Encoder / Gemini Semantic / Gemini LLM)
+        6. Multi-strategy reranking with consensus protection
         7. Child -> Parent chunk resolution
-        8. Evidence sufficiency check (max 1 retry)
+        8. Hop-coverage retry and evidence sufficiency check
         """
         t0 = time.time()
         storage = await get_storage()
@@ -57,7 +58,6 @@ class RetrievalEngine:
         target_top_k = top_k or settings.default_top_k
         max_retries = settings.max_retrieval_retries
 
-        # Resolve user preferences if user_id is provided
         active_emb_model = embedding_model
         active_emb_dim = embedding_dim
         active_reranker = reranker
@@ -94,10 +94,30 @@ class RetrievalEngine:
         current_query = query
         retry_count = 0
 
+        if is_anachronism(query):
+            latency_ms = int((time.time() - t0) * 1000)
+            await storage.insert_event_trace(
+                event_type="retrieval",
+                payload={
+                    "query": query,
+                    "query_shape": shape.value,
+                    "sufficient": False,
+                    "reason": "anachronism",
+                },
+                latency_ms=latency_ms,
+            )
+            return RetrievalResult(
+                sufficient=False,
+                parent_chunks=[],
+                citations=[],
+                query_shape=shape,
+                retry_count=0,
+                insufficiency_reason="anachronism",
+            )
+
         while True:
             sub_queries = await self.rewriter.rewrite_or_decompose(current_query, shape)
 
-            # Check if target documents specify vectorless mode
             is_vectorless = False
             if filters.document_ids and len(filters.document_ids) == 1:
                 doc = await storage.get_document(filters.document_ids[0])
@@ -107,7 +127,6 @@ class RetrievalEngine:
             candidates: list[dict[str, Any]] = []
 
             if is_vectorless and filters.document_ids:
-                # Tree navigation path
                 tree_nav = TreeNavigator(storage)
                 leaf_ids = await tree_nav.navigate(current_query, filters.document_ids[0])
                 leaf_chunks = await storage.get_chunks_by_ids(leaf_ids)
@@ -127,7 +146,6 @@ class RetrievalEngine:
                         }
                     )
             else:
-                # Standard Hybrid RAG path (BM25 + Vector + RRF)
                 hybrid_retriever = HybridRetriever(storage)
                 candidates = await hybrid_retriever.retrieve_candidates(
                     sub_queries=sub_queries,
@@ -137,20 +155,39 @@ class RetrievalEngine:
                     embedding_dim=active_emb_dim,
                 )
 
-            # Multi-strategy Reranker (Cross-Encoder / Gemini Semantic / Gemini LLM)
+            rerank_pool = min(24, max(target_top_k, len(candidates)))
             reranked_children = await Reranker.rerank(
                 query=current_query,
                 candidates=candidates,
-                top_k=target_top_k,
+                top_k=rerank_pool,
                 strategy=active_reranker,
                 embedding_model=active_emb_model,
                 embedding_dim=active_emb_dim,
             )
+            reranked_children = protect_consensus(
+                candidates, reranked_children, top_k=rerank_pool
+            )
 
-            # Resolve Child -> Parent chunks (FR2)
             parents = await self._resolve_parent_chunks(storage, reranked_children)
+            parents = parents[:target_top_k]
 
-            # Build Citation objects
+            missing_hops = hop_coverage(sub_queries, parents)
+            if missing_hops and retry_count == 0 and not is_vectorless:
+                extra = await HybridRetriever(storage).retrieve_candidates(
+                    sub_queries=missing_hops,
+                    filters=filters,
+                    limit=max(20, target_top_k * 2),
+                    embedding_model=active_emb_model,
+                    embedding_dim=active_emb_dim,
+                )
+                extra_parents = await self._resolve_parent_chunks(storage, extra)
+                seen = {p.get("chunk_id") for p in parents}
+                for parent in extra_parents:
+                    if parent.get("chunk_id") not in seen:
+                        parents.append(parent)
+                        seen.add(parent.get("chunk_id"))
+                parents = parents[: max(target_top_k, 12)]
+
             citations = [
                 Citation(
                     chunk_id=p["chunk_id"],
@@ -163,7 +200,6 @@ class RetrievalEngine:
                 for p in parents
             ]
 
-            # Evidence sufficiency check
             is_sufficient, insufficiency_reason = self._check_evidence_sufficiency(parents, shape)
 
             if is_sufficient:
@@ -177,6 +213,7 @@ class RetrievalEngine:
                         "parents_returned": len(parents),
                         "retries": retry_count,
                         "sufficient": True,
+                        "sub_queries": sub_queries,
                     },
                     latency_ms=latency_ms,
                 )
@@ -188,7 +225,6 @@ class RetrievalEngine:
                     retry_count=retry_count,
                 )
 
-            # Insufficient evidence handling
             if retry_count >= max_retries:
                 latency_ms = int((time.time() - t0) * 1000)
                 await storage.insert_event_trace(
@@ -213,7 +249,6 @@ class RetrievalEngine:
                     insufficiency_reason=insufficiency_reason,
                 )
 
-            # Corrective rewrite retry (FR4: max 1 retry)
             current_query = f"{query} relevant details specifications context"
             retry_count += 1
             logger.info("Corrective retrieval retry %d for query: %s", retry_count, query)
@@ -257,7 +292,6 @@ class RetrievalEngine:
                     }
                 )
             else:
-                # If child had no parent or parent not found, use child itself
                 if c["id"] in seen_parent_ids:
                     continue
                 seen_parent_ids.add(c["id"])

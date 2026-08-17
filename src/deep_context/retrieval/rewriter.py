@@ -32,7 +32,13 @@ def safe_parse_json_list(text: str) -> list[str]:
 
     items = re.findall(r"\"([^\"\n\r]{3,100})\"", text)
     if items:
-        return [it.strip() for it in items if it.strip() and not it.lower().startswith("sub-query") and not it.lower().startswith("search query")]
+        return [
+            it.strip()
+            for it in items
+            if it.strip()
+            and not it.lower().startswith("sub-query")
+            and not it.lower().startswith("search query")
+        ]
 
     return []
 
@@ -45,25 +51,23 @@ class QueryRewriter:
         q_lower = query.lower()
         sub_queries: list[str] = [query]
 
-        # 1. Appendix / Heraldry / Lineage routing
         if any(w in q_lower for w in ("appendix", "words of house", "house words", "sigil", "sworn houses")):
             appendix_q = f"appendix {query}"
             if appendix_q not in sub_queries:
                 sub_queries.append(appendix_q)
 
-        # Target ultra-fast LLM for rewrite
         target_model = "meta/llama-3.1-8b-instruct" if settings.has_nvidia_key else settings.llm_model
 
-        # 2. Multi-hop decomposition
         if shape in (QueryShape.MULTI_HOP, QueryShape.AGGREGATION) or " and " in q_lower or "?" in query[10:]:
             try:
                 prompt = [
                     {
                         "role": "system",
                         "content": (
-                            "You are an expert search query optimizer for the fantasy novel A Game of Thrones (A Song of Ice and Fire) and corpus documents.\n"
-                            "Decompose the complex user query into 2-3 focused sub-queries targeting distinct entities, events, and scenes.\n"
-                            'Return ONLY a valid JSON array of strings, e.g. ["sub-query 1", "sub-query 2"].'
+                            "Decompose the user query into 2-3 focused search queries. "
+                            "Each query should target a distinct entity, event, or requested fact "
+                            "already named in the question. Do not invent proper nouns that are not "
+                            "in the question. Return ONLY a JSON array of strings."
                         ),
                     },
                     {"role": "user", "content": f"Query: {query}"},
@@ -89,7 +93,6 @@ class QueryRewriter:
                         if p not in sub_queries:
                             sub_queries.append(p)
 
-        # 3. Paraphrase expansion for descriptive queries
         all_words = re.findall(r"\w+", query)
         has_proper_nouns = any(w[0].isupper() for w in all_words[1:]) if len(all_words) > 1 else False
         if not has_proper_nouns and len(sub_queries) == 1:
@@ -98,9 +101,9 @@ class QueryRewriter:
                     {
                         "role": "system",
                         "content": (
-                            "You are an expert search query expander for the fantasy novel A Game of Thrones (A Song of Ice and Fire) and corpus documents.\n"
-                            "Identify the core scene, entity, or event described in the question and produce 2-3 specific search queries targeting the canon names, characters, objects, and terms.\n"
-                            'Return ONLY a JSON array of strings, e.g. ["search query 1", "search query 2"].'
+                            "Rewrite the descriptive question into 2-3 specific search queries. "
+                            "Keep likely in-corpus object, place, and event names if they are implied, "
+                            "but do not invent a fictional canon. Return ONLY a JSON array of strings."
                         ),
                     },
                     {"role": "user", "content": f"Query: {query}"},
