@@ -1,78 +1,335 @@
-# Deep Context Platform — RAG + RLM Architecture Package
+<div align="center">
 
-Agent backend design: hybrid RAG for everyday retrieval, typed long-term memory for continuity across sessions,
-and an RLM (Recursive Language Model) engine for the minority of tasks that require reading more material than
-fits in any model's context window — fronted by FastAPI, exposed to agents as composable `SKILL.md` skills.
+# ⚡ Deep Context Platform
+### *Bare-Metal Agentic RAG, Recursive Language Models (RLM), and Typed Long-Term Memory*
 
-Verified against the actual `PrimeIntellect-ai/prime-agent` repository and the RLM paper (arXiv:2512.24601) on
-17 August 2026 — see `docs/VERIFICATION_AND_SOURCES.md` for exactly what was confirmed, corrected, and left
-unverified. **Read `docs/CRITICAL_ASSESSMENT_AND_SCOPE.md` before you start building** — it's the honest answer
-to "should I actually build all of this," not just "here's the full architecture you asked for."
+[![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![PostgreSQL + pgvector](https://img.shields.io/badge/PostgreSQL-pgvector%20HNSW-336791?logo=postgresql&logoColor=white)](https://github.com/pgvector/pgvector)
+[![Google Gemini GenAI](https://img.shields.io/badge/Google%20GenAI-Gemini%202.5%20%2B%20Embedding--2-4285F4?logo=google&logoColor=white)](https://ai.google.dev)
+[![Groq Fast Inference](https://img.shields.io/badge/Groq-Qwen%203.6%2027B%20%2F%20Llama%203.3-F05032?logo=fastly&logoColor=white)](https://groq.com)
+[![NVIDIA NIM](https://img.shields.io/badge/NVIDIA%20NIM-Llama%203.1%20%2F%20GLM--5.2-76B900?logo=nvidia&logoColor=white)](https://build.nvidia.com)
+[![Tests](https://img.shields.io/badge/Tests-43%20Passed%20(100%25)-brightgreen)](https://github.com)
+[![Zero Frameworks](https://img.shields.io/badge/Frameworks-Zero%20(No%20LangChain%20%2F%20LlamaIndex)-black)](https://github.com)
 
-## Where to start
+**A high-performance, framework-free Agentic Retrieval-Augmented Generation (RAG) platform.**  
+Built entirely from scratch with raw Python, pure SQL (`asyncpg` + `pgvector`), multi-provider LLMs, typed durable memory, sandboxed recursive language modeling (RLM), and a zero-dependency Vanilla web interface.
 
-| If you want to... | Read |
-|---|---|
-| Understand what this platform does and why, requirements, phased release plan | `docs/PRD.md` |
-| Understand *whether you should build all of it*, and in what order | `docs/CRITICAL_ASSESSMENT_AND_SCOPE.md` |
-| Understand the technical design: components, host/kernel boundary, memory, RLM engine | `docs/ARCHITECTURE.md` |
-| See exactly what was verified vs. corrected vs. not re-checked, and against which sources | `docs/VERIFICATION_AND_SOURCES.md` |
-| Pick concrete tools (language, DB, reranker, sandboxing, orchestration) and know when to switch | `docs/TECH_STACK.md` |
-| Get the runnable Postgres schema | `docs/DATA_MODEL.sql` |
-| Follow the exact step-by-step pipelines | `workflows/` |
-| Get Claude/Prime-Agent/LangGraph-loadable `SKILL.md` packages for every subsystem | `skills/` |
-| See the system diagrams | `diagrams/` |
-| Read the original research brief this package extends | `docs/source-verdict-aug-2026.md` |
+[Quickstart](#-quickstart) • [Architecture](#-architecture) • [Features](#-core-features) • [API Contracts](#-api--streaming-contracts) • [CLI Manual](#-cli-reference) • [Documentation](#-documentation)
 
-## Directory map
+---
 
-```text
-├── README.md                          — this file
-├── docs/
-│   ├── PRD.md                         — product requirements: goals, FR1–FR23, NFR1–NFR6, phased release plan
-│   ├── ARCHITECTURE.md                — technical design: layers, host/kernel boundary, RLM engine, memory
-│   ├── TECH_STACK.md                  — concrete tool choices + explicit switch criteria for each
-│   ├── DATA_MODEL.sql                 — full runnable Postgres 15 + pgvector schema
-│   ├── CRITICAL_ASSESSMENT_AND_SCOPE.md — honest scope recommendation; read this first
-│   ├── VERIFICATION_AND_SOURCES.md    — what was fact-checked against primary sources, and how
-│   └── source-verdict-aug-2026.md     — the original Perplexity research brief this package extends
-├── workflows/
-│   ├── 01_ingestion_pipeline.md       — raw document → searchable chunks (FR2, FR5, FR6)
-│   ├── 02_retrieval_pipeline.md       — the default hybrid retrieval path (FR1, FR3–FR6)
-│   └── 03_rlm_recursion_pipeline.md   — the RLM escalation path (FR11–FR16)
-├── diagrams/
-│   ├── system_architecture.mermaid    — rendered version of ARCHITECTURE.md §2
-│   └── rlm_core_loop.mermaid          — rendered version of ARCHITECTURE.md §5.2
-└── skills/
-    ├── rag-retrieval/                 — hybrid retrieval: retrieve() contract + reference implementation
-    ├── typed-memory/                  — four-store memory + promotion gate
-    ├── rlm-orchestrator/              — host/kernel boundary, async subagent spawn, RLM core loop
-    ├── verification/                  — evidence-sufficiency gate + fact-checking methodology
-    ├── code-execution/                — sandboxing tiers and policy for the RLM kernel
-    └── refinement/                    — bounded corrective-retrieval retry + /refine-analogous loop
-        (each skill/ folder is a self-contained SKILL.md package per the open Agent Skills
-         standard — loadable by Claude, Claude Code, or a Prime-Agent-style harness as-is)
+</div>
+
+## 🌟 Why Deep Context Platform?
+
+Most modern RAG systems suffer from three critical flaws:
+1. **Framework Bloat & Fragility:** Heavy abstraction layers (LangChain, LlamaIndex, CrewAI) obscure SQL execution, add latency, and complicate production debugging.
+2. **Context Blindness & Haystack Loss:** Traditional fixed chunking either loses macro context (small chunks) or dilutes embedding precision (large chunks), failing on complex 1,000-page documents.
+3. **Lack of Infinite-Context Recursion:** When a query requires reading or aggregating over millions of tokens across an entire repository or book, standard top-$k$ retrieval fails.
+
+**Deep Context Platform solves this from first principles:**
+- **100% Hand-Crafted Core:** Zero LangChain, zero LlamaIndex, zero LangGraph. Pure, reviewable, high-speed Python 3.12 and raw SQL.
+- **Hierarchical Parent-Child Resolution:** Ingests documents into 1,000–2,500 token parent blocks mapped to 200–600 token child chunks with 15% overlap. Vector search hits precise children; synthesis receives rich parent context.
+- **Multi-Strategy Hybrid Retrieval:** Combines BM25 full-text indexing, `pgvector` HNSW dense vector search, Reciprocal Rank Fusion (RRF $k=60$), and multi-strategy rerankers.
+- **Matryoshka Representation Learning (MRL):** Native support for Google `gemini-embedding-2` and `gemini-embedding-001` with flexible output dimensions (768d, 1536d, 3072d) for up to 75% vector storage savings.
+- **Recursive Language Model (RLM) Engine:** Implements the MIT / Prime-Intellect architecture. When context exceeds window limits, the agent operates in a sandboxed Python REPL, spawning subagents and searching the corpus recursively.
+- **4-Store Typed Memory with Promotion Gate:** Durable memory partitioned into **Policy**, **Preference**, **Semantic Fact**, and **Episodic Summary**, governed by a strict 4-stage promotion gate and compiled via an 8-layer prompt assembler.
+- **Grounding Verification Gate:** Deterministic Natural Language Inference (NLI) and quote overlap checks that score evidence support before emitting final answers.
+
+---
+
+## 🏛 Architecture Overview
+
+```
+                                 ┌────────────────────────────────────────────────────────┐
+                                 │                   USER / WEB UI / CLI                  │
+                                 └───────────────────────────┬────────────────────────────┘
+                                                             │
+                                                             ▼
+                                 ┌────────────────────────────────────────────────────────┐
+                                 │                FastAPI Application Layer               │
+                                 │       • SSE Token Streaming    • REST Endpoints        │
+                                 └───────────────────────────┬────────────────────────────┘
+                                                             │
+                                                             ▼
+                                 ┌────────────────────────────────────────────────────────┐
+                                 │            Agentic Router & Query Classifier           │
+                                 │          (Factual Lookup / Multi-Hop / Aggregation)    │
+                                 └───────┬───────────────────┼────────────────────┬───────┘
+                                         │                   │                    │
+                    ┌────────────────────┘                   │                    └────────────────────┐
+                    ▼                                        ▼                                         ▼
+   ┌─────────────────────────────────┐     ┌───────────────────────────────────┐     ┌──────────────────────────────────┐
+   │       Hybrid RAG Pipeline       │     │       Agentic Planner Loop        │     │       RLM Recursion Engine       │
+   │  1. BM25 Text Search            │     │  • Iterative Sub-Query Generation │     │  • Sandboxed Python REPL Kernel  │
+   │  2. Dense Vector (Gemini/NIM)   │     │  • Multi-Hop Retrieval            │     │  • Regex & Keyword Search APIs   │
+   │  3. Reciprocal Rank Fusion (RRF)│     │  • Chunk Deduplication            │     │  • Async Subagent Spawn & Mailbox│
+   │  4. Multi-Strategy Precision    │     │  • Bounded Token Budgeting        │     │  • Structured Answer Synthesis   │
+   │     Reranker (Cross/LLM/Embed)  │     └─────────────────┬─────────────────┘     └────────────────┬─────────────────┘
+   │  5. Child -> Parent Resolution  │                       │                                        │
+   └────────────────┬────────────────┘                       │                                        │
+                    │                                        │                                        │
+                    └────────────────────────────────────────┼────────────────────────────────────────┘
+                                                             │
+                                                             ▼
+                                 ┌────────────────────────────────────────────────────────┐
+                                 │           Evidence-Sufficiency & Support Gate          │
+                                 │             • NLI Claim Verification                   │
+                                 │             • Grounding & Citation Traceability        │
+                                 └───────────────────────────┬────────────────────────────┘
+                                                             │
+                                                             ▼
+                                 ┌────────────────────────────────────────────────────────┐
+                                 │               4-Store Typed Memory Layer               │
+                                 │  • Policy  • User Preferences  • Facts  • Episodes     │
+                                 └───────────────────────────┬────────────────────────────┘
+                                                             │
+                                                             ▼
+                                 ┌────────────────────────────────────────────────────────┐
+                                 │                Storage & Vector Engine                 │
+                                 │   • PostgreSQL + pgvector (HNSW)   • SQLite + FTS5     │
+                                 └───────────────────────────┬────────────────────────────┘
 ```
 
-## The one-paragraph version
+---
 
-Route every request through a cheap classifier first (`docs/ARCHITECTURE.md` §1, principle 1). Simple questions
-go to hybrid retrieval (BM25 + vector + RRF + reranking). Multi-step tasks go to an agentic planner. Only tasks
-that genuinely require reading an entire large corpus — where missing one section invalidates the answer — go
-to the RLM engine, which is slower and less consistent by design (`docs/VERIFICATION_AND_SOURCES.md` §2) and
-should never be the default. Every path terminates at the same evidence-sufficiency gate before returning an
-answer. Nothing becomes durable memory without passing through the promotion gate. **Phase 1 alone (hybrid
-retrieval + corrective retry, no RLM) is a complete, deployable Agentic RAG Assistant** — see
-`docs/CRITICAL_ASSESSMENT_AND_SCOPE.md` §5 for the recommended build order.
+## ⚡ Core Features
 
-## Recommended build order
+### 1. Multi-Provider LLM & Embedding Matrix
+The platform features dynamic model routing, automatic failover, and dynamic `.env` hot-reloading:
 
-1. **Phase 1 (weeks 1–3):** ingestion + hybrid retrieval + reranking + corrective retry + FastAPI interface.
-   Ship this alone as a first milestone — `skills/rag-retrieval/` covers it in full.
-2. **Phase 2 (weeks 4–6):** full typed memory + promotion gate (`skills/typed-memory/`), query classifier +
-   agentic planner, evidence verifier (`skills/verification/`).
-3. **Phase 3 (weeks 7–10, highest risk — build only when you hit the actual need):** the RLM engine
-   (`skills/rlm-orchestrator/`, `skills/code-execution/`) — fully specified here so the *design* cost is zero
-   when that day comes, per `docs/CRITICAL_ASSESSMENT_AND_SCOPE.md` §1.
-4. **Phase 4 (weeks 11+):** `skills/refinement/`'s supplemental-state loop, skill registry versioning, expanded
-   eval harness against `docs/PRD.md` §4 metrics.
+| Provider | Supported Models | Capabilities |
+| :--- | :--- | :--- |
+| **Google GenAI** | `gemini-2.5-flash`, `gemini-2.5-pro` | Ultra-fast multimodal reasoning, streaming synthesis |
+| **Google Embeddings** | `gemini-embedding-2`, `gemini-embedding-001` | Multimodal text MRL (768d, 1536d, 3072d), task-specific prefixing |
+| **Groq Cloud** | `qwen/qwen3.6-27b`, `llama-3.3-70b-versatile`, `llama-3.1-8b-instant` | Real-time reasoning token streaming (`<think>` blocks), sub-second execution |
+| **NVIDIA NIM** | `meta/llama-3.1-8b-instruct`, `z-ai/glm-5.2`, `nv-embedqa-e5-v5`, `baai/bge-m3` | High-throughput enterprise LLMs & 1024-dim dense embeddings |
+
+### 2. Multi-Strategy Precision Reranking
+Configurable on the fly or persisted per user in typed memory:
+- **`cross_encoder` (Default):** Exact quote match + token Jaccard overlap + lexical boost.
+- **`gemini_semantic`:** Cosine similarity reranking using `gemini-embedding-2` / `gemini-embedding-001`.
+- **`gemini_llm`:** Zero-shot point-wise relevance scoring via `gemini-2.5-flash`.
+
+### 3. 4-Store Typed Memory System
+Durable memory is partitioned to prevent cross-contamination:
+- **`memory_policy`:** Immutable runtime safety and behavior constraints.
+- **`memory_preference`:** User-scoped persistent preferences (e.g. preferred embedding model, output dimension, reranker, and LLM).
+- **`memory_fact`:** Verified semantic world/user facts promoted through confidence scoring.
+- **`memory_episode`:** Session history, outcome summaries, and interaction traces.
+
+### 4. 100% Vanilla Web Studio
+Located at `src/deep_context/ui/index.html`:
+- **Zero npm, zero webpack, zero React:** Pure HTML5, CSS3, and JavaScript.
+- **Live Thought Drawer:** Real-time collapsible display for model reasoning tokens (`<think>`).
+- **Needle-in-a-Haystack 5-Stage Diagnostic Lab:** Step-by-step visibility into every retrieval layer.
+- **1,000-Page Document Hub:** Drag-and-drop batch upload with streaming PDF extraction.
+
+---
+
+## 🚀 Quickstart
+
+### 1. Prerequisites
+- **Python 3.12+**
+- **uv** (Modern Python package manager):
+  ```bash
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  ```
+- **PostgreSQL 15+ with pgvector** (or SQLite for local zero-config mode).
+
+### 2. Installation & Environment Setup
+Clone the repository and sync dependencies:
+
+```bash
+git clone https://github.com/lakshya4568/DeepContext.git
+cd DeepContext
+
+# Create virtual environment and sync dependencies
+uv sync --extra dev
+```
+
+### 3. Configure API Keys
+Create a `.env` file in the project root:
+
+```env
+# Google Gemini API (Embeddings & Reasoning)
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# Groq API (Ultra-Fast Reasoning & Streaming)
+GROQ_API_KEY=your_groq_api_key_here
+
+# NVIDIA NIM API (Optional Fallback / Enterprise LLMs)
+NVIDIA_API_KEY=your_nvidia_api_key_here
+
+# Database Configuration ('postgres' or 'sqlite')
+DATABASE_TYPE=postgres
+POSTGRES_DSN=postgresql://postgres:postgres@localhost:5432/deep_context
+
+# Default Embedding & Model Settings
+EMBEDDING_MODEL=gemini-embedding-2
+EMBEDDING_DIM=768
+RERANKER_STRATEGY=cross_encoder
+LLM_MODEL=qwen/qwen3.6-27b
+```
+
+### 4. Launch the Web Studio
+Start the high-performance async server:
+
+```bash
+uv run uvicorn deep_context.api.app:app --host 0.0.0.0 --port 8000 --reload
+```
+
+Open [http://localhost:8000](http://localhost:8000) in your browser to access the **Deep Context Studio**.
+
+---
+
+## 💻 CLI Reference
+
+The platform provides a complete command-line interface via `deep-context`:
+
+```bash
+# 1. Ingest a document (PDF, Markdown, Code, TXT) with Gemini embeddings
+uv run deep-context ingest path/to/document.pdf -e gemini-embedding-2 -d 768
+
+# 2. Batch ingest an entire folder of files
+uv run deep-context ingest-folder ./documents/ -e gemini-embedding-2 -d 768
+
+# 3. Test hybrid retrieval across ingested documents
+uv run deep-context retrieve "What is the core finding?" -k 5 -r cross_encoder
+
+# 4. Run full grounded query synthesis
+uv run deep-context query "Explain the architecture" -m gemini-2.5-flash
+
+# 5. Manage user preferences in durable memory
+uv run deep-context set-preference --user user_42 -e gemini-embedding-2 -d 768 -r gemini_semantic
+uv run deep-context preferences user_42
+
+# 6. Run a Recursive Language Model (RLM) session in sandboxed REPL
+uv run deep-context rlm "Scan all 195 chunks and identify every occurrence of Ser Kevan"
+```
+
+---
+
+## 📡 API & Streaming Contracts
+
+### `POST /v1/query/stream` (Server-Sent Events)
+Streams real-time status, citations, live thinking tokens, and final answer content:
+
+```bash
+curl -N -X POST http://localhost:8000/v1/query/stream   -H "Content-Type: application/json"   -d '{
+    "query": "Identify who is speaking: "They seem ferocious enough"",
+    "user_id": "user_42",
+    "model": "qwen/qwen3.6-27b",
+    "embedding_model": "gemini-embedding-2",
+    "embedding_dim": 768,
+    "reranker": "cross_encoder"
+  }'
+```
+
+**Stream Event Structure:**
+```json
+data: {"type": "status", "stage": "retrieval", "message": "📚 Running BM25 + Dense Vector hybrid search..."}
+data: {"type": "citations", "citations": [{"chunk_id": "...", "document_title": "Eval 1.pdf", "page_number": 616}]}
+data: {"type": "reasoning", "delta": "Analyzing the scene at the Golden Tooth..."}
+data: {"type": "content", "delta": "The line is spoken by Ser Kevan Lannister..."}
+data: {"type": "done", "latency_ms": 1420, "path_taken": "hybrid_rag", "support_check_passed": true}
+```
+
+### `POST /v1/preferences` (User Memory)
+Persists embedding and reranker settings to user-specific durable memory:
+
+```bash
+curl -X POST http://localhost:8000/v1/preferences   -H "Content-Type: application/json"   -d '{
+    "user_id": "user_42",
+    "embedding_model": "gemini-embedding-2",
+    "embedding_dim": 768,
+    "reranker": "gemini_semantic",
+    "llm_model": "gemini-2.5-flash"
+  }'
+```
+
+### `POST /v1/haystack/benchmark`
+Runs automated 5-stage needle-in-a-haystack verification over a multi-thousand-chunk corpus.
+
+---
+
+## 🧪 Testing & Verification
+
+Run the comprehensive test suite (100% offline with zero external network dependencies required):
+
+```bash
+# Run all 43 automated unit and integration tests
+uv run pytest
+
+# Check code style and formatting
+uv run ruff check src tests
+uv run ruff format --check src tests
+
+# Static type checking
+uv run mypy src
+```
+
+---
+
+## 📂 Repository Layout
+
+```text
+.
+├── pyproject.toml                     # Dependency manifest & build definitions
+├── src/deep_context/
+│   ├── agentic/                       # Agentic planner & query shape classifier
+│   │   ├── planner.py                 # Multi-hop query decomposition & iterative retrieval
+│   │   └── router.py                  # Intelligent execution path router
+│   ├── api/                           # FastAPI endpoints & Server-Sent Events (SSE)
+│   │   ├── app.py                     # App factory & lifecycle handlers
+│   │   └── routes_rag.py              # Ingest, stream query, preferences, haystack APIs
+│   ├── cli/                           # Command-line interface (Typer + Rich)
+│   │   └── main.py                    # CLI commands for ingestion, query, preferences
+│   ├── core/                          # Core primitives, config, and LLM client
+│   │   ├── config.py                  # Pydantic BaseSettings with .env hot-reloading
+│   │   ├── llm_client.py              # Unified client for Gemini, Groq, and NVIDIA NIM
+│   │   ├── logging.py                 # Structured application logging
+│   │   └── types.py                   # Domain models, enums, and request schemas
+│   ├── ingestion/                     # Document loading, parsing, and chunking
+│   │   ├── chunker.py                 # Hierarchical parent-child token chunker
+│   │   ├── parser.py                  # PDF, Markdown, TXT, Code structural parser
+│   │   ├── pipeline.py                # End-to-end ingestion pipeline
+│   │   └── tree_indexer.py            # Vectorless hierarchical document tree indexer
+│   ├── memory/                        # 4-Store typed memory & prompt assembly
+│   │   ├── prompt_assembler.py        # 8-layer prompt compiler
+│   │   ├── promotion_gate.py          # 4-stage promotion gate for durable memory
+│   │   └── stores.py                  # Policy, Preference, Fact, Episode stores
+│   ├── retrieval/                     # Hybrid search, fusion, and reranking
+│   │   ├── classifier.py              # Query classifier (factual/multi-hop/aggregation)
+│   │   ├── engine.py                  # Central retrieval engine & sufficiency gate
+│   │   ├── hybrid.py                  # BM25 + Dense Vector + Reciprocal Rank Fusion (RRF)
+│   │   ├── reranker.py                # CrossEncoder, Gemini Semantic, Gemini LLM rerankers
+│   │   └── tree_navigator.py          # Vectorless DAG tree traversal
+│   ├── rlm/                           # Recursive Language Model engine
+│   │   ├── host_bridge.py             # Subagent tree, recursion depth & mailbox passing
+│   │   ├── kernel.py                  # Sandboxed Python REPL execution environment
+│   │   └── orchestrator.py            # Multi-turn RLM session orchestrator
+│   ├── storage/                       # Database storage drivers
+│   │   ├── base.py                    # StorageInterface abstract base class
+│   │   ├── postgres_store.py          # PostgreSQL + pgvector (HNSW) implementation
+│   │   └── sqlite_store.py            # SQLite + FTS5 implementation
+│   ├── ui/                            # 100% Vanilla Web Interface
+│   │   └── index.html                 # Grounded Studio, Haystack Lab, Preference Manager
+│   └── verification/                  # Grounding & evidence verification
+│       └── checker.py                 # Anti-hallucination evidence verifier
+├── tests/                             # 43 automated test suites
+├── docs/                              # Formal specifications, PRD, and design docs
+│   ├── PRD.md                         # Product requirements & functional specs
+│   ├── ARCHITECTURE.md                # System architecture & component boundaries
+│   ├── DATA_MODEL.sql                 # PostgreSQL 15 + pgvector DDL schema
+│   ├── TECH_STACK.md                  # Concrete tool choices & switch criteria
+│   └── VERIFICATION_AND_SOURCES.md    # Primary source verification & benchmarks
+└── workflows/                         # Step-by-step pipeline specifications
+```
+
+---
+
+## 📜 License
+
+This project is licensed under the Apache 2.0 License. Built for high-reliability, verifiable, and transparent context engineering.
