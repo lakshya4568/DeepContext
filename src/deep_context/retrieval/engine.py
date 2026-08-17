@@ -237,6 +237,7 @@ class RetrievalEngine:
 
         for c in children:
             pid = c.get("parent_chunk_id")
+            score_val = c.get("rerank_score", c.get("score", c.get("rrf_score", 0.0)))
             if pid and pid in parent_chunk_map:
                 if pid in seen_parent_ids:
                     continue
@@ -251,6 +252,8 @@ class RetrievalEngine:
                         "page_number": p.page_number or c.get("page_number"),
                         "document_title": c.get("document_title", ""),
                         "source_uri": c.get("source_uri"),
+                        "score": score_val,
+                        "rrf_score": c.get("rrf_score", 0.0),
                     }
                 )
             else:
@@ -267,6 +270,8 @@ class RetrievalEngine:
                         "page_number": c.get("page_number"),
                         "document_title": c.get("document_title", ""),
                         "source_uri": c.get("source_uri"),
+                        "score": score_val,
+                        "rrf_score": c.get("rrf_score", 0.0),
                     }
                 )
 

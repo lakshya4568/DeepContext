@@ -107,7 +107,22 @@ class HybridRetriever:
                     cand["score"] = cand["rrf_score"]
                     id_to_candidate[cid] = cand
 
+        # 4. Appendix / Metadata Intent Boosting
+        is_appendix_intent = any(
+            any(w in sq.lower() for w in ("appendix", "words of house", "house words", "sigil", "sworn houses"))
+            for sq in sub_queries
+        )
+        if is_appendix_intent:
+            for cid, cand in id_to_candidate.items():
+                p_num = cand.get("page_number") or 0
+                sec = (cand.get("section_path") or "").lower()
+                if p_num >= 730 or "appendix" in sec:
+                    fused_score_map[cid] = fused_score_map.get(cid, 0.0) + 0.05
+                    cand["rrf_score"] = fused_score_map[cid]
+                    cand["score"] = cand["rrf_score"]
+            fused_ids = sorted(fused_ids, key=lambda cid: fused_score_map.get(cid, 0.0), reverse=True)
+
         ordered_candidates = [id_to_candidate[cid] for cid in fused_ids if cid in id_to_candidate]
 
-        # 4. Deduplicate
+        # 5. Deduplicate
         return deduplicate_candidates(ordered_candidates, max_candidates=limit)

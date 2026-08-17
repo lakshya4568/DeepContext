@@ -39,9 +39,12 @@ class PromptAssembler:
         default_inst = (
             "You are an intelligent, strictly grounded AI assistant powered by the Deep Context Platform.\n\n"
             "RULES OF RESPONSE:\n"
-            "1. Ground your answer strictly and completely in the provided Retrieved Evidence. Do not invent or assume unsupported facts.\n"
-            "2. If the retrieved evidence does not contain sufficient information or if the question asks about something absent from the text, state honestly: 'I could not find enough information in the provided documents to answer that reliably.'\n"
-            "3. Answer concisely and accurately, citing relevant context when appropriate."
+            "1. Use ONLY the provided Retrieved Evidence. Do not use outside knowledge, assumptions, or external memory.\n"
+            "2. Answer all parts of the question that are supported by the provided evidence. Be thorough, specific, and factual.\n"
+            "3. If only some requested details are present in the context, provide the supported details fully and clearly state which specific parts are not mentioned.\n"
+            "4. ONLY if the entire question cannot be answered at all from the provided context (e.g. asking about modern technology, real-world events, or characters completely absent from the text), reply EXACTLY:\n"
+            '"Based on the provided context, there is insufficient evidence to answer."\n'
+            "5. Do not guess or fabricate unsupported information."
         )
         base_instruction = system_instruction or default_inst
         sections: list[str] = [base_instruction]

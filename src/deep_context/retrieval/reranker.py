@@ -66,8 +66,13 @@ class CrossEncoderReranker:
             for i in range(len(content_words) - 1):
                 n_grams.append(f"{content_words[i]} {content_words[i+1]}")
 
-        scored_candidates: list[tuple[float, dict[str, Any]]] = []
+        # Extract RRF scores for min-max normalization
+        rrf_scores = [float(c.get("rrf_score", 0.0)) for c in candidates]
+        min_rrf = min(rrf_scores) if rrf_scores else 0.0
+        max_rrf = max(rrf_scores) if rrf_scores else 1.0
+        rrf_range = max_rrf - min_rrf if max_rrf > min_rrf else 1.0
 
+        raw_scores: list[float] = []
         for idx, c in enumerate(candidates):
             content = c.get("content", "")
             content_lower = content.lower()
@@ -85,23 +90,33 @@ class CrossEncoderReranker:
             overlap_count = sum(1 for w in q_word_set if w in content_words_in_doc)
             overlap_ratio = overlap_count / max(1, len(q_word_set))
 
-            # 3. First-stage position & RRF consensus score (0 to 1)
-            rrf_score = float(c.get("rrf_score", 0.0))
+            # 3. Position decay
             position_score = 1.0 / (1.0 + idx * 0.05)
 
-            # Combined weighted score (balances high-recall vector consensus with high-precision lexical alignment)
-            relevance = (
-                0.30 * exact_bonus
-                + 0.35 * overlap_ratio
-                + 0.25 * min(1.0, rrf_score * 40.0)
-                + 0.10 * position_score
-            )
+            # Heuristic rerank score
+            heur_score = 0.40 * exact_bonus + 0.40 * overlap_ratio + 0.20 * position_score
+            raw_scores.append(heur_score)
+
+        min_heur = min(raw_scores) if raw_scores else 0.0
+        max_heur = max(raw_scores) if raw_scores else 1.0
+        heur_range = max_heur - min_heur if max_heur > min_heur else 1.0
+
+        scored_candidates: list[tuple[float, dict[str, Any]]] = []
+        for idx, (c, raw_heur) in enumerate(zip(candidates, raw_scores)):
+            rrf_val = float(c.get("rrf_score", 0.0))
+            norm_rrf = (rrf_val - min_rrf) / rrf_range
+            norm_heur = (raw_heur - min_heur) / heur_range
+
+            # Blended consensus: 60% Hybrid RRF rank consensus + 40% Heuristic Reranker
+            # Guaranteed protection: top-3 RRF consensus items receive rank preservation
+            consensus_boost = 0.15 if idx < 3 else 0.0
+            blended_score = 0.60 * norm_rrf + 0.40 * norm_heur + consensus_boost
 
             c_copy = dict(c)
-            c_copy["rerank_score"] = float(relevance)
-            scored_candidates.append((relevance, c_copy))
+            c_copy["rerank_score"] = float(blended_score)
+            scored_candidates.append((blended_score, c_copy))
 
-        # Sort descending by relevance
+        # Sort descending by blended relevance
         scored_candidates.sort(key=lambda x: x[0], reverse=True)
         return [c for _, c in scored_candidates[:top_k]]
 
@@ -281,7 +296,9 @@ class Reranker:
             (strategy or settings.reranker_strategy or "cross_encoder").lower().replace("-", "_")
         )
 
-        if active_strategy in ("gemini", "gemini_semantic", "gemini_embeddings"):
+        if active_strategy in ("none", "bypass", "rrf", "hybrid", "disabled"):
+            return candidates[:top_k]
+        elif active_strategy in ("gemini", "gemini_semantic", "gemini_embeddings"):
             return await GeminiSemanticReranker.rerank(
                 query=query,
                 candidates=candidates,
