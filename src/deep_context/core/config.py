@@ -1,0 +1,99 @@
+"""Configuration settings for Deep Context Platform."""
+
+from __future__ import annotations
+
+from pydantic import AliasChoices, Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    # API Keys & Endpoints
+    nvidia_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "NVIDIA_API_KEY", "NVIDIA_API", "nvidia_api_key", "nvidia_api"
+        ),
+    )
+    nvidia_base_url: str = Field(
+        default="https://integrate.api.nvidia.com/v1",
+        alias="NVIDIA_BASE_URL",
+    )
+
+    groq_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "GROQ_API_KEY", "GROK_API_KEY", "groq_api_key", "grok_api_key", "GROQ_API", "GROK_API"
+        ),
+    )
+    groq_base_url: str = Field(
+        default="https://api.groq.com/openai/v1",
+        alias="GROQ_BASE_URL",
+    )
+
+    # Models
+    embedding_model: str = Field(default="nvidia/nv-embedqa-e5-v5", alias="EMBEDDING_MODEL")
+    embedding_dim: int = Field(default=1024, alias="EMBEDDING_DIM")
+    llm_provider: str = Field(default="groq", alias="LLM_PROVIDER")  # 'groq' | 'nvidia'
+    llm_model: str = Field(default="qwen/qwen3.6-27b", alias="LLM_MODEL")
+
+    # Database
+    database_type: str = Field(default="postgres", alias="DATABASE_TYPE")  # 'sqlite' | 'postgres'
+    sqlite_db_path: str = Field(default="deep_context.db", alias="SQLITE_DB_PATH")
+    postgres_dsn: str = Field(
+        default="postgresql://proximus@127.0.0.1:5432/awems",
+        alias="POSTGRES_DSN",
+    )
+
+    # Retrieval parameters
+    rrf_k: int = Field(default=60, alias="RRF_K")
+    default_top_k: int = Field(default=8, alias="DEFAULT_TOP_K")
+    first_stage_limit: int = Field(default=100, alias="FIRST_STAGE_LIMIT")
+    max_retrieval_retries: int = Field(default=1, alias="MAX_RETRIEVAL_RETRIES")
+
+    # Ingestion parameters
+    parent_chunk_min_tokens: int = 1000
+    parent_chunk_max_tokens: int = 2500
+    child_chunk_min_tokens: int = 300
+    child_chunk_max_tokens: int = 600
+    chunk_overlap_percentage: float = 0.15
+
+    # RLM parameters
+    max_recursion_depth: int = Field(default=1, alias="MAX_RECURSION_DEPTH")
+    max_repl_chars_per_turn: int = Field(default=8192, alias="MAX_REPL_CHARS_PER_TURN")
+    max_rlm_turns: int = Field(default=30, alias="MAX_RLM_TURNS")
+    max_rlm_wall_clock_seconds: int = Field(default=3600, alias="MAX_RLM_WALL_CLOCK_SECONDS")
+
+    # Verification parameters
+    confidence_threshold: float = 0.75
+    min_aggregation_coverage: float = 0.95
+
+    # Server settings
+    host: str = Field(default="0.0.0.0", alias="HOST")
+    port: int = Field(default=8000, alias="PORT")
+    log_level: str = Field(default="INFO", alias="LOG_LEVEL")
+
+    # Fallback/Test helper
+    allow_mock_fallback: bool = Field(default=True, alias="ALLOW_MOCK_FALLBACK")
+
+    @property
+    def has_groq_key(self) -> bool:
+        k = self.groq_api_key.strip()
+        return bool(k and not k.startswith("gsk_your_key") and len(k) > 10)
+
+    @property
+    def has_nvidia_key(self) -> bool:
+        k = self.nvidia_api_key.strip()
+        return bool(k and not k.startswith("nvapi-your-key") and len(k) > 10)
+
+    @property
+    def has_valid_api_key(self) -> bool:
+        return self.has_groq_key or self.has_nvidia_key
+
+
+settings = Settings()
