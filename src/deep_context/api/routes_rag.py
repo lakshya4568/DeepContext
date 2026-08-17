@@ -1,0 +1,873 @@
+"""RAG Ingestion, Retrieval, Uploads, Haystack Benchmark, and Query routes."""
+
+from __future__ import annotations
+
+import json
+import os
+import random
+import time
+from collections.abc import AsyncIterator
+from pathlib import Path
+from typing import Any
+
+from fastapi import APIRouter, BackgroundTasks, File, Form, UploadFile
+from fastapi.responses import HTMLResponse, StreamingResponse
+
+from deep_context.agentic.planner import AgenticPlanner
+from deep_context.agentic.router import QueryRouter
+from deep_context.core.llm_client import llm_client
+from deep_context.core.logging import logger
+from deep_context.core.types import (
+    HaystackBenchmarkRequest,
+    HaystackBenchmarkResponse,
+    HaystackGenerateRequest,
+    IngestRequest,
+    IngestResponse,
+    Observation,
+    QueryRequest,
+    QueryResponse,
+    QueryShape,
+    RetrievalFilters,
+    RetrievalMode,
+    RetrieveRequest,
+    RetrieveResponse,
+    RoutingPath,
+    StageDiagnostic,
+)
+from deep_context.ingestion.pipeline import ingestion_pipeline
+from deep_context.memory.prompt_assembler import PromptAssembler
+from deep_context.memory.stores import MemoryStoreManager
+from deep_context.retrieval.engine import retrieval_engine
+from deep_context.retrieval.hybrid import HybridRetriever
+from deep_context.retrieval.reranker import CrossEncoderReranker
+from deep_context.rlm.orchestrator import RLMOrchestrator
+from deep_context.storage import get_storage
+from deep_context.verification.checker import EvidenceVerifier
+
+router = APIRouter(tags=["RAG & Query"])
+
+# UI HTML path
+UI_HTML_PATH = Path(__file__).parent.parent / "ui" / "index.html"
+
+
+@router.get("/", response_class=HTMLResponse)
+async def serve_ui() -> HTMLResponse:
+    """Serve the Deep Context Platform interactive web UI."""
+    if UI_HTML_PATH.exists():
+        content = UI_HTML_PATH.read_text(encoding="utf-8")
+        return HTMLResponse(content=content)
+    return HTMLResponse("<h1>Deep Context Platform UI loading...</h1>")
+
+
+@router.get("/v1/documents")
+async def list_documents(limit: int = 50) -> list[dict[str, Any]]:
+    """List ingested documents and chunk stats."""
+    storage = await get_storage()
+    return await storage.list_document_summaries(limit=limit)
+
+
+@router.delete("/v1/documents/{document_id}")
+async def delete_single_document(document_id: str) -> dict[str, Any]:
+    """Delete a single document and all associated chunks and tree nodes."""
+    storage = await get_storage()
+    success = await storage.delete_document(document_id)
+    return {"status": "deleted", "document_id": document_id, "success": success}
+
+
+@router.delete("/v1/documents")
+async def delete_all_documents() -> dict[str, Any]:
+    """Clear all ingested documents and chunks from the knowledge base."""
+    storage = await get_storage()
+    deleted_count = await storage.delete_all_documents()
+    return {"status": "cleared", "deleted_documents_count": deleted_count}
+
+
+@router.post("/v1/upload", response_model=IngestResponse)
+async def upload_file(
+    file: UploadFile = File(...),
+    title: str = Form(""),
+    doc_type: str = Form("auto"),
+    vectorless: bool = Form(False),
+) -> IngestResponse:
+    """Upload and ingest a file (PDF up to 1000 pages, Markdown, Code, TXT)."""
+    filename = file.filename or "uploaded_doc"
+    file_bytes = await file.read()
+
+    detected_type = doc_type
+    if detected_type == "auto":
+        ext = Path(filename).suffix.lower()
+        if ext == ".pdf":
+            detected_type = "pdf"
+        elif ext in (".md", ".markdown"):
+            detected_type = "markdown"
+        elif ext in (".py", ".js", ".ts", ".java", ".go", ".cpp", ".c", ".rs"):
+            detected_type = "code"
+        else:
+            detected_type = "text"
+
+    doc_title = title.strip() or Path(filename).stem
+    mode = RetrievalMode.VECTORLESS if vectorless else RetrievalMode.HYBRID
+
+    # Save to temp file if PDF for streaming pypdf extraction
+    if detected_type == "pdf":
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+            tmp_file.write(file_bytes)
+            tmp_path = tmp_file.name
+
+        try:
+            req = IngestRequest(
+                title=doc_title,
+                content=tmp_path,
+                doc_type="pdf",
+                source_uri=filename,
+                retrieval_mode=mode,
+                metadata={"filename": filename, "file_size": len(file_bytes)},
+            )
+            res = await ingestion_pipeline.ingest(req)
+            return res
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+    else:
+        text_content = file_bytes.decode("utf-8", errors="replace")
+        req = IngestRequest(
+            title=doc_title,
+            content=text_content,
+            doc_type=detected_type,
+            source_uri=filename,
+            retrieval_mode=mode,
+            metadata={"filename": filename, "file_size": len(file_bytes)},
+        )
+        return await ingestion_pipeline.ingest(req)
+
+
+@router.post("/v1/upload-batch", response_model=list[IngestResponse])
+async def upload_batch_files(
+    files: list[UploadFile] = File(...),
+    vectorless: bool = Form(False),
+) -> list[IngestResponse]:
+    """Upload and ingest multiple files at once (PDFs, TXT, MD, Code)."""
+    results: list[IngestResponse] = []
+    for file in files:
+        filename = file.filename or "uploaded_doc"
+        file_bytes = await file.read()
+        ext = Path(filename).suffix.lower()
+
+        if ext == ".pdf":
+            detected_type = "pdf"
+        elif ext in (".md", ".markdown"):
+            detected_type = "markdown"
+        elif ext in (".py", ".js", ".ts", ".java", ".go", ".cpp", ".c", ".rs"):
+            detected_type = "code"
+        else:
+            detected_type = "text"
+
+        doc_title = Path(filename).stem
+        mode = RetrievalMode.VECTORLESS if vectorless else RetrievalMode.HYBRID
+
+        if detected_type == "pdf":
+            import tempfile
+
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+                tmp_file.write(file_bytes)
+                tmp_path = tmp_file.name
+
+            try:
+                req = IngestRequest(
+                    title=doc_title,
+                    content=tmp_path,
+                    doc_type="pdf",
+                    source_uri=filename,
+                    retrieval_mode=mode,
+                    metadata={"filename": filename, "file_size": len(file_bytes)},
+                )
+                res = await ingestion_pipeline.ingest(req)
+                results.append(res)
+            finally:
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+        else:
+            text_content = file_bytes.decode("utf-8", errors="replace")
+            req = IngestRequest(
+                title=doc_title,
+                content=text_content,
+                doc_type=detected_type,
+                source_uri=filename,
+                retrieval_mode=mode,
+                metadata={"filename": filename, "file_size": len(file_bytes)},
+            )
+            res = await ingestion_pipeline.ingest(req)
+            results.append(res)
+
+    return results
+
+
+@router.post("/v1/sync-folder", response_model=list[IngestResponse])
+async def sync_local_folder(
+    folder_path: str = "documents",
+    vectorless: bool = False,
+) -> list[IngestResponse]:
+    """Scan and ingest all supported files from a local directory (e.g. './documents')."""
+    target_dir = Path(folder_path)
+    if not target_dir.exists():
+        target_dir.mkdir(parents=True, exist_ok=True)
+        return []
+
+    supported = {
+        ".pdf": "pdf",
+        ".md": "markdown",
+        ".markdown": "markdown",
+        ".txt": "text",
+        ".text": "text",
+        ".log": "text",
+        ".csv": "text",
+        ".json": "text",
+        ".py": "code",
+        ".js": "code",
+        ".ts": "code",
+        ".java": "code",
+        ".go": "code",
+    }
+    ignored = {".venv", ".git", "__pycache__", "dist", "build"}
+
+    results: list[IngestResponse] = []
+    mode = RetrievalMode.VECTORLESS if vectorless else RetrievalMode.HYBRID
+
+    for p in target_dir.rglob("*"):
+        if p.is_file() and not any(part in ignored for part in p.parts):
+            ext = p.suffix.lower()
+            if ext in supported:
+                dtype = supported[ext]
+                content = (
+                    str(p.resolve())
+                    if dtype == "pdf"
+                    else p.read_text(encoding="utf-8", errors="replace")
+                )
+                req = IngestRequest(
+                    title=p.stem,
+                    content=content,
+                    doc_type=dtype,
+                    source_uri=str(p.resolve()),
+                    retrieval_mode=mode,
+                )
+                try:
+                    res = await ingestion_pipeline.ingest(req)
+                    results.append(res)
+                except Exception as e:
+                    logger.warning("Failed to sync file %s: %s", p, e)
+
+    return results
+
+
+@router.post("/v1/ingest", response_model=IngestResponse)
+async def ingest_document(req: IngestRequest) -> IngestResponse:
+    """Ingests a document, parses sections, creates parent-child chunks & bge-m3 embeddings."""
+    return await ingestion_pipeline.ingest(req)
+
+
+@router.post("/v1/retrieve", response_model=RetrieveResponse)
+async def retrieve_knowledge(req: RetrieveRequest) -> RetrieveResponse:
+    """Direct hybrid retrieval with RRF, reranking, parent resolution, and citations."""
+    filters = RetrievalFilters(
+        tenant_id=req.tenant_id,
+        permission_scope=req.permission_scope,
+        document_ids=req.document_ids,
+    )
+    res = await retrieval_engine.retrieve(query=req.query, filters=filters, top_k=req.top_k)
+    return RetrieveResponse(
+        sufficient=res.sufficient,
+        parent_chunks=res.parent_chunks,
+        citations=[c.to_dict() for c in res.citations],
+        query_shape=res.query_shape or QueryShape.FACTUAL_LOOKUP,
+        retry_count=res.retry_count,
+        insufficiency_reason=res.insufficiency_reason,
+    )
+
+
+@router.post("/v1/query", response_model=QueryResponse)
+async def query_platform(req: QueryRequest, background_tasks: BackgroundTasks) -> QueryResponse:
+    """End-to-end intelligent query answering with GLM-5.2 reasoning."""
+    t0 = time.time()
+    storage = await get_storage()
+    filters = RetrievalFilters(
+        tenant_id=req.tenant_id,
+        permission_scope=req.permission_scope,
+        document_ids=req.document_ids,
+    )
+
+    decision = await QueryRouter.route(
+        query=req.query,
+        forced_path=req.force_path,
+    )
+
+    answer_text = ""
+    citations_list: list[dict[str, Any]] = []
+    reasoning_text: str | None = None
+    support_passed = True
+    support_confidence = 1.0
+
+    if decision.path == RoutingPath.HYBRID_RAG:
+        retrieval_res = await retrieval_engine.retrieve(query=req.query, filters=filters, top_k=6)
+        citations_list = [c.to_dict() for c in retrieval_res.citations]
+
+        assembler = PromptAssembler(storage)
+        messages = await assembler.assemble_messages(
+            query=req.query,
+            retrieved_chunks=retrieval_res.parent_chunks,
+            tenant_id=req.tenant_id,
+            user_id=req.user_id,
+        )
+
+        answer_text, reasoning_text = await llm_client.complete(
+            messages, model=req.model, temperature=0.5, enable_thinking=True
+        )
+
+        support_res = await EvidenceVerifier.check_support(
+            draft_answer=answer_text,
+            evidence=retrieval_res.parent_chunks,
+            is_aggregation=(decision.query_shape.value == "aggregation"),
+        )
+        support_passed = support_res.passed
+        support_confidence = support_res.confidence
+
+    elif decision.path == RoutingPath.AGENTIC_PLANNER:
+        planner = AgenticPlanner(storage)
+        answer_text, citations_list, reasoning_text = await planner.execute_plan(
+            query=req.query, filters=filters
+        )
+
+    elif decision.path == RoutingPath.RLM_ENGINE:
+        orchestrator = RLMOrchestrator(storage)
+        corpus_chunks: list[dict[str, Any]] = []
+        if req.document_ids:
+            for did in req.document_ids:
+                chunks = await storage.get_document_chunks(document_id=did, level="parent")
+                corpus_chunks.extend(chunks)
+        else:
+            corpus_chunks = await storage.get_document_chunks(level="parent")
+
+        corpus = corpus_chunks if corpus_chunks else [{"content": "Default document corpus."}]
+
+        rlm_res = await orchestrator.run_session(
+            task_spec=req.query,
+            corpus=corpus,
+            user_id=req.user_id or "default",
+            model=req.model,
+        )
+        answer_text = rlm_res.answer
+        citations_list = rlm_res.citations
+        reasoning_text = rlm_res.reasoning
+
+    latency_ms = int((time.time() - t0) * 1000)
+
+    if req.user_id and len(req.query) > 10:
+        background_tasks.add_task(
+            _background_memory_extract,
+            storage,
+            req.query,
+            req.tenant_id,
+            req.user_id,
+        )
+
+    return QueryResponse(
+        answer=answer_text,
+        citations=citations_list,
+        path_taken=decision.path,
+        query_shape=decision.query_shape,
+        reasoning=reasoning_text,
+        support_check_passed=support_passed,
+        support_confidence=support_confidence,
+        latency_ms=latency_ms,
+        token_cost=0,
+    )
+
+
+@router.post("/v1/query/stream")
+async def query_platform_stream(
+    req: QueryRequest, background_tasks: BackgroundTasks
+) -> StreamingResponse:
+    """Streams real-time thinking tokens, status updates, answer tokens, and citations using Server-Sent Events (SSE)."""
+
+    async def event_generator() -> AsyncIterator[str]:
+        t0 = time.time()
+        storage = await get_storage()
+        filters = RetrievalFilters(
+            tenant_id=req.tenant_id,
+            permission_scope=req.permission_scope,
+            document_ids=req.document_ids,
+        )
+
+        try:
+            # 1. Routing Phase
+            yield f"data: {json.dumps({'type': 'status', 'stage': 'routing', 'message': '🔍 Classifying query and routing execution path...'})}\n\n"
+            decision = await QueryRouter.route(
+                query=req.query,
+                forced_path=req.force_path,
+            )
+            yield f"data: {json.dumps({'type': 'status', 'stage': 'routed', 'path': decision.path.value, 'query_shape': decision.query_shape.value, 'message': f'Path selected: {decision.path.value} ({decision.query_shape.value})'})}\n\n"
+
+            citations_list: list[dict[str, Any]] = []
+            accumulated_content: list[str] = []
+            accumulated_reasoning: list[str] = []
+            support_passed = True
+            support_confidence = 1.0
+
+            if decision.path == RoutingPath.HYBRID_RAG:
+                # 2. Hybrid Retrieval Phase
+                yield f"data: {json.dumps({'type': 'status', 'stage': 'retrieval', 'message': '📚 Running BM25 + Dense Vector hybrid search & RRF ranking...'})}\n\n"
+                retrieval_res = await retrieval_engine.retrieve(
+                    query=req.query, filters=filters, top_k=6
+                )
+                citations_list = [c.to_dict() for c in retrieval_res.citations]
+                yield f"data: {json.dumps({'type': 'citations', 'citations': citations_list})}\n\n"
+
+                # 3. Prompt Assembly Phase
+                assembler = PromptAssembler(storage)
+                messages = await assembler.assemble_messages(
+                    query=req.query,
+                    retrieved_chunks=retrieval_res.parent_chunks,
+                    tenant_id=req.tenant_id,
+                    user_id=req.user_id,
+                )
+
+                # 4. Real-Time Generation & Thinking Stream
+                yield f"data: {json.dumps({'type': 'status', 'stage': 'generating', 'message': '🧠 Generating grounded answer with live reasoning...'})}\n\n"
+                async for token_chunk in llm_client.stream_complete(
+                    messages, model=req.model, temperature=0.5, enable_thinking=True
+                ):
+                    chunk_type = token_chunk.get("type", "content")
+                    if chunk_type == "rate_limit":
+                        yield f"data: {json.dumps(token_chunk)}\n\n"
+                        continue
+                    chunk_text = token_chunk.get("text", "")
+                    if chunk_type == "reasoning":
+                        accumulated_reasoning.append(chunk_text)
+                        yield f"data: {json.dumps({'type': 'reasoning', 'delta': chunk_text})}\n\n"
+                    else:
+                        accumulated_content.append(chunk_text)
+                        yield f"data: {json.dumps({'type': 'content', 'delta': chunk_text})}\n\n"
+
+                # 5. Verification Phase
+                draft_answer = "".join(accumulated_content)
+                support_res = await EvidenceVerifier.check_support(
+                    draft_answer=draft_answer,
+                    evidence=retrieval_res.parent_chunks,
+                    is_aggregation=(decision.query_shape.value == "aggregation"),
+                )
+                support_passed = support_res.passed
+                support_confidence = support_res.confidence
+
+            elif decision.path == RoutingPath.AGENTIC_PLANNER:
+                planner = AgenticPlanner(storage)
+                async for ev in planner.execute_plan_stream(
+                    query=req.query, filters=filters, model=req.model
+                ):
+                    ev_type = ev.get("type")
+                    if ev_type == "status":
+                        yield f"data: {json.dumps(ev)}\n\n"
+                    elif ev_type == "citations":
+                        citations_list = ev.get("citations", [])
+                        yield f"data: {json.dumps(ev)}\n\n"
+                    elif ev_type == "reasoning":
+                        accumulated_reasoning.append(ev.get("delta", ""))
+                        yield f"data: {json.dumps(ev)}\n\n"
+                    elif ev_type == "content":
+                        accumulated_content.append(ev.get("delta", ""))
+                        yield f"data: {json.dumps(ev)}\n\n"
+
+            elif decision.path == RoutingPath.RLM_ENGINE:
+                yield f"data: {json.dumps({'type': 'status', 'stage': 'rlm', 'message': '⚡ Initializing Recursive Language Model sandboxed REPL...'})}\n\n"
+                orchestrator = RLMOrchestrator(storage)
+                corpus_chunks: list[dict[str, Any]] = []
+                if req.document_ids:
+                    for did in req.document_ids:
+                        chunks = await storage.get_document_chunks(document_id=did, level="parent")
+                        corpus_chunks.extend(chunks)
+                else:
+                    corpus_chunks = await storage.get_document_chunks(level="parent")
+
+                corpus = (
+                    corpus_chunks if corpus_chunks else [{"content": "Default document corpus."}]
+                )
+
+                rlm_res = await orchestrator.run_session(
+                    task_spec=req.query,
+                    corpus=corpus,
+                    user_id=req.user_id or "default",
+                    model=req.model,
+                )
+                yield f"data: {json.dumps({'type': 'citations', 'citations': rlm_res.citations})}\n\n"
+                if rlm_res.reasoning:
+                    accumulated_reasoning.append(rlm_res.reasoning)
+                    yield f"data: {json.dumps({'type': 'reasoning', 'delta': rlm_res.reasoning})}\n\n"
+                accumulated_content.append(rlm_res.answer)
+                yield f"data: {json.dumps({'type': 'content', 'delta': rlm_res.answer})}\n\n"
+
+            latency_ms = int((time.time() - t0) * 1000)
+
+            # 6. Final Done Event
+            yield f"data: {json.dumps({'type': 'done', 'path_taken': decision.path.value, 'query_shape': decision.query_shape.value, 'support_check_passed': support_passed, 'support_confidence': support_confidence, 'latency_ms': latency_ms})}\n\n"
+
+            # Background memory extraction if applicable
+            if req.user_id and len(req.query) > 10:
+                background_tasks.add_task(
+                    _background_memory_extract,
+                    storage,
+                    req.query,
+                    req.tenant_id,
+                    req.user_id,
+                )
+
+        except Exception as e:
+            logger.exception("Error in query_platform_stream: %s", e)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.get("/v1/quota/status")
+async def get_quota_status() -> dict[str, Any]:
+    """Return live rate limit and quota status for Groq and NVIDIA NIM."""
+    from deep_context.core.config import settings
+    from deep_context.core.llm_client import LLMClient
+
+    rate_limit = LLMClient.global_rate_limit or llm_client.last_rate_limit
+    has_groq = settings.has_groq_key
+    has_nvidia = settings.has_nvidia_key
+
+    is_active_limited = False
+    if rate_limit and (time.time() - float(rate_limit.get("timestamp", 0)) < 3600):
+        is_active_limited = True
+
+    return {
+        "groq": {
+            "configured": has_groq,
+            "is_rate_limited": is_active_limited,
+            "model": (
+                rate_limit.get("model", settings.llm_model) if rate_limit else settings.llm_model
+            ),
+            "message": rate_limit.get("message") if rate_limit else "Normal (Within daily quota)",
+            "retry_after": rate_limit.get("retry_after") if rate_limit else None,
+            "limit": rate_limit.get("limit") if rate_limit else "200000",
+            "used": rate_limit.get("used") if rate_limit else "0",
+            "quota_type": (rate_limit.get("quota_type") if rate_limit else "tokens per day (TPD)"),
+            "last_error_at": rate_limit.get("timestamp") if rate_limit else None,
+        },
+        "nvidia_nim": {
+            "configured": has_nvidia,
+            "model": settings.embedding_model,
+        },
+    }
+
+
+@router.post("/v1/quota/reset")
+async def reset_quota_status() -> dict[str, Any]:
+    """Reset rate limit status and reload API keys dynamically from environment/.env."""
+    from deep_context.core.llm_client import LLMClient, llm_client
+
+    LLMClient.clear_rate_limits()
+    llm_client.last_rate_limit = None
+    llm_client._refresh_groq_client()
+    return {"status": "ok", "message": "Rate limit cache cleared and Groq API client reloaded."}
+
+
+# ---------------------------------------------------------------------------
+# Needle In A Haystack Diagnostic Benchmark
+# ---------------------------------------------------------------------------
+
+FILLER_PARAGRAPHS = [
+    "Distributed computing systems rely on consensus protocols such as Raft and Paxos to maintain consistent replicated state machines across clusters. Nodes communicate state changes through append entries RPCs.",
+    "Database indexing using B+ trees provides logarithmic search, insert, and delete operations. Leaf nodes form a doubly linked list allowing efficient sequential range queries over sorted keys.",
+    "Cache replacement policies such as Least Recently Used (LRU) and Adaptive Replacement Cache (ARC) dynamically balance recency and frequency to optimize hit ratios in memory constrained environments.",
+    "Vector embeddings map high dimensional semantic information into continuous latent spaces where cosine similarity quantifies directional alignment between query vectors and document representations.",
+    "Network flow control mechanisms including TCP congestion avoidance use additive-increase multiplicative-decrease (AIMD) algorithms to saturate bandwidth without triggering bufferbloat.",
+    "Compiler optimization passes perform dead code elimination, constant propagation, and loop unrolling in intermediate representations before generating optimized machine instructions.",
+    "Message queue architectures decouple producer services from consumer workers, providing backpressure buffering, dead letter queues, and idempotent message delivery guarantees.",
+    "Microservice telemetry pipelines aggregate structured distributed traces, structured logs, and Prometheus time-series metrics to enable real-time observability across services.",
+]
+
+
+@router.post("/v1/haystack/generate", response_model=IngestResponse)
+async def generate_haystack(req: HaystackGenerateRequest) -> IngestResponse:
+    """
+    Generates a synthetic haystack document of N words with a targeted needle
+    inserted at a precise depth percentage (0% = top, 50% = middle, 100% = bottom).
+    """
+    words_per_para = 35
+    total_paras = max(10, req.total_words // words_per_para)
+    needle_para_idx = int(total_paras * (req.depth_percent / 100.0))
+    needle_para_idx = max(0, min(total_paras - 1, needle_para_idx))
+
+    sections_text: list[str] = [f"# {req.topic} — Benchmark Corpus ({req.total_words} words)\n"]
+
+    for i in range(total_paras):
+        sec_num = (i // 10) + 1
+        if i % 10 == 0:
+            sections_text.append(f"\n## Chapter {sec_num}: System Architecture Analysis\n")
+
+        p = random.choice(FILLER_PARAGRAPHS)
+        if i == needle_para_idx:
+            # Insert the needle prominently within this paragraph
+            p = f"Special Security Notice: {req.needle} All authorized personnel must reference this credential. {p}"
+
+        sections_text.append(p + "\n")
+
+    full_text = "\n".join(sections_text)
+    doc_title = f"Haystack Corpus ({req.total_words} words @ {req.depth_percent:.0f}% depth)"
+
+    ingest_req = IngestRequest(
+        title=doc_title,
+        content=full_text,
+        doc_type="markdown",
+        source_uri=f"synthetic://haystack/{int(time.time())}",
+        retrieval_mode=RetrievalMode.HYBRID,
+        metadata={
+            "needle": req.needle,
+            "depth_percent": req.depth_percent,
+            "total_words": req.total_words,
+            "topic": req.topic,
+        },
+    )
+    return await ingestion_pipeline.ingest(ingest_req)
+
+
+@router.post("/v1/haystack/benchmark", response_model=HaystackBenchmarkResponse)
+async def benchmark_haystack(
+    req: HaystackBenchmarkRequest,
+) -> HaystackBenchmarkResponse:
+    """
+    Diagnostic tracer ("What it uses to get the context"):
+    Traces the needle step-by-step across:
+    Stage 1: BM25 FTS5 Recall
+    Stage 2: BGE-M3 Dense Vector Recall
+    Stage 3: Reciprocal Rank Fusion (k=60)
+    Stage 4: Cross-Encoder Reranker
+    Stage 5: Parent Chunk Resolution
+    Stage 6: Grounded Answer Generation
+    """
+    t0 = time.time()
+    storage = await get_storage()
+
+    # Find target document
+    doc_id = req.document_id
+    doc_title = "Repository Documents"
+    if doc_id:
+        doc = await storage.get_document(doc_id)
+        if doc:
+            doc_title = doc.title
+
+    filters = RetrievalFilters(
+        tenant_id="default",
+        document_ids=[doc_id] if doc_id else None,
+    )
+
+    stages: list[StageDiagnostic] = []
+    needle_clean = req.needle.strip().lower()
+
+    # Stage 1: BM25 FTS5
+    bm25_results = await storage.search_bm25(query=req.query, filters=filters, limit=100)
+    bm25_found = False
+    bm25_rank = None
+    bm25_score = None
+    for idx, r in enumerate(bm25_results, start=1):
+        if needle_clean in r["content"].lower():
+            bm25_found = True
+            bm25_rank = idx
+            bm25_score = r.get("score")
+            break
+
+    stages.append(
+        StageDiagnostic(
+            stage_name="Stage 1: BM25 Full-Text Search (PostgreSQL TSVector / Lexical)",
+            needle_found=bm25_found,
+            needle_rank=bm25_rank,
+            score=round(bm25_score, 4) if bm25_score is not None else None,
+            details=(
+                f"Retrieved {len(bm25_results)} candidate chunks via keyword inverted index. "
+                + (
+                    f"Needle found at BM25 rank #{bm25_rank} (score: {bm25_score:.3f})."
+                    if bm25_found
+                    else "Needle not in top BM25 candidates."
+                )
+            ),
+        )
+    )
+
+    # Stage 2: BGE-M3 Dense Vector Search
+    q_emb = await llm_client.get_embedding(req.query)
+    vec_results = await storage.search_vector(query_embedding=q_emb, filters=filters, limit=100)
+    vec_found = False
+    vec_rank = None
+    vec_sim = None
+    for idx, r in enumerate(vec_results, start=1):
+        if needle_clean in r["content"].lower():
+            vec_found = True
+            vec_rank = idx
+            vec_sim = r.get("score")
+            break
+
+    stages.append(
+        StageDiagnostic(
+            stage_name="Stage 2: Dense Vector Search (PostgreSQL pgvector HNSW 1024-dim Cosine Sim)",
+            needle_found=vec_found,
+            needle_rank=vec_rank,
+            score=round(vec_sim, 4) if vec_sim is not None else None,
+            details=(
+                "Scanned child vectors using 1024-dim BGE-M3 embeddings. "
+                + (
+                    f"Needle found at Vector rank #{vec_rank} (cosine similarity: {vec_sim:.4f})."
+                    if vec_found
+                    else "Needle not in top Vector candidates."
+                )
+            ),
+        )
+    )
+
+    # Stage 3: Reciprocal Rank Fusion (RRF k=60)
+    hybrid_retriever = HybridRetriever(storage)
+    rrf_candidates = await hybrid_retriever.retrieve_candidates(
+        sub_queries=[req.query], filters=filters, limit=100
+    )
+    rrf_found = False
+    rrf_rank = None
+    rrf_score = None
+    for idx, r in enumerate(rrf_candidates, start=1):
+        if needle_clean in r["content"].lower():
+            rrf_found = True
+            rrf_rank = idx
+            rrf_score = r.get("score")
+            break
+
+    stages.append(
+        StageDiagnostic(
+            stage_name="Stage 3: Reciprocal Rank Fusion (RRF k=60)",
+            needle_found=rrf_found,
+            needle_rank=rrf_rank,
+            score=round(rrf_score, 4) if rrf_score is not None else None,
+            details=(
+                "Fused BM25 and Dense vector rankings using 1/(60 + rank). "
+                + (
+                    f"Needle fused to position #{rrf_rank} (RRF score: {rrf_score:.5f})."
+                    if rrf_found
+                    else "Needle dropped during RRF merge."
+                )
+            ),
+        )
+    )
+
+    # Stage 4: Cross-Encoder Reranking
+    reranked = await CrossEncoderReranker.rerank(
+        query=req.query, candidates=rrf_candidates, top_k=req.top_k
+    )
+    rerank_found = False
+    rerank_rank = None
+    rerank_score = None
+    for idx, r in enumerate(reranked, start=1):
+        if needle_clean in r["content"].lower():
+            rerank_found = True
+            rerank_rank = idx
+            rerank_score = r.get("score")
+            break
+
+    stages.append(
+        StageDiagnostic(
+            stage_name="Stage 4: Cross-Encoder Precision Reranker",
+            needle_found=rerank_found,
+            needle_rank=rerank_rank,
+            score=round(rerank_score, 4) if rerank_score is not None else None,
+            details=(
+                f"Reranked top {len(rrf_candidates)} chunks to final top-{req.top_k}. "
+                + (
+                    f"Needle confirmed in final set at rank #{rerank_rank} (relevance score: {rerank_score:.3f})."
+                    if rerank_found
+                    else "Needle did not make top-k cutoff."
+                )
+            ),
+        )
+    )
+
+    # Stage 5: Child -> Parent Resolution
+    retrieval_res = await retrieval_engine.retrieve(
+        query=req.query, filters=filters, top_k=req.top_k
+    )
+    parent_found = False
+    matched_parent = None
+    for p in retrieval_res.parent_chunks:
+        if needle_clean in p["content"].lower():
+            parent_found = True
+            matched_parent = p
+            break
+
+    stages.append(
+        StageDiagnostic(
+            stage_name="Stage 5: Hierarchical Parent Chunk Resolution (1000-2500 tokens)",
+            needle_found=parent_found,
+            details=(
+                f"Expanded child chunk to full parent context ({len(matched_parent['content'])} chars, Section: {matched_parent.get('section_path', 'N/A')}, Page: {matched_parent.get('page_number', 1)})."
+                if (parent_found and matched_parent is not None)
+                else "Parent chunk resolution did not contain needle."
+            ),
+        )
+    )
+
+    # Stage 6: Generation & Verification
+    assembler = PromptAssembler(storage)
+    focused_chunks = [matched_parent] if matched_parent else retrieval_res.parent_chunks[:2]
+    messages = await assembler.assemble_messages(
+        query=req.query,
+        retrieved_chunks=focused_chunks,
+    )
+    answer, reasoning = await llm_client.complete(messages, temperature=0.3, enable_thinking=True)
+
+    passed = needle_clean in answer.lower() or needle_clean in (
+        matched_parent["content"].lower() if matched_parent else ""
+    )
+
+    latency_ms = int((time.time() - t0) * 1000)
+
+    # Count total chunks in document
+    total_child = 0
+    total_parent = 0
+    if doc_id:
+        total_child, total_parent = await storage.count_chunks_for_document(doc_id)
+
+    return HaystackBenchmarkResponse(
+        document_id=doc_id or "all_documents",
+        document_title=doc_title,
+        total_parent_chunks=total_parent,
+        total_child_chunks=total_child,
+        query=req.query,
+        needle=req.needle,
+        stages=stages,
+        retrieved_parent_chunk=matched_parent,
+        passed=passed,
+        answer=answer,
+        reasoning=reasoning,
+        latency_ms=latency_ms,
+    )
+
+
+async def _background_memory_extract(
+    storage: Any, query: str, tenant_id: str, user_id: str
+) -> None:
+    try:
+        manager = MemoryStoreManager(storage)
+        obs = Observation(
+            raw_text=query,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            source="user_stated",
+        )
+        await manager.observe_and_promote(obs)
+    except Exception:
+        pass
