@@ -13,6 +13,7 @@ import asyncio
 import json
 import math
 import re
+import sys
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -278,11 +279,11 @@ async def run_evaluation():
     
     storage = await get_storage()
     dataset_path = Path(__file__).parent.parent / "tests" / "eval_dataset.json"
-    if not dataset_path.exists():
-        raise FileNotFoundError(f"Evaluation dataset not found at {dataset_path}")
+    if len(sys.argv) > 1 and "eval_quantum" in sys.argv[1]:
+        dataset_path = Path(__file__).parent.parent / "tests" / "eval_quantum_dataset.json"
 
     dataset = json.loads(dataset_path.read_text(encoding="utf-8"))
-    print(f"Loaded {len(dataset)} evaluation cases across 6 taxonomy categories.\n")
+    print(f"Loaded {len(dataset)} evaluation cases from {dataset_path.name} across 6 taxonomy categories for Eval 1.pdf.\n")
 
     results: list[QueryEvalResult] = []
     
@@ -290,6 +291,9 @@ async def run_evaluation():
     docs = await storage.list_document_summaries()
     doc_id = docs[0]["id"] if docs else None
     filters = RetrievalFilters(tenant_id="default")
+
+    eval_emb_model = "nvidia/nv-embedqa-e5-v5" if settings.has_nvidia_key else settings.embedding_model
+    eval_emb_dim = 1024 if "nv-embedqa" in eval_emb_model else settings.embedding_dim
 
     for i, item in enumerate(dataset, start=1):
         q_id = item["id"]
@@ -314,8 +318,8 @@ async def run_evaluation():
         # -------------------------------------------------------------
         q_vec = await llm_client.get_embedding(
             question,
-            model=settings.embedding_model,
-            dim=settings.embedding_dim,
+            model=eval_emb_model,
+            dim=eval_emb_dim,
             is_query=True,
         )
         vec_res = await storage.search_vector(q_vec, filters=filters, limit=8)
@@ -330,8 +334,8 @@ async def run_evaluation():
             sub_queries=[question],
             filters=filters,
             limit=8,
-            embedding_model=settings.embedding_model,
-            embedding_dim=settings.embedding_dim,
+            embedding_model=eval_emb_model,
+            embedding_dim=eval_emb_dim,
         )
         hybrid_sets = [extract_chunk_pages(c) for c in hybrid_candidates]
         hybrid_hit_5 = 1.0 if any(bool(s & set(expected_pages)) for s in hybrid_sets[:5]) else 0.0
@@ -344,8 +348,8 @@ async def run_evaluation():
             query=question,
             filters=filters,
             top_k=8,
-            embedding_model=settings.embedding_model,
-            embedding_dim=settings.embedding_dim,
+            embedding_model=eval_emb_model,
+            embedding_dim=eval_emb_dim,
         )
         ret_latency = int((time.time() - t_ret_0) * 1000)
 
@@ -393,23 +397,20 @@ async def run_evaluation():
         ctx_rel = calculate_context_relevancy(context_text, question, expected_facts)
 
         # -------------------------------------------------------------
-        # 5. Generation Layer
+        # 5. Generation Layer (Two-Pass Grounded Generation)
         # -------------------------------------------------------------
-        assembler = PromptAssembler(storage)
-        messages = await assembler.assemble_messages(
-            query=question,
-            retrieved_chunks=retrieval_res.parent_chunks,
-        )
+        from deep_context.generation.grounded_answer import generate_grounded_answer
 
         t_gen_0 = time.time()
         eval_gen_model = "meta/llama-3.1-8b-instruct" if settings.has_nvidia_key else settings.llm_model
-        answer, reasoning = await llm_client.complete(
-            messages,
+        grounded_res = await generate_grounded_answer(
+            query=question,
+            retrieved_chunks=retrieval_res.parent_chunks,
             model=eval_gen_model,
-            temperature=0.1,
-            enable_thinking=False,
             timeout=15.0,
         )
+        answer = grounded_res.answer
+        reasoning = grounded_res.reason
         gen_latency = int((time.time() - t_gen_0) * 1000)
 
         # Generation metrics

@@ -399,25 +399,17 @@ async def query_platform(req: QueryRequest, background_tasks: BackgroundTasks) -
         )
         citations_list = [c.to_dict() for c in retrieval_res.citations]
 
-        assembler = PromptAssembler(storage)
-        messages = await assembler.assemble_messages(
+        from deep_context.generation.grounded_answer import generate_grounded_answer
+
+        grounded_res = await generate_grounded_answer(
             query=req.query,
             retrieved_chunks=retrieval_res.parent_chunks,
-            tenant_id=req.tenant_id,
-            user_id=req.user_id,
+            model=req.model,
         )
-
-        answer_text, reasoning_text = await llm_client.complete(
-            messages, model=req.model, temperature=0.5, enable_thinking=True
-        )
-
-        support_res = await EvidenceVerifier.check_support(
-            draft_answer=answer_text,
-            evidence=retrieval_res.parent_chunks,
-            is_aggregation=(decision.query_shape.value == "aggregation"),
-        )
-        support_passed = support_res.passed
-        support_confidence = support_res.confidence
+        answer_text = grounded_res.answer
+        reasoning_text = grounded_res.reason
+        support_passed = grounded_res.support_passed
+        support_confidence = grounded_res.support_confidence
 
     elif decision.path == RoutingPath.AGENTIC_PLANNER:
         planner = AgenticPlanner(storage)

@@ -41,6 +41,11 @@ def _parse_extract_payload(text: str) -> dict[str, Any]:
                 return data
         except Exception:
             pass
+    # Fallback: parse bullet points if model returned text
+    lines = [line.strip().lstrip("*-0123456789.) ").strip() for line in text.split("\n") if line.strip()]
+    facts = [line for line in lines if len(line) > 10 and not line.startswith("{") and not line.startswith("}")]
+    if facts:
+        return {"supported": facts, "unanswerable": False}
     return {}
 
 
@@ -128,6 +133,45 @@ async def generate_grounded_answer(
     unanswerable = bool(payload.get("unanswerable")) or not supported
 
     if unanswerable:
+        # Check if question has evidence overlap before hard refusal to prevent false abstention
+        q_keywords = [w for w in re.findall(r"\w+", query.lower()) if len(w) > 3]
+        overlap_count = sum(1 for w in q_keywords if w in evidence_text.lower())
+        if overlap_count >= 2 and not is_anachronism(query):
+            fallback_messages = [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are an expert AI answering questions strictly from the provided context.\n"
+                        "Answer all parts of the question that the context supports. If some facts are missing, state that they are not mentioned.\n"
+                        'If the question cannot be answered from the context at all, reply EXACTLY:\n"Based on the provided context, there is insufficient evidence to answer."'
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": f"Question: {query}\n\nEvidence:\n{evidence_text[:12000]}",
+                },
+            ]
+            try:
+                ans, _ = await llm_client.complete(
+                    fallback_messages,
+                    model=target_model,
+                    temperature=0.1,
+                    enable_thinking=False,
+                    timeout=timeout,
+                )
+                if ans and REFUSAL_TEMPLATE not in ans:
+                    answer = ans.strip()
+                    check = await EvidenceVerifier.check_support(answer, retrieved_chunks)
+                    return GroundedAnswer(
+                        answer=answer,
+                        supported_facts=[answer],
+                        refused=False,
+                        support_passed=check.passed,
+                        support_confidence=check.confidence,
+                    )
+            except Exception as exc:
+                logger.warning("Fallback generation failed (%s).", exc)
+
         return GroundedAnswer(
             answer=REFUSAL_TEMPLATE,
             supported_facts=supported,

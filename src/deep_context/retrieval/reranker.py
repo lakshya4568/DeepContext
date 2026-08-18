@@ -42,8 +42,8 @@ def _blend_with_rrf(candidates: list[dict[str, Any]], raw_scores: list[float]) -
     for idx, (candidate, raw) in enumerate(zip(candidates, raw_scores)):
         norm_rrf = (float(candidate.get("rrf_score", 0.0)) - min_rrf) / rrf_range
         norm_raw = (raw - min_raw) / raw_range
-        consensus_boost = 0.15 if idx < 3 else 0.0
-        blended = 0.60 * norm_rrf + 0.40 * norm_raw + consensus_boost
+        consensus_boost = 0.20 if idx < 3 else (0.08 if idx < 6 else 0.0)
+        blended = 0.70 * norm_rrf + 0.30 * norm_raw + consensus_boost
         copy = dict(candidate)
         copy["rerank_score"] = float(blended)
         scored.append((blended, copy))
@@ -128,15 +128,19 @@ class GeminiSemanticReranker:
                 dim=dim,
                 is_query=False,
             )
+            candidate_copies: list[dict[str, Any]] = []
             raw_scores: list[float] = []
             for candidate, c_vec in zip(candidates, c_vecs):
                 c_arr = np.array(c_vec, dtype=np.float32)
                 c_norm = np.linalg.norm(c_arr)
                 if c_norm > 0:
                     c_arr = c_arr / c_norm
-                raw_scores.append(max(0.0, float(np.dot(q_arr, c_arr))))
-                candidate = dict(candidate)
-            scored = _blend_with_rrf(candidates, raw_scores)
+                cos_sim = max(0.0, float(np.dot(q_arr, c_arr)))
+                raw_scores.append(cos_sim)
+                cand_copy = dict(candidate)
+                cand_copy["gemini_cos_sim"] = cos_sim
+                candidate_copies.append(cand_copy)
+            scored = _blend_with_rrf(candidate_copies, raw_scores)
             return [item for _, item in scored[:top_k]]
         except Exception as e:
             logger.warning(

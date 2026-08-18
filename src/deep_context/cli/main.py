@@ -386,20 +386,17 @@ def query_cmd(
             f"[dim]Retrieved {len(retrieval_res.parent_chunks)} parent chunks (sufficient: {retrieval_res.sufficient})[/dim]"
         )
 
+        from deep_context.generation.grounded_answer import generate_grounded_answer
+
         model_label = model or settings.llm_model
-        with console.status(f"[bold green]Generating answer with {model_label}..."):
-            assembler = PromptAssembler(storage)
-            messages = await assembler.assemble_messages(
+        with console.status(f"[bold green]Generating grounded answer with {model_label}..."):
+            grounded_res = await generate_grounded_answer(
                 query=query,
                 retrieved_chunks=retrieval_res.parent_chunks,
-                user_id=user_id,
-            )
-            answer, reasoning = await llm_client.complete(
-                messages,
                 model=model if model else None,
-                enable_thinking=True,
-                timeout=30.0,
             )
+            answer = grounded_res.answer
+            reasoning = grounded_res.reason
 
         if reasoning:
             console.print(

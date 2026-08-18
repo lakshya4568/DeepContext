@@ -579,9 +579,9 @@ class LLMClient:
 
         # --- Attempt 2: Groq API (Ultra-fast reasoning) ---
         groq_client = self._refresh_groq_client()
-        if groq_client and not is_nim_model:
-            m = self.llm_model if (not model or is_gemini_model) else model
-            if not m or m.startswith("gemini-"):
+        if groq_client:
+            m = self.llm_model if (not model or is_gemini_model or is_nim_model) else model
+            if not m or m.startswith("gemini-") or ("meta/" in m and "groq" not in m):
                 m = "qwen/qwen3.6-27b"
             try:
                 resp = await asyncio.wait_for(
