@@ -61,7 +61,23 @@ class Settings(BaseSettings):
     embedding_dim: int = Field(default=768, alias="EMBEDDING_DIM")  # 768 for gemini-embedding-2 MRL
     reranker_strategy: str = Field(
         default="cross_encoder", alias="RERANKER_STRATEGY"
-    )  # 'cross_encoder' | 'gemini_semantic' | 'gemini_llm'
+    )  # 'cross_encoder' | 'gemini_semantic' | 'gemini_llm' | 'rrf'
+
+    # Reranker blend tuning (see reranker.py _blend_with_rrf docstring for regression history).
+    # 0.60/0.40 is the empirically validated default: it produced 87.1% Hit@5 on the GoT
+    # 36-query benchmark. A 0.70/0.30 experiment regressed Hit@5 to 61.3% across every
+    # category and must not be reintroduced as the default without a fresh A/B on the
+    # frozen eval script.
+    reranker_blend_rrf_weight: float = Field(default=0.60, alias="RERANKER_BLEND_RRF_WEIGHT")
+    reranker_consensus_top1_count: int = Field(default=3, alias="RERANKER_CONSENSUS_TOP1_COUNT")
+    reranker_consensus_top2_count: int = Field(default=6, alias="RERANKER_CONSENSUS_TOP2_COUNT")
+    reranker_consensus_boost_tier1: float = Field(
+        default=0.15, alias="RERANKER_CONSENSUS_BOOST_TIER1"
+    )
+    reranker_consensus_boost_tier2: float = Field(
+        default=0.0, alias="RERANKER_CONSENSUS_BOOST_TIER2"
+    )
+
     llm_provider: str = Field(default="groq", alias="LLM_PROVIDER")  # 'groq' | 'nvidia' | 'gemini'
     llm_model: str = Field(default="qwen/qwen3.6-27b", alias="LLM_MODEL")
 

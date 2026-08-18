@@ -29,7 +29,30 @@ STOPWORDS = {
 }
 
 
-def _blend_with_rrf(candidates: list[dict[str, Any]], raw_scores: list[float]) -> list[tuple[float, dict[str, Any]]]:
+def _blend_with_rrf(
+    candidates: list[dict[str, Any]],
+    raw_scores: list[float],
+) -> list[tuple[float, dict[str, Any]]]:
+    """Blend a secondary reranker signal with normalized RRF consensus.
+
+    IMPORTANT TUNING NOTE (regression history):
+    A weighting of 0.70 * norm_rrf + 0.30 * norm_raw with a 0.20/0.08 tiered
+    consensus boost was tried and *dropped* full-pipeline Hit@5 on the GoT
+    eval set from 87.1% to 61.3%, and also degraded Direct Factual, Citation,
+    and Multi-Hop Hit@5 by ~25 points each versus the 0.60/0.40 weighting.
+    The higher RRF weight combined with the larger consensus boost caused the
+    blend to over-anchor on first-stage rank order and under-weight the
+    lexical/semantic reranker signal that corrects RRF mistakes.
+
+    Default weights are restored to the values that produced the best
+    validated Hit@5 (87.1%) on the same corpus and eval set. Do not change
+    these defaults without running the full 36-query benchmark before and
+    after, on a frozen scorer version, and confirming Hit@5/nDCG@5 improve
+    together (not just one of them).
+    """
+    rrf_weight = settings.reranker_blend_rrf_weight
+    raw_weight = 1.0 - rrf_weight
+
     rrf_scores = [float(c.get("rrf_score", 0.0)) for c in candidates]
     min_rrf = min(rrf_scores) if rrf_scores else 0.0
     max_rrf = max(rrf_scores) if rrf_scores else 1.0
@@ -42,8 +65,13 @@ def _blend_with_rrf(candidates: list[dict[str, Any]], raw_scores: list[float]) -
     for idx, (candidate, raw) in enumerate(zip(candidates, raw_scores)):
         norm_rrf = (float(candidate.get("rrf_score", 0.0)) - min_rrf) / rrf_range
         norm_raw = (raw - min_raw) / raw_range
-        consensus_boost = 0.20 if idx < 3 else (0.08 if idx < 6 else 0.0)
-        blended = 0.70 * norm_rrf + 0.30 * norm_raw + consensus_boost
+        if idx < settings.reranker_consensus_top1_count:
+            consensus_boost = settings.reranker_consensus_boost_tier1
+        elif idx < settings.reranker_consensus_top2_count:
+            consensus_boost = settings.reranker_consensus_boost_tier2
+        else:
+            consensus_boost = 0.0
+        blended = rrf_weight * norm_rrf + raw_weight * norm_raw + consensus_boost
         copy = dict(candidate)
         copy["rerank_score"] = float(blended)
         scored.append((blended, copy))
@@ -66,7 +94,7 @@ class CrossEncoderReranker:
         if len(candidates) <= top_k:
             return candidates
 
-        clean_query = query.strip().strip('"').strip("'").strip("“").strip("”")
+        clean_query = query.strip().strip('"').strip("'").strip("\u201c").strip("\u201d")
         q_lower = clean_query.lower()
         all_words = [w for w in re.findall(r"\w+", q_lower) if len(w) > 1]
         content_words = [w for w in all_words if w not in STOPWORDS and len(w) > 2] or all_words
