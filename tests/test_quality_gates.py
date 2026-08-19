@@ -4,6 +4,7 @@ from deep_context.retrieval.quality_gates import (
     REFUSAL_TEMPLATE,
     hop_coverage,
     is_anachronism,
+    is_top_consensus_candidate,
     protect_consensus,
 )
 
@@ -35,3 +36,24 @@ def test_protect_consensus_keeps_dual_hits() -> None:
     merged = protect_consensus(original, reranked, top_k=2)
     assert [c["id"] for c in merged] == ["noise", "keep"]
     assert REFUSAL_TEMPLATE.startswith("Based on the provided context")
+
+
+def test_consensus_requires_bm25_and_dense_membership() -> None:
+    both = {
+        "bm25_rank": 3,
+        "dense_rank": 5,
+    }
+
+    bm25_only = {
+        "bm25_rank": 3,
+        "dense_rank": None,
+    }
+
+    dense_only = {
+        "bm25_rank": None,
+        "dense_rank": 5,
+    }
+
+    assert is_top_consensus_candidate(both) is True
+    assert is_top_consensus_candidate(bm25_only) is False
+    assert is_top_consensus_candidate(dense_only) is False

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import math
 import re
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 
@@ -13,6 +13,8 @@ from deep_context.core.config import settings
 from deep_context.core.llm_client import llm_client
 from deep_context.core.logging import logger
 from deep_context.retrieval.quality_gates import protect_consensus
+
+RerankerScoreType = Literal["logit", "probability"]
 
 STOPWORDS = {
     "a",
@@ -144,25 +146,109 @@ STOPWORDS = {
 
 
 def _sigmoid(x: float) -> float:
-    """Standard sigmoid activation to map unbounded cross-encoder logits to [0, 1]."""
-    if x < -709.0:
+    """Map a finite reranker logit to a bounded relevance score in [0, 1]."""
+    if not math.isfinite(x):
+        if math.isnan(x):
+            return 0.0
+        return 1.0 if x > 0 else 0.0
+
+    if x >= 0.0:
+        z = math.exp(-x) if x < 709.0 else 0.0
+        return 1.0 / (1.0 + z)
+
+    z = math.exp(x) if x > -709.0 else 0.0
+    return z / (1.0 + z)
+
+
+def _normalize_reranker_scores(
+    raw_scores: list[float],
+    score_type: RerankerScoreType,
+) -> list[float]:
+    """Normalize reranker scores without guessing their provider semantics.
+
+    Local cross-encoders commonly return logits. Hosted reranker APIs may
+    already return bounded relevance scores. Applying sigmoid based only on
+    numeric range can accidentally transform valid bounded scores twice.
+    """
+    normalized: list[float] = []
+
+    for raw_score in raw_scores:
+        score = float(raw_score)
+
+        if score_type == "logit":
+            normalized.append(_sigmoid(score))
+            continue
+
+        if score_type == "probability":
+            if not math.isfinite(score):
+                normalized.append(0.0)
+            else:
+                normalized.append(min(1.0, max(0.0, score)))
+            continue
+
+        raise ValueError(f"Unsupported reranker score type: {score_type}")
+
+    return normalized
+
+
+def _consensus_boost_for_candidate(
+    candidate: dict[str, Any],
+    candidate_index: int,
+) -> float:
+    """Return a bounded consensus boost based on retrieval metadata.
+
+    Retrieval ranks are preferred. The index fallback preserves compatibility
+    with older candidate objects that do not expose BM25/vector ranks.
+    """
+    bm25_rank = candidate.get("bm25_rank")
+    dense_rank = candidate.get("dense_rank")
+
+    if bm25_rank is not None and dense_rank is not None:
+        try:
+            bm25_rank = int(bm25_rank)
+            dense_rank = int(dense_rank)
+        except (TypeError, ValueError):
+            bm25_rank = None
+            dense_rank = None
+
+    if bm25_rank is not None and dense_rank is not None:
+        if bm25_rank <= 10 and dense_rank <= 10:
+            return min(
+                0.15,
+                max(0.0, settings.reranker_consensus_boost_tier1),
+            )
+
+        if bm25_rank <= 20 and dense_rank <= 20:
+            return min(
+                0.10,
+                max(0.0, settings.reranker_consensus_boost_tier2),
+            )
+
         return 0.0
-    if x > 709.0:
-        return 1.0
-    return 1.0 / (1.0 + math.exp(-x))
+
+    # Compatibility fallback for candidates that only contain RRF ordering.
+    if candidate_index < settings.reranker_consensus_top1_count:
+        return min(
+            0.15,
+            max(0.0, settings.reranker_consensus_boost_tier1),
+        )
+
+    if candidate_index < settings.reranker_consensus_top2_count:
+        return min(
+            0.10,
+            max(0.0, settings.reranker_consensus_boost_tier2),
+        )
+
+    return 0.0
 
 
 def _blend_with_rrf(
     candidates: list[dict[str, Any]],
     raw_scores: list[float],
+    *,
+    score_type: RerankerScoreType = "probability",
 ) -> list[tuple[float, dict[str, Any]]]:
     """Blend a secondary reranker signal with normalized RRF consensus.
-
-    Calibration rules:
-    - RRF scores are normalized to [0, 1] relative to the candidate batch.
-    - Neural cross-encoder logits outside [0, 1] are converted to [0, 1] via sigmoid.
-    - Bounded scores (from hosted API or heuristic) are preserved on [0, 1].
-    - Consensus boost rewards top-tier RRF candidates within safe bounds.
 
     IMPORTANT TUNING NOTE (regression history):
     A weighting of 0.70 * norm_rrf + 0.30 * norm_raw with a 0.20/0.08 tiered
@@ -179,36 +265,58 @@ def _blend_with_rrf(
     after, on a frozen scorer version, and confirming Hit@5/nDCG@5 improve
     together (not just one of them).
     """
-    rrf_weight = settings.reranker_blend_rrf_weight
-    raw_weight = 1.0 - rrf_weight
+    if len(candidates) != len(raw_scores):
+        raise ValueError(
+            "Candidate count must match reranker score count: "
+            f"{len(candidates)} != {len(raw_scores)}"
+        )
 
-    rrf_scores = [float(c.get("rrf_score", 0.0)) for c in candidates]
-    min_rrf = min(rrf_scores) if rrf_scores else 0.0
-    max_rrf = max(rrf_scores) if rrf_scores else 1.0
-    rrf_range = max_rrf - min_rrf if max_rrf > min_rrf else 1.0
+    rrf_scores = [float(candidate.get("rrf_score", 0.0)) for candidate in candidates]
 
-    # Ensure raw scores are calibrated to [0, 1]
-    has_unbounded = any(s < 0.0 or s > 1.0 for s in raw_scores)
-    if has_unbounded:
-        norm_scores = [_sigmoid(s) for s in raw_scores]
+    min_rrf = min(rrf_scores, default=0.0)
+    max_rrf = max(rrf_scores, default=0.0)
+    rrf_range = max_rrf - min_rrf
+
+    # If all candidates have identical RRF support, RRF provides no
+    # ordering signal and therefore contributes zero to the blend.
+    if rrf_range <= 1e-12:
+        normalized_rrf = [0.0] * len(rrf_scores)
     else:
-        norm_scores = list(raw_scores)
+        normalized_rrf = [(score - min_rrf) / rrf_range for score in rrf_scores]
+
+    normalized_scores = _normalize_reranker_scores(
+        raw_scores,
+        score_type,
+    )
 
     scored: list[tuple[float, dict[str, Any]]] = []
-    for idx, (candidate, norm_raw) in enumerate(zip(candidates, norm_scores)):
-        norm_rrf = (float(candidate.get("rrf_score", 0.0)) - min_rrf) / rrf_range
-        if idx < settings.reranker_consensus_top1_count:
-            consensus_boost = settings.reranker_consensus_boost_tier1
-        elif idx < settings.reranker_consensus_top2_count:
-            consensus_boost = settings.reranker_consensus_boost_tier2
-        else:
-            consensus_boost = 0.0
-        blended = rrf_weight * norm_rrf + raw_weight * norm_raw + consensus_boost
+
+    for idx, (candidate, norm_raw, norm_rrf) in enumerate(
+        zip(candidates, normalized_scores, normalized_rrf, strict=True)
+    ):
+        consensus_boost = _consensus_boost_for_candidate(
+            candidate,
+            idx,
+        )
+
+        final_score = (
+            settings.reranker_blend_rrf_weight * norm_rrf
+            + (1.0 - settings.reranker_blend_rrf_weight) * norm_raw
+            + consensus_boost
+        )
+
         copy = dict(candidate)
-        copy["rerank_score"] = float(blended)
-        scored.append((blended, copy))
-    scored.sort(key=lambda item: item[0], reverse=True)
-    return scored
+        copy["rerank_score"] = float(final_score)
+        scored.append((final_score, copy))
+
+    return sorted(
+        scored,
+        key=lambda item: (
+            -item[0],
+            -float(item[1].get("rrf_score", 0.0)),
+            str(item[1].get("id", "")),
+        ),
+    )
 
 
 class CrossEncoderReranker:
@@ -323,8 +431,8 @@ class LocalCrossEncoderReranker:
         logits = session.run(None, ort_inputs)[0]
         raw_scores: list[float] = logits.reshape(-1).tolist()
 
-        # Reuse the fixed RRF blend — consensus protection stays intact
-        scored = _blend_with_rrf(candidates, raw_scores)
+        # Reuse the fixed RRF blend with explicit logit score type
+        scored = _blend_with_rrf(candidates, raw_scores, score_type="logit")
         return [item for _, item in scored[:top_k]]
 
 

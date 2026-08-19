@@ -44,6 +44,20 @@ def hop_coverage(sub_queries: list[str], parents: list[dict[str, Any]]) -> list[
     return missing
 
 
+def is_top_consensus_candidate(candidate: dict[str, Any]) -> bool:
+    """Return True if candidate was ranked in top 10 by both BM25 and dense retrieval."""
+    bm25_rank = candidate.get("bm25_rank")
+    dense_rank = candidate.get("dense_rank")
+
+    if bm25_rank is None or dense_rank is None:
+        return False
+
+    try:
+        return int(bm25_rank) <= 10 and int(dense_rank) <= 10
+    except (TypeError, ValueError):
+        return False
+
+
 def protect_consensus(
     original: list[dict[str, Any]],
     reranked: list[dict[str, Any]],
@@ -53,10 +67,8 @@ def protect_consensus(
     merged = list(reranked)
     seen = {str(item.get("id") or item.get("chunk_id")) for item in merged}
     for candidate in original:
-        bm25_rank = candidate.get("bm25_rank", 99)
-        dense_rank = candidate.get("dense_rank", 99)
         cid = str(candidate.get("id") or candidate.get("chunk_id") or "")
-        if bm25_rank < 10 and dense_rank < 10 and cid and cid not in seen:
+        if is_top_consensus_candidate(candidate) and cid and cid not in seen:
             merged.append(candidate)
             seen.add(cid)
     return merged[:top_k]

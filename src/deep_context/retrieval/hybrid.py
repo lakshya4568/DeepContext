@@ -54,12 +54,13 @@ def deduplicate_candidates(
     return deduped
 
 
-def _best_rank(lists: list[list[dict[str, Any]]], cid: str) -> int:
-    best = 10_000
+def _best_rank(lists: list[list[dict[str, Any]]], cid: str) -> int | None:
+    best: int | None = None
     for ranked_list in lists:
         for rank, item in enumerate(ranked_list, start=1):
             if item.get("id") == cid:
-                best = min(best, rank)
+                if best is None or rank < best:
+                    best = rank
                 break
     return best
 
