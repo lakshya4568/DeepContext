@@ -164,9 +164,7 @@ class RetrievalEngine:
                 embedding_model=active_emb_model,
                 embedding_dim=active_emb_dim,
             )
-            reranked_children = protect_consensus(
-                candidates, reranked_children, top_k=rerank_pool
-            )
+            reranked_children = protect_consensus(candidates, reranked_children, top_k=rerank_pool)
 
             parents = await self._resolve_parent_chunks(storage, reranked_children)
             parents = parents[:target_top_k]

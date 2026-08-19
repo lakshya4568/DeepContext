@@ -23,14 +23,10 @@ import numpy as np
 
 from deep_context.core.config import settings
 from deep_context.core.llm_client import llm_client
-from deep_context.core.logging import logger
-from deep_context.core.types import QueryShape, RetrievalFilters
-from deep_context.memory.prompt_assembler import PromptAssembler
+from deep_context.core.types import RetrievalFilters
 from deep_context.retrieval.engine import retrieval_engine
 from deep_context.retrieval.hybrid import HybridRetriever
-from deep_context.retrieval.reranker import Reranker
 from deep_context.storage import get_storage
-from deep_context.verification.checker import EvidenceVerifier
 
 
 @dataclass
@@ -110,7 +106,9 @@ def calculate_ndcg(retrieved_pages: list[int], expected_pages: list[int], k: int
     return dcg / idcg
 
 
-def calculate_context_precision(retrieved_pages: list[int], expected_pages: list[int], k: int = 8) -> float:
+def calculate_context_precision(
+    retrieved_pages: list[int], expected_pages: list[int], k: int = 8
+) -> float:
     """
     Ragas Context Precision Formula:
     Mean of precision@k at each rank where a relevant chunk is retrieved.
@@ -150,7 +148,9 @@ def calculate_context_recall(retrieved_text: str, expected_facts: list[str]) -> 
     return covered / len(expected_facts)
 
 
-def calculate_context_relevancy(retrieved_text: str, query: str, expected_facts: list[str]) -> float:
+def calculate_context_relevancy(
+    retrieved_text: str, query: str, expected_facts: list[str]
+) -> float:
     """Ratio of sentences in retrieved context that contain useful query/fact info."""
     sentences = [s.strip() for s in re.split(r"[.!?]\s+", retrieved_text) if len(s.strip()) > 15]
     if not sentences:
@@ -276,23 +276,23 @@ async def run_evaluation():
     print("=" * 80)
     print("DEEP CONTEXT PLATFORM — COMPREHENSIVE RAG EVALUATION BENCHMARK")
     print("=" * 80)
-    
+
     storage = await get_storage()
     dataset_path = Path(__file__).parent.parent / "tests" / "eval_dataset.json"
     if len(sys.argv) > 1 and "eval_quantum" in sys.argv[1]:
         dataset_path = Path(__file__).parent.parent / "tests" / "eval_quantum_dataset.json"
 
     dataset = json.loads(dataset_path.read_text(encoding="utf-8"))
-    print(f"Loaded {len(dataset)} evaluation cases from {dataset_path.name} across 6 taxonomy categories for Eval 1.pdf.\n")
+    print(
+        f"Loaded {len(dataset)} evaluation cases from {dataset_path.name} across 6 taxonomy categories for Eval 1.pdf.\n"
+    )
 
     results: list[QueryEvalResult] = []
-    
-    # Pre-fetch document metadata
-    docs = await storage.list_document_summaries()
-    doc_id = docs[0]["id"] if docs else None
     filters = RetrievalFilters(tenant_id="default")
 
-    eval_emb_model = "nvidia/nv-embedqa-e5-v5" if settings.has_nvidia_key else settings.embedding_model
+    eval_emb_model = (
+        "nvidia/nv-embedqa-e5-v5" if settings.has_nvidia_key else settings.embedding_model
+    )
     eval_emb_dim = 1024 if "nv-embedqa" in eval_emb_model else settings.embedding_dim
 
     for i, item in enumerate(dataset, start=1):
@@ -354,16 +354,34 @@ async def run_evaluation():
         ret_latency = int((time.time() - t_ret_0) * 1000)
 
         parent_page_sets = [extract_chunk_pages(p) for p in retrieval_res.parent_chunks]
-        retrieved_pages = [p.get("page_number") for p in retrieval_res.parent_chunks if p.get("page_number")]
+        retrieved_pages = [
+            p.get("page_number") for p in retrieval_res.parent_chunks if p.get("page_number")
+        ]
         context_text = "\n\n".join(p.get("content", "") for p in retrieval_res.parent_chunks)
 
         # Calculate retrieval metrics
         exp_set = set(expected_pages)
-        hit_1 = 1.0 if (expected_pages and parent_page_sets and bool(parent_page_sets[0] & exp_set)) else (1.0 if is_unanswerable else 0.0)
-        hit_3 = 1.0 if any(bool(s & exp_set) for s in parent_page_sets[:3]) else (1.0 if is_unanswerable else 0.0)
-        hit_5 = 1.0 if any(bool(s & exp_set) for s in parent_page_sets[:5]) else (1.0 if is_unanswerable else 0.0)
-        hit_8 = 1.0 if any(bool(s & exp_set) for s in parent_page_sets[:8]) else (1.0 if is_unanswerable else 0.0)
-        
+        hit_1 = (
+            1.0
+            if (expected_pages and parent_page_sets and bool(parent_page_sets[0] & exp_set))
+            else (1.0 if is_unanswerable else 0.0)
+        )
+        hit_3 = (
+            1.0
+            if any(bool(s & exp_set) for s in parent_page_sets[:3])
+            else (1.0 if is_unanswerable else 0.0)
+        )
+        hit_5 = (
+            1.0
+            if any(bool(s & exp_set) for s in parent_page_sets[:5])
+            else (1.0 if is_unanswerable else 0.0)
+        )
+        hit_8 = (
+            1.0
+            if any(bool(s & exp_set) for s in parent_page_sets[:8])
+            else (1.0 if is_unanswerable else 0.0)
+        )
+
         # MRR
         mrr = 0.0
         if not expected_pages:
@@ -378,8 +396,13 @@ async def run_evaluation():
         def _calc_ndcg_sets(k: int) -> float:
             if not expected_pages:
                 return 1.0
-            dcg = sum((1.0 if (s & exp_set) else 0.0) / math.log2(idx + 1) for idx, s in enumerate(parent_page_sets[:k], start=1))
-            idcg = sum(1.0 / math.log2(idx + 1) for idx in range(1, min(k, len(expected_pages)) + 1))
+            dcg = sum(
+                (1.0 if (s & exp_set) else 0.0) / math.log2(idx + 1)
+                for idx, s in enumerate(parent_page_sets[:k], start=1)
+            )
+            idcg = sum(
+                1.0 / math.log2(idx + 1) for idx in range(1, min(k, len(expected_pages)) + 1)
+            )
             return (dcg / idcg) if idcg > 0 else 0.0
 
         ndcg_5 = _calc_ndcg_sets(5)
@@ -391,7 +414,7 @@ async def run_evaluation():
         for idx, s in enumerate(parent_page_sets[:8], start=1):
             if s & exp_set:
                 rel_found += 1
-                prec_sum += (rel_found / idx)
+                prec_sum += rel_found / idx
         ctx_prec = (prec_sum / rel_found) if rel_found > 0 else (1.0 if is_unanswerable else 0.0)
         ctx_rec = calculate_context_recall(context_text, expected_facts)
         ctx_rel = calculate_context_relevancy(context_text, question, expected_facts)
@@ -402,7 +425,9 @@ async def run_evaluation():
         from deep_context.generation.grounded_answer import generate_grounded_answer
 
         t_gen_0 = time.time()
-        eval_gen_model = "meta/llama-3.1-8b-instruct" if settings.has_nvidia_key else settings.llm_model
+        eval_gen_model = (
+            "meta/llama-3.1-8b-instruct" if settings.has_nvidia_key else settings.llm_model
+        )
         grounded_res = await generate_grounded_answer(
             query=question,
             retrieved_chunks=retrieval_res.parent_chunks,
@@ -418,14 +443,24 @@ async def run_evaluation():
             question, answer, context_text, is_unanswerable
         )
         abstention_acc = check_abstention(answer, is_unanswerable)
-        
+
         # Factual correctness & completeness
         ans_lower = answer.lower()
         # Normalize digits
         num_map = {
-            "400": "four hundred", "30": "thirty", "3": "three", "1": "one", "2": "two",
-            "4": "four", "14": "fourteen", "11": "eleven", "9": "nine", "7": "seven",
-            "first": "1st", "second": "2nd", "third": "3rd"
+            "400": "four hundred",
+            "30": "thirty",
+            "3": "three",
+            "1": "one",
+            "2": "two",
+            "4": "four",
+            "14": "fourteen",
+            "11": "eleven",
+            "9": "nine",
+            "7": "seven",
+            "first": "1st",
+            "second": "2nd",
+            "third": "3rd",
         }
         for num, word in num_map.items():
             if num in ans_lower:
@@ -436,23 +471,42 @@ async def run_evaluation():
         facts_found = 0
         for f in expected_facts:
             f_words = [w.lower() for w in re.findall(r"\w+", f) if len(w) > 2]
-            if f.lower() in ans_lower or (f_words and (sum(1 for w in f_words if w in ans_lower) / len(f_words)) >= 0.45):
+            if f.lower() in ans_lower or (
+                f_words and (sum(1 for w in f_words if w in ans_lower) / len(f_words)) >= 0.45
+            ):
                 facts_found += 1
-        
-        completeness = facts_found / max(1, len(expected_facts)) if not is_unanswerable else (1.0 if abstention_acc == 1.0 else 0.0)
+
+        completeness = (
+            facts_found / max(1, len(expected_facts))
+            if not is_unanswerable
+            else (1.0 if abstention_acc == 1.0 else 0.0)
+        )
         fact_f1 = (2 * completeness * faithfulness) / max(0.001, (completeness + faithfulness))
 
         # Semantic similarity
-        eval_emb_model = "nvidia/nv-embedqa-e5-v5" if settings.has_nvidia_key else settings.embedding_model
+        eval_emb_model = (
+            "nvidia/nv-embedqa-e5-v5" if settings.has_nvidia_key else settings.embedding_model
+        )
         eval_emb_dim = 1024 if "nv-embedqa" in eval_emb_model else settings.embedding_dim
-        ans_emb = await llm_client.get_embedding(answer[:1000], model=eval_emb_model, dim=eval_emb_dim, is_query=True)
-        gt_emb = await llm_client.get_embedding(gt[:1000], model=eval_emb_model, dim=eval_emb_dim, is_query=True)
-        sem_sim = max(0.0, float(np.dot(ans_emb, gt_emb) / (np.linalg.norm(ans_emb) * np.linalg.norm(gt_emb) + 1e-9)))
+        ans_emb = await llm_client.get_embedding(
+            answer[:1000], model=eval_emb_model, dim=eval_emb_dim, is_query=True
+        )
+        gt_emb = await llm_client.get_embedding(
+            gt[:1000], model=eval_emb_model, dim=eval_emb_dim, is_query=True
+        )
+        sem_sim = max(
+            0.0,
+            float(
+                np.dot(ans_emb, gt_emb) / (np.linalg.norm(ans_emb) * np.linalg.norm(gt_emb) + 1e-9)
+            ),
+        )
 
         # Citation validation
         citations_data = [c.to_dict() for c in retrieval_res.citations]
         citation_prec = 1.0 if len(citations_data) > 0 else 0.0
-        citation_rec = min(1.0, len(citations_data) / max(1, len(expected_pages))) if expected_pages else 1.0
+        citation_rec = (
+            min(1.0, len(citations_data) / max(1, len(expected_pages))) if expected_pages else 1.0
+        )
 
         # Failure diagnosis categorization
         failure_cat = None

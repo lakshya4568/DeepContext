@@ -123,19 +123,38 @@ class HybridRetriever:
             sec = (cand.get("section_path") or "").lower()
             doc_type = str(cand.get("doc_type") or "").lower()
             content_head = (cand.get("content") or "")[:250].lower()
-            
+
             boost = 0.0
             for sq in sub_queries:
                 sq_lower = sq.lower()
-                for app_label in ("appendix a", "appendix b", "appendix c", "appendix d", "appendix e", "appendix f", "appendix g"):
+                for app_label in (
+                    "appendix a",
+                    "appendix b",
+                    "appendix c",
+                    "appendix d",
+                    "appendix e",
+                    "appendix f",
+                    "appendix g",
+                ):
                     if app_label in sq_lower and (app_label in sec or app_label in content_head):
                         boost += 0.12
-                for ch_label in ("chapter 1", "chapter 2", "chapter 3", "chapter 4", "chapter 5", "chapter 6", "chapter 7", "chapter 8"):
+                for ch_label in (
+                    "chapter 1",
+                    "chapter 2",
+                    "chapter 3",
+                    "chapter 4",
+                    "chapter 5",
+                    "chapter 6",
+                    "chapter 7",
+                    "chapter 8",
+                ):
                     if ch_label in sq_lower and (ch_label in sec or ch_label in content_head):
                         boost += 0.08
-                if "appendix" in sq_lower and ("appendix" in sec or doc_type == "appendix" or "appendix" in content_head):
+                if "appendix" in sq_lower and (
+                    "appendix" in sec or doc_type == "appendix" or "appendix" in content_head
+                ):
                     boost += 0.05
-            
+
             if boost > 0:
                 fused_score_map[cid] = fused_score_map.get(cid, 0.0) + boost
                 cand["rrf_score"] = fused_score_map[cid]

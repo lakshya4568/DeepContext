@@ -53,6 +53,24 @@ class Settings(BaseSettings):
         alias="GEMINI_BASE_URL",
     )
 
+    # EcoHash API (for hosted BGE reranker)
+    ecohash_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "ECOHASH_API_KEY",
+            "ecohash_api_key",
+            "ECOHASH_KEY",
+        ),
+    )
+    ecohash_rerank_url: str = Field(
+        default="https://api.ecohash.com/v1/rerank",
+        alias="ECOHASH_RERANK_URL",
+    )
+    ecohash_rerank_model: str = Field(
+        default="bge-reranker-v2-m3",
+        alias="ECOHASH_RERANK_MODEL",
+    )
+
     # Models & Embedding Configuration
     embedding_provider: str = Field(
         default="auto", alias="EMBEDDING_PROVIDER"
@@ -136,8 +154,15 @@ class Settings(BaseSettings):
         return bool(k and not k.startswith("nvapi-your-key") and len(k) > 10)
 
     @property
+    def has_ecohash_key(self) -> bool:
+        k = self.ecohash_api_key.strip()
+        return bool(k and len(k) > 5)
+
+    @property
     def has_valid_api_key(self) -> bool:
-        return self.has_gemini_key or self.has_groq_key or self.has_nvidia_key
+        return (
+            self.has_gemini_key or self.has_groq_key or self.has_nvidia_key or self.has_ecohash_key
+        )
 
 
 settings = Settings()

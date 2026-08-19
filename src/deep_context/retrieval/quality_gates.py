@@ -5,9 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-REFUSAL_TEMPLATE = (
-    "Based on the provided context, there is insufficient evidence to answer."
-)
+REFUSAL_TEMPLATE = "Based on the provided context, there is insufficient evidence to answer."
 
 ANACHRONISM_MARKERS = (
     "smartphone",

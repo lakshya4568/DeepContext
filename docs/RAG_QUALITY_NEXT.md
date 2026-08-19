@@ -80,3 +80,35 @@ Compare Hit@5, nDCG@5, and factual F1 across both runs before changing the defau
 4. **Always re-run the full 36-query benchmark after any reranker or rewriter change**, and
    record Hit@5, nDCG@5, factual F1, and faithfulness together. A generation-only improvement
    can mask a retrieval regression, as this commit's history demonstrates.
+
+## BGE Reranker Upgrade A/B Benchmark Results
+
+Upgraded reranker to true cross-encoder architecture (`bge-reranker-v2-m3`) with dual integration modes:
+- **Hosted API Module:** `EcoHashReranker` (`src/deep_context/retrieval/ecohash_reranker.py`) using `https://api.ecohash.com/v1/rerank` (zero local compute/memory overhead).
+- **Local Embedded Module:** `LocalCrossEncoderReranker` (`src/deep_context/retrieval/reranker.py`) using quantized INT8 ONNX graph (`tss-deposium/bge-reranker-v2-m3-onnx-int8`) with `onnxruntime`.
+
+### 36-Query Benchmark Comparison (`Eval 1.pdf`, 755 pages)
+
+| Metric | Heuristic Baseline (`cross_encoder`) | RRF Only (`rrf`) | Hosted BGE-M3 (`ecohash`) | BGE vs Baseline Δ |
+|---|---:|---:|---:|---:|
+| **Hit@1** | 29.0% | 35.5% | **35.5%** | **+6.5%** |
+| **Hit@3** | 51.6% | 54.8% | **64.5%** | **+12.9%** |
+| **Hit@5** | 64.5% | 61.3% | **67.7%** | **+3.2%** |
+| **Hit@8** | 77.4% | 67.7% | **83.9%** | **+6.5%** |
+| **Mean Reciprocal Rank (MRR)** | 0.4395 | 0.4594 | **0.5225** | **+0.0830 (+18.9%)** |
+| **nDCG@5** | 0.3321 | 0.3354 | **0.3719** | **+0.0398 (+12.0%)** |
+| **nDCG@8** | 0.3810 | 0.3718 | **0.4306** | **+0.0496 (+13.0%)** |
+| **Context Precision** | 0.4083 | 0.4196 | **0.4856** | **+0.0773 (+18.9%)** |
+| **Context Recall** | 92.7% | 92.2% | **93.8%** | **+1.1%** |
+| **Faithfulness (Groundedness)** | 88.0% | 88.7% | **88.7%** | **+0.7%** |
+| **Answer Relevancy** | 83.6% | 85.8% | **84.5%** | **+0.9%** |
+| **Factual Correctness (F1)** | 0.3854 | 0.4825 | **0.4664** | **+0.0810 (+21.0%)** |
+| **Semantic Similarity** | 0.5853 | 0.5970 | **0.6054** | **+0.0201** |
+| **Abstention Accuracy** | 100.0% | 100.0% | **100.0%** | **0.0%** |
+
+### Decision Summary
+Per the upgrade criteria in `RERANKER_UPGRADE.md`, `bge-reranker-v2-m3` passed all required quality thresholds:
+1. **Hit@1 delta:** +6.5% (Threshold: $\ge +3.0\%$) — **PASSED**
+2. **MRR delta:** +0.0830 (Threshold: $\ge +0.03$) — **PASSED**
+3. **Consensus Protection:** Retained via `protect_consensus()` and 60/40 RRF score blending.
+

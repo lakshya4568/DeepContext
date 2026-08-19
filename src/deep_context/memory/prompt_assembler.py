@@ -46,7 +46,7 @@ class PromptAssembler:
             "Do NOT use the refusal template for partial answers.\n"
             "4. If the evidence names the asked entity and states a fact about it, you MUST answer. "
             "Do not refuse because the wording differs from the question.\n"
-            f"5. Use this exact sentence ONLY when no asked fact is supported:\n\"{REFUSAL_TEMPLATE}\"\n"
+            f'5. Use this exact sentence ONLY when no asked fact is supported:\n"{REFUSAL_TEMPLATE}"\n'
             "6. Modern anachronisms (smartphones, airplanes, nuclear power, real elections, "
             "characters from other fictional universes) are unanswerable even if a place or person name overlaps."
         )

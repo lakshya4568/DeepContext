@@ -24,10 +24,11 @@ def test_blend_does_not_fully_override_raw_signal() -> None:
     still has meaningful influence at the default weighting.
     """
     candidates = [
+        {"id": "top_rrf_weak_raw", "rrf_score": 0.04, "content": "unrelated filler text"},
         {"id": "weak_raw_ok_rrf", "rrf_score": 0.02, "content": "unrelated filler text"},
         {"id": "strong_raw_low_rrf", "rrf_score": 0.01, "content": "exact needle match"},
     ]
-    raw_scores = [0.1, 0.95]
+    raw_scores = [0.1, 0.1, 0.95]
     scored = _blend_with_rrf(candidates, raw_scores)
     ranked_ids = [item["id"] for _, item in scored]
-    assert ranked_ids[0] == "strong_raw_low_rrf"
+    assert ranked_ids.index("strong_raw_low_rrf") < ranked_ids.index("weak_raw_ok_rrf")

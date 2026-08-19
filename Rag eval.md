@@ -61,20 +61,10 @@ A typical evaluation dataset contains:
 
 ```python
 dataset = {
-    "question": [
-        "What is the refund policy?"
-    ],
-    "answer": [
-        "Customers can request a refund within 30 days."
-    ],
-    "contexts": [
-        [
-            "Refunds are available within 30 days of purchase."
-        ]
-    ],
-    "ground_truth": [
-        "Customers may request a refund within 30 days of purchase."
-    ]
+    "question": ["What is the refund policy?"],
+    "answer": ["Customers can request a refund within 30 days."],
+    "contexts": [["Refunds are available within 30 days of purchase."]],
+    "ground_truth": ["Customers may request a refund within 30 days of purchase."],
 }
 ```
 
@@ -91,20 +81,10 @@ from ragas.metrics import (
 )
 
 data = {
-    "user_input": [
-        "What is the refund policy?"
-    ],
-    "response": [
-        "Customers can request a refund within 30 days."
-    ],
-    "retrieved_contexts": [
-        [
-            "Refunds are available within 30 days of purchase."
-        ]
-    ],
-    "reference": [
-        "Customers may request a refund within 30 days of purchase."
-    ],
+    "user_input": ["What is the refund policy?"],
+    "response": ["Customers can request a refund within 30 days."],
+    "retrieved_contexts": [["Refunds are available within 30 days of purchase."]],
+    "reference": ["Customers may request a refund within 30 days of purchase."],
 }
 
 dataset = Dataset.from_dict(data)
@@ -157,9 +137,7 @@ from deepeval.metrics import (
 test_case = LLMTestCase(
     input="What is the refund policy?",
     actual_output="Customers can request a refund within 30 days.",
-    retrieval_context=[
-        "Refunds are available within 30 days of purchase."
-    ],
+    retrieval_context=["Refunds are available within 30 days of purchase."],
     expected_output="Customers may request a refund within 30 days of purchase.",
 )
 

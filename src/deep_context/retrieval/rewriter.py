@@ -51,14 +51,23 @@ class QueryRewriter:
         q_lower = query.lower()
         sub_queries: list[str] = [query]
 
-        if any(w in q_lower for w in ("appendix", "words of house", "house words", "sigil", "sworn houses")):
+        if any(
+            w in q_lower
+            for w in ("appendix", "words of house", "house words", "sigil", "sworn houses")
+        ):
             appendix_q = f"appendix {query}"
             if appendix_q not in sub_queries:
                 sub_queries.append(appendix_q)
 
-        target_model = "meta/llama-3.1-8b-instruct" if settings.has_nvidia_key else settings.llm_model
+        target_model = (
+            "meta/llama-3.1-8b-instruct" if settings.has_nvidia_key else settings.llm_model
+        )
 
-        if shape in (QueryShape.MULTI_HOP, QueryShape.AGGREGATION) or " and " in q_lower or "?" in query[10:]:
+        if (
+            shape in (QueryShape.MULTI_HOP, QueryShape.AGGREGATION)
+            or " and " in q_lower
+            or "?" in query[10:]
+        ):
             try:
                 prompt = [
                     {
@@ -94,7 +103,9 @@ class QueryRewriter:
                             sub_queries.append(p)
 
         all_words = re.findall(r"\w+", query)
-        has_proper_nouns = any(w[0].isupper() for w in all_words[1:]) if len(all_words) > 1 else False
+        has_proper_nouns = (
+            any(w[0].isupper() for w in all_words[1:]) if len(all_words) > 1 else False
+        )
         if not has_proper_nouns and len(sub_queries) == 1:
             try:
                 prompt = [

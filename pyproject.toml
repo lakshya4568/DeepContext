@@ -21,6 +21,8 @@ dependencies = [
     "pypdf>=6.16.1",
     "python-multipart>=0.0.32",
     "google-genai>=0.1.0",
+    "sentence-transformers>=3.0.0",
+    "onnxruntime>=1.29.0",
 ]
 
 [project.optional-dependencies]
@@ -63,5 +65,5 @@ disallow_untyped_defs = false
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = ["asyncpg.*", "pgvector.*", "fitz.*"]
+module = ["asyncpg.*", "pgvector.*", "fitz.*", "onnxruntime.*"]
 ignore_missing_imports = true

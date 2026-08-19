@@ -20,7 +20,6 @@ from deep_context.core.types import (
     RetrievalMode,
 )
 from deep_context.ingestion.pipeline import ingestion_pipeline
-from deep_context.memory.prompt_assembler import PromptAssembler
 from deep_context.retrieval.engine import retrieval_engine
 from deep_context.rlm.orchestrator import RLMOrchestrator
 from deep_context.storage import close_storage, get_storage
@@ -361,7 +360,6 @@ def query_cmd(
     """Run full intelligent grounded query answering with preference resolution."""
 
     async def _run() -> None:
-        storage = await get_storage()
         filters = RetrievalFilters()
 
         with console.status("[bold green]Classifying query..."):

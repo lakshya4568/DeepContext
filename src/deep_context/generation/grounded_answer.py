@@ -42,8 +42,14 @@ def _parse_extract_payload(text: str) -> dict[str, Any]:
         except Exception:
             pass
     # Fallback: parse bullet points if model returned text
-    lines = [line.strip().lstrip("*-0123456789.) ").strip() for line in text.split("\n") if line.strip()]
-    facts = [line for line in lines if len(line) > 10 and not line.startswith("{") and not line.startswith("}")]
+    lines = [
+        line.strip().lstrip("*-0123456789.) ").strip() for line in text.split("\n") if line.strip()
+    ]
+    facts = [
+        line
+        for line in lines
+        if len(line) > 10 and not line.startswith("{") and not line.startswith("}")
+    ]
     if facts:
         return {"supported": facts, "unanswerable": False}
     return {}
@@ -91,8 +97,7 @@ async def generate_grounded_answer(
         )
 
     evidence_text = "\n\n".join(
-        f"[{idx}] {chunk.get('content', '')}"
-        for idx, chunk in enumerate(retrieved_chunks, start=1)
+        f"[{idx}] {chunk.get('content', '')}" for idx, chunk in enumerate(retrieved_chunks, start=1)
     )
     target_model = model or (
         "meta/llama-3.1-8b-instruct" if settings.has_nvidia_key else settings.llm_model

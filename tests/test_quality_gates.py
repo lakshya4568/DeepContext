@@ -17,7 +17,10 @@ def test_anachronism_detects_adversarial_queries() -> None:
 
 def test_hop_coverage_flags_missing_entity() -> None:
     missing = hop_coverage(
-        ["Why did Catelyn seize Tyrion and what did Littlefinger claim?", "Littlefinger dagger wager"],
+        [
+            "Why did Catelyn seize Tyrion and what did Littlefinger claim?",
+            "Littlefinger dagger wager",
+        ],
         [{"content": "Catelyn seized Tyrion at the inn after Bran was attacked."}],
     )
     assert missing == ["Littlefinger dagger wager"]
