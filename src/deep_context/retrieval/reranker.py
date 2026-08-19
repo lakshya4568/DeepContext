@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 from typing import Any
 
@@ -142,11 +143,26 @@ STOPWORDS = {
 }
 
 
+def _sigmoid(x: float) -> float:
+    """Standard sigmoid activation to map unbounded cross-encoder logits to [0, 1]."""
+    if x < -709.0:
+        return 0.0
+    if x > 709.0:
+        return 1.0
+    return 1.0 / (1.0 + math.exp(-x))
+
+
 def _blend_with_rrf(
     candidates: list[dict[str, Any]],
     raw_scores: list[float],
 ) -> list[tuple[float, dict[str, Any]]]:
     """Blend a secondary reranker signal with normalized RRF consensus.
+
+    Calibration rules:
+    - RRF scores are normalized to [0, 1] relative to the candidate batch.
+    - Neural cross-encoder logits outside [0, 1] are converted to [0, 1] via sigmoid.
+    - Bounded scores (from hosted API or heuristic) are preserved on [0, 1].
+    - Consensus boost rewards top-tier RRF candidates within safe bounds.
 
     IMPORTANT TUNING NOTE (regression history):
     A weighting of 0.70 * norm_rrf + 0.30 * norm_raw with a 0.20/0.08 tiered
@@ -170,14 +186,17 @@ def _blend_with_rrf(
     min_rrf = min(rrf_scores) if rrf_scores else 0.0
     max_rrf = max(rrf_scores) if rrf_scores else 1.0
     rrf_range = max_rrf - min_rrf if max_rrf > min_rrf else 1.0
-    min_raw = min(raw_scores) if raw_scores else 0.0
-    max_raw = max(raw_scores) if raw_scores else 1.0
-    raw_range = max_raw - min_raw if max_raw > min_raw else 1.0
+
+    # Ensure raw scores are calibrated to [0, 1]
+    has_unbounded = any(s < 0.0 or s > 1.0 for s in raw_scores)
+    if has_unbounded:
+        norm_scores = [_sigmoid(s) for s in raw_scores]
+    else:
+        norm_scores = list(raw_scores)
 
     scored: list[tuple[float, dict[str, Any]]] = []
-    for idx, (candidate, raw) in enumerate(zip(candidates, raw_scores)):
+    for idx, (candidate, norm_raw) in enumerate(zip(candidates, norm_scores)):
         norm_rrf = (float(candidate.get("rrf_score", 0.0)) - min_rrf) / rrf_range
-        norm_raw = (raw - min_raw) / raw_range
         if idx < settings.reranker_consensus_top1_count:
             consensus_boost = settings.reranker_consensus_boost_tier1
         elif idx < settings.reranker_consensus_top2_count:
