@@ -1,7 +1,8 @@
 <div align="center">
 
 # ⚡ Deep Context Platform
-### *Bare-Metal Agentic RAG, Recursive Language Models (RLM), and Typed Long-Term Memory*
+
+### _Bare-Metal Agentic RAG, Recursive Language Models (RLM), and Typed Long-Term Memory_
 
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
@@ -9,8 +10,8 @@
 [![Google Gemini GenAI](https://img.shields.io/badge/Google%20GenAI-Gemini%202.5%20%2B%20Embedding--2-4285F4?logo=google&logoColor=white)](https://ai.google.dev)
 [![Groq Fast Inference](https://img.shields.io/badge/Groq-Qwen%203.6%2027B%20%2F%20Llama%203.3-F05032?logo=fastly&logoColor=white)](https://groq.com)
 [![NVIDIA NIM](https://img.shields.io/badge/NVIDIA%20NIM-Llama%203.1%20%2F%20GLM--5.2-76B900?logo=nvidia&logoColor=white)](https://build.nvidia.com)
-[![Tests](https://img.shields.io/badge/Tests-43%20Passed%20(100%25)-brightgreen)](https://github.com)
-[![Zero Frameworks](https://img.shields.io/badge/Frameworks-Zero%20(No%20LangChain%20%2F%20LlamaIndex)-black)](https://github.com)
+[![Tests](<https://img.shields.io/badge/Tests-43%20Passed%20(100%25)-brightgreen>)](https://github.com)
+[![Zero Frameworks](<https://img.shields.io/badge/Frameworks-Zero%20(No%20LangChain%20%2F%20LlamaIndex)-black>)](https://github.com)
 
 **A high-performance, framework-free Agentic Retrieval-Augmented Generation (RAG) platform.**  
 Built entirely from scratch with raw Python, pure SQL (`asyncpg` + `pgvector`), multi-provider LLMs, typed durable memory, sandboxed recursive language modeling (RLM), and a zero-dependency Vanilla web interface.
@@ -24,11 +25,13 @@ Built entirely from scratch with raw Python, pure SQL (`asyncpg` + `pgvector`), 
 ## 🌟 Why Deep Context Platform?
 
 Most modern RAG systems suffer from three critical flaws:
+
 1. **Framework Bloat & Fragility:** Heavy abstraction layers (LangChain, LlamaIndex, CrewAI) obscure SQL execution, add latency, and complicate production debugging.
 2. **Context Blindness & Haystack Loss:** Traditional fixed chunking either loses macro context (small chunks) or dilutes embedding precision (large chunks), failing on complex 1,000-page documents.
 3. **Lack of Infinite-Context Recursion:** When a query requires reading or aggregating over millions of tokens across an entire repository or book, standard top-$k$ retrieval fails.
 
 **Deep Context Platform solves this from first principles:**
+
 - **100% Hand-Crafted Core:** Zero LangChain, zero LlamaIndex, zero LangGraph. Pure, reviewable, high-speed Python 3.12 and raw SQL.
 - **Hierarchical Parent-Child Resolution:** Ingests documents into 1,000–2,500 token parent blocks mapped to 200–600 token child chunks with 15% overlap. Vector search hits precise children; synthesis receives rich parent context.
 - **Multi-Strategy Hybrid Retrieval:** Combines BM25 full-text indexing, `pgvector` HNSW dense vector search, Reciprocal Rank Fusion (RRF $k=60$), and multi-strategy rerankers.
@@ -97,40 +100,81 @@ Most modern RAG systems suffer from three critical flaws:
 ## ⚡ Core Features
 
 ### 1. Multi-Provider LLM & Embedding Matrix
+
 The platform features dynamic model routing, automatic failover, and dynamic `.env` hot-reloading:
 
-| Provider | Supported Models | Capabilities |
-| :--- | :--- | :--- |
-| **Google GenAI** | `gemini-2.5-flash`, `gemini-2.5-pro` | Ultra-fast multimodal reasoning, streaming synthesis |
-| **Google Embeddings** | `gemini-embedding-2`, `gemini-embedding-001` | Multimodal text MRL (768d, 1536d, 3072d), task-specific prefixing |
-| **Groq Cloud** | `qwen/qwen3.6-27b`, `llama-3.3-70b-versatile`, `llama-3.1-8b-instant` | Real-time reasoning token streaming (`<think>` blocks), sub-second execution |
-| **NVIDIA NIM** | `meta/llama-3.1-8b-instruct`, `z-ai/glm-5.2`, `nv-embedqa-e5-v5`, `baai/bge-m3` | High-throughput enterprise LLMs & 1024-dim dense embeddings |
+| Provider              | Supported Models                                                                | Capabilities                                                                 |
+| :-------------------- | :------------------------------------------------------------------------------ | :--------------------------------------------------------------------------- |
+| **Google GenAI**      | `gemini-2.5-flash`, `gemini-2.5-pro`                                            | Ultra-fast multimodal reasoning, streaming synthesis                         |
+| **Google Embeddings** | `gemini-embedding-2`, `gemini-embedding-001`                                    | Multimodal text MRL (768d, 1536d, 3072d), task-specific prefixing            |
+| **Groq Cloud**        | `qwen/qwen3.6-27b`, `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`           | Real-time reasoning token streaming (`<think>` blocks), sub-second execution |
+| **NVIDIA NIM**        | `meta/llama-3.1-8b-instruct`, `z-ai/glm-5.2`, `nv-embedqa-e5-v5`, `baai/bge-m3` | High-throughput enterprise LLMs & 1024-dim dense embeddings                  |
 
 ### 2. Multi-Strategy Precision Reranking
+
 Configurable on the fly or persisted per user in typed memory:
+
 - **`cross_encoder` (Default):** Exact quote match + token Jaccard overlap + lexical boost.
 - **`ecohash` (Hosted Neural):** BGE-reranker-v2-m3 cross-encoder via EcoHash API with calibrated probabilities.
 - **`local_cross_encoder`:** Quantized INT8 BGE-reranker-v2-m3 running on ONNX Runtime with sigmoid normalization.
 
 ### 3. 4-Store Typed Memory System
+
 Durable memory is partitioned to prevent cross-contamination:
+
 - **`memory_policy`:** Immutable runtime safety and behavior constraints.
 - **`memory_preference`:** User-scoped persistent preferences (e.g. preferred embedding model, output dimension, reranker, and LLM).
 - **`memory_fact`:** Verified semantic world/user facts promoted through confidence scoring.
 - **`memory_episode`:** Session history, outcome summaries, and interaction traces.
 
 ### 4. 100% Vanilla Web Studio
+
 Located at `src/deep_context/ui/index.html`:
+
 - **Zero npm, zero webpack, zero React:** Pure HTML5, CSS3, and JavaScript.
 - **Live Thought Drawer:** Real-time collapsible display for model reasoning tokens (`<think>`).
 - **Needle-in-a-Haystack 5-Stage Diagnostic Lab:** Step-by-step visibility into every retrieval layer.
 - **1,000-Page Document Hub:** Drag-and-drop batch upload with streaming PDF extraction.
+
+### 5. Response Cache Layer (Redis or In-Memory)
+
+Whole-answer caching at the RAG pipeline level (`question → answer + citations`), comparable to production agentic-RAG cache services:
+
+- **Stable keys:** SHA-256 of canonical JSON over query + tenant + permissions + filters + model config.
+- **Redis-backed** when `CACHE_URL` is set; automatic in-memory fallback otherwise.
+- **TTL-based expiry** (`CACHE_TTL`, default 300s) and namespace invalidation on document deletion.
+- Only support-checked answers are cached; `/v1/retrieve` and `/v1/query` responses expose a `cache_hit` flag.
+
+### 6. Internal Scheduler (Airflow-style job table)
+
+A lightweight persistence-backed scheduler for ingestion and index maintenance:
+
+- **`jobs` table** in SQLite/Postgres with cron-like schedules (`*/15 * * * *`) or `every:<seconds>` shorthand.
+- **Built-in tasks:** `cleanup_orphaned_docs`, `reindex_corpus`, `refresh_embeddings`.
+- **Retries with backoff**, failure recording, and manual tick endpoint for cron-wrapped deploys.
+
+### 7. Corrective Agentic RAG State Machine
+
+A hand-built LangGraph-equivalent corrective loop following the CRAG pattern (arXiv:2401.15884):
+
+```
+retrieve → grade_documents ──relevant──→ generate_answer → END
+                │ irrelevant (rewrite_count < max)
+          rewrite_question → retrieve → grade_documents
+                │ exhausted
+            abstain (safe fallback)
+```
+
+- Deterministic relevance grading against `AGENTIC_GRADE_THRESHOLD`.
+- Query rewriting reuses the existing LLM rewriter with a deterministic offline fallback.
+- Generation reuses the grounded two-pass generator and evidence verifier.
 
 ---
 
 ## 🚀 Quickstart
 
 ### 1. Prerequisites
+
 - **Python 3.12+**
 - **uv** (Modern Python package manager):
   ```bash
@@ -139,6 +183,7 @@ Located at `src/deep_context/ui/index.html`:
 - **PostgreSQL 15+ with pgvector** (or SQLite for local zero-config mode).
 
 ### 2. Installation & Environment Setup
+
 Clone the repository and sync dependencies:
 
 ```bash
@@ -150,6 +195,7 @@ uv sync --extra dev
 ```
 
 ### 3. Configure API Keys
+
 Create a `.env` file in the project root:
 
 ```env
@@ -174,6 +220,7 @@ LLM_MODEL=qwen/qwen3.6-27b
 ```
 
 ### 4. Launch the Web Studio
+
 Start the high-performance async server:
 
 ```bash
@@ -207,6 +254,15 @@ uv run deep-context preferences user_42
 
 # 6. Run a Recursive Language Model (RLM) session in sandboxed REPL
 uv run deep-context rlm "Scan all 195 chunks and identify every occurrence of Ser Kevan"
+
+# 7. Run the corrective agentic RAG state machine (grade -> rewrite loop -> generate)
+uv run deep-context agentic-query "What is reward hacking?" --max-rewrites 2
+
+# 8. Run the internal scheduler (Ctrl+C to stop)
+uv run deep-context scheduler
+
+# 9. List registered scheduled jobs and their state
+uv run deep-context jobs
 ```
 
 ---
@@ -214,6 +270,7 @@ uv run deep-context rlm "Scan all 195 chunks and identify every occurrence of Se
 ## 📡 API & Streaming Contracts
 
 ### `POST /v1/query/stream` (Server-Sent Events)
+
 Streams real-time status, citations, live thinking tokens, and final answer content:
 
 ```bash
@@ -230,6 +287,7 @@ curl -N -X POST http://localhost:8000/v1/query/stream \
 ```
 
 **Stream Event Structure:**
+
 ```json
 data: {"type": "status", "stage": "retrieval", "message": "📚 Running BM25 + Dense Vector hybrid search..."}
 data: {"type": "citations", "citations": [{"chunk_id": "...", "document_title": "Eval 1.pdf", "page_number": 616}]}
@@ -239,6 +297,7 @@ data: {"type": "done", "latency_ms": 1420, "path_taken": "hybrid_rag", "support_
 ```
 
 ### `POST /v1/preferences` (User Memory)
+
 Persists embedding and reranker settings to user-specific durable memory:
 
 ```bash
@@ -254,7 +313,37 @@ curl -X POST http://localhost:8000/v1/preferences \
 ```
 
 ### `POST /v1/haystack/benchmark`
+
 Runs automated 5-stage needle-in-a-haystack verification over a multi-thousand-chunk corpus.
+
+### `POST /v1/agentic-rag` (Corrective RAG State Machine)
+
+Runs the corrective loop: retrieve → grade → (rewrite & retry) → generate, with a full execution trace:
+
+```bash
+curl -X POST http://localhost:8000/v1/agentic-rag \
+  -H "Content-Type: application/json" \
+  -d '{"query": "What is reward hacking?", "max_rewrites": 2, "top_k": 6}'
+```
+
+Response includes `answer`, `citations`, `grade_result` (`relevant`/`irrelevant`), `rewrite_count`,
+`abstained`, `support_passed`, and a per-node `trace`.
+
+### Scheduler Control
+
+```bash
+GET  /v1/scheduler/jobs          # List jobs + registered task callables
+POST /v1/scheduler/jobs          # Register/update a job (cron or "every:<seconds>")
+POST /v1/scheduler/tick          # Execute all due jobs once
+POST /v1/scheduler/defaults      # Install built-in maintenance jobs
+```
+
+### Cache Diagnostics
+
+```bash
+GET  /v1/cache/status            # Backend kind (redis|memory), TTL, namespace
+POST /v1/cache/invalidate?namespace=rag   # Drop cached ask/retrieve entries
+```
 
 ---
 
@@ -263,7 +352,7 @@ Runs automated 5-stage needle-in-a-haystack verification over a multi-thousand-c
 Run the comprehensive test suite (100% offline with zero external network dependencies required):
 
 ```bash
-# Run all 43 automated unit and integration tests
+# Run all automated unit and integration tests
 uv run pytest
 
 # Check code style and formatting

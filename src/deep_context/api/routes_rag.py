@@ -15,6 +15,7 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 
 from deep_context.agentic.planner import AgenticPlanner
 from deep_context.agentic.router import QueryRouter
+from deep_context.cache import make_query_cache_payload, response_cache
 from deep_context.core.config import settings
 from deep_context.core.llm_client import llm_client
 from deep_context.core.logging import logger
@@ -74,7 +75,13 @@ async def delete_single_document(document_id: str) -> dict[str, Any]:
     """Delete a single document and all associated chunks and tree nodes."""
     storage = await get_storage()
     success = await storage.delete_document(document_id)
-    return {"status": "deleted", "document_id": document_id, "success": success}
+    invalidated = await response_cache.invalidate_namespace("rag")
+    return {
+        "status": "deleted",
+        "document_id": document_id,
+        "success": success,
+        "cache_entries_invalidated": invalidated,
+    }
 
 
 @router.delete("/v1/documents")
@@ -82,7 +89,12 @@ async def delete_all_documents() -> dict[str, Any]:
     """Clear all ingested documents and chunks from the knowledge base."""
     storage = await get_storage()
     deleted_count = await storage.delete_all_documents()
-    return {"status": "cleared", "deleted_documents_count": deleted_count}
+    invalidated = await response_cache.invalidate_namespace("rag")
+    return {
+        "status": "cleared",
+        "deleted_documents_count": deleted_count,
+        "cache_entries_invalidated": invalidated,
+    }
 
 
 @router.post("/v1/upload", response_model=IngestResponse)
@@ -245,7 +257,9 @@ async def get_user_preferences_api(user_id: str = "default") -> UserPreferenceRe
 
 
 @router.post("/v1/preferences", response_model=UserPreferenceResponse)
-async def set_user_preferences_api(req: UserPreferenceRequest) -> UserPreferenceResponse:
+async def set_user_preferences_api(
+    req: UserPreferenceRequest,
+) -> UserPreferenceResponse:
     """Persist user embedding and reranker preferences to durable memory."""
     storage = await get_storage()
     mgr = MemoryStoreManager(storage)
@@ -341,6 +355,11 @@ async def ingest_document(req: IngestRequest) -> IngestResponse:
 @router.post("/v1/retrieve", response_model=RetrieveResponse)
 async def retrieve_knowledge(req: RetrieveRequest) -> RetrieveResponse:
     """Direct hybrid retrieval with RRF, reranking, parent resolution, and citations."""
+    cache_payload = make_query_cache_payload(req)
+    cached = await response_cache.get_json("rag:retrieve", cache_payload)
+    if cached is not None:
+        return RetrieveResponse(**cached, cache_hit=True)
+
     filters = RetrievalFilters(
         tenant_id=req.tenant_id,
         permission_scope=req.permission_scope,
@@ -355,20 +374,36 @@ async def retrieve_knowledge(req: RetrieveRequest) -> RetrieveResponse:
         reranker=req.reranker,
         user_id=req.user_id,
     )
-    return RetrieveResponse(
+    response = RetrieveResponse(
         sufficient=res.sufficient,
         parent_chunks=res.parent_chunks,
         citations=[c.to_dict() for c in res.citations],
         query_shape=res.query_shape or QueryShape.FACTUAL_LOOKUP,
         retry_count=res.retry_count,
         insufficiency_reason=res.insufficiency_reason,
+        cache_hit=False,
     )
+    if res.sufficient:
+        await response_cache.set_json(
+            "rag:retrieve", cache_payload, response.model_dump()
+        )
+    return response
 
 
 @router.post("/v1/query", response_model=QueryResponse)
-async def query_platform(req: QueryRequest, background_tasks: BackgroundTasks) -> QueryResponse:
+async def query_platform(
+    req: QueryRequest, background_tasks: BackgroundTasks
+) -> QueryResponse:
     """End-to-end intelligent query answering with GLM-5.2 reasoning."""
     t0 = time.time()
+
+    # Whole-answer cache: repeated identical questions skip the full pipeline.
+    if not req.stream:
+        cache_payload = make_query_cache_payload(req)
+        cached = await response_cache.get_json("rag:ask", cache_payload)
+        if cached is not None:
+            return QueryResponse(**cached, cache_hit=True)
+
     storage = await get_storage()
     filters = RetrievalFilters(
         tenant_id=req.tenant_id,
@@ -422,12 +457,18 @@ async def query_platform(req: QueryRequest, background_tasks: BackgroundTasks) -
         corpus_chunks: list[dict[str, Any]] = []
         if req.document_ids:
             for did in req.document_ids:
-                chunks = await storage.get_document_chunks(document_id=did, level="parent")
+                chunks = await storage.get_document_chunks(
+                    document_id=did, level="parent"
+                )
                 corpus_chunks.extend(chunks)
         else:
             corpus_chunks = await storage.get_document_chunks(level="parent")
 
-        corpus = corpus_chunks if corpus_chunks else [{"content": "Default document corpus."}]
+        corpus = (
+            corpus_chunks
+            if corpus_chunks
+            else [{"content": "Default document corpus."}]
+        )
 
         rlm_res = await orchestrator.run_session(
             task_spec=req.query,
@@ -441,16 +482,7 @@ async def query_platform(req: QueryRequest, background_tasks: BackgroundTasks) -
 
     latency_ms = int((time.time() - t0) * 1000)
 
-    if req.user_id and len(req.query) > 10:
-        background_tasks.add_task(
-            _background_memory_extract,
-            storage,
-            req.query,
-            req.tenant_id,
-            req.user_id,
-        )
-
-    return QueryResponse(
+    response = QueryResponse(
         answer=answer_text,
         citations=citations_list,
         path_taken=decision.path,
@@ -460,7 +492,29 @@ async def query_platform(req: QueryRequest, background_tasks: BackgroundTasks) -
         support_confidence=support_confidence,
         latency_ms=latency_ms,
         token_cost=0,
+        cache_hit=False,
     )
+
+    # Only cache grounded, support-checked answers to avoid poisoning the
+    # cache with failed verifications or empty corpora.
+    if (
+        not req.stream
+        and answer_text
+        and support_passed
+        and decision.path != RoutingPath.RLM_ENGINE
+    ):
+        await response_cache.set_json("rag:ask", cache_payload, response.model_dump())
+
+    if req.user_id and len(req.query) > 10:
+        background_tasks.add_task(
+            _background_memory_extract,
+            storage,
+            req.query,
+            req.tenant_id,
+            req.user_id,
+        )
+
+    return response
 
 
 @router.post("/v1/query/stream")
@@ -568,13 +622,17 @@ async def query_platform_stream(
                 corpus_chunks: list[dict[str, Any]] = []
                 if req.document_ids:
                     for did in req.document_ids:
-                        chunks = await storage.get_document_chunks(document_id=did, level="parent")
+                        chunks = await storage.get_document_chunks(
+                            document_id=did, level="parent"
+                        )
                         corpus_chunks.extend(chunks)
                 else:
                     corpus_chunks = await storage.get_document_chunks(level="parent")
 
                 corpus = (
-                    corpus_chunks if corpus_chunks else [{"content": "Default document corpus."}]
+                    corpus_chunks
+                    if corpus_chunks
+                    else [{"content": "Default document corpus."}]
                 )
 
                 rlm_res = await orchestrator.run_session(
@@ -639,13 +697,21 @@ async def get_quota_status() -> dict[str, Any]:
             "configured": has_groq,
             "is_rate_limited": is_active_limited,
             "model": (
-                rate_limit.get("model", settings.llm_model) if rate_limit else settings.llm_model
+                rate_limit.get("model", settings.llm_model)
+                if rate_limit
+                else settings.llm_model
             ),
-            "message": rate_limit.get("message") if rate_limit else "Normal (Within daily quota)",
+            "message": (
+                rate_limit.get("message")
+                if rate_limit
+                else "Normal (Within daily quota)"
+            ),
             "retry_after": rate_limit.get("retry_after") if rate_limit else None,
             "limit": rate_limit.get("limit") if rate_limit else "200000",
             "used": rate_limit.get("used") if rate_limit else "0",
-            "quota_type": (rate_limit.get("quota_type") if rate_limit else "tokens per day (TPD)"),
+            "quota_type": (
+                rate_limit.get("quota_type") if rate_limit else "tokens per day (TPD)"
+            ),
             "last_error_at": rate_limit.get("timestamp") if rate_limit else None,
         },
         "nvidia_nim": {
@@ -663,7 +729,10 @@ async def reset_quota_status() -> dict[str, Any]:
     LLMClient.clear_rate_limits()
     llm_client.last_rate_limit = None
     llm_client._refresh_groq_client()
-    return {"status": "ok", "message": "Rate limit cache cleared and Groq API client reloaded."}
+    return {
+        "status": "ok",
+        "message": "Rate limit cache cleared and Groq API client reloaded.",
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -693,12 +762,16 @@ async def generate_haystack(req: HaystackGenerateRequest) -> IngestResponse:
     needle_para_idx = int(total_paras * (req.depth_percent / 100.0))
     needle_para_idx = max(0, min(total_paras - 1, needle_para_idx))
 
-    sections_text: list[str] = [f"# {req.topic} — Benchmark Corpus ({req.total_words} words)\n"]
+    sections_text: list[str] = [
+        f"# {req.topic} — Benchmark Corpus ({req.total_words} words)\n"
+    ]
 
     for i in range(total_paras):
         sec_num = (i // 10) + 1
         if i % 10 == 0:
-            sections_text.append(f"\n## Chapter {sec_num}: System Architecture Analysis\n")
+            sections_text.append(
+                f"\n## Chapter {sec_num}: System Architecture Analysis\n"
+            )
 
         p = random.choice(FILLER_PARAGRAPHS)
         if i == needle_para_idx:
@@ -708,7 +781,9 @@ async def generate_haystack(req: HaystackGenerateRequest) -> IngestResponse:
         sections_text.append(p + "\n")
 
     full_text = "\n".join(sections_text)
-    doc_title = f"Haystack Corpus ({req.total_words} words @ {req.depth_percent:.0f}% depth)"
+    doc_title = (
+        f"Haystack Corpus ({req.total_words} words @ {req.depth_percent:.0f}% depth)"
+    )
 
     ingest_req = IngestRequest(
         title=doc_title,
@@ -760,7 +835,9 @@ async def benchmark_haystack(
     needle_clean = req.needle.strip().lower()
 
     # Stage 1: BM25 FTS5
-    bm25_results = await storage.search_bm25(query=req.query, filters=filters, limit=100)
+    bm25_results = await storage.search_bm25(
+        query=req.query, filters=filters, limit=100
+    )
     bm25_found = False
     bm25_rank = None
     bm25_score = None
@@ -794,7 +871,9 @@ async def benchmark_haystack(
     q_emb = await llm_client.get_embedding(
         req.query, model=active_emb, dim=active_dim, is_query=True
     )
-    vec_results = await storage.search_vector(query_embedding=q_emb, filters=filters, limit=100)
+    vec_results = await storage.search_vector(
+        query_embedding=q_emb, filters=filters, limit=100
+    )
     vec_found = False
     vec_rank = None
     vec_sim = None
@@ -921,12 +1000,16 @@ async def benchmark_haystack(
 
     # Stage 6: Generation & Verification
     assembler = PromptAssembler(storage)
-    focused_chunks = [matched_parent] if matched_parent else retrieval_res.parent_chunks[:2]
+    focused_chunks = (
+        [matched_parent] if matched_parent else retrieval_res.parent_chunks[:2]
+    )
     messages = await assembler.assemble_messages(
         query=req.query,
         retrieved_chunks=focused_chunks,
     )
-    answer, reasoning = await llm_client.complete(messages, temperature=0.3, enable_thinking=True)
+    answer, reasoning = await llm_client.complete(
+        messages, temperature=0.3, enable_thinking=True
+    )
 
     passed = needle_clean in answer.lower() or needle_clean in (
         matched_parent["content"].lower() if matched_parent else ""

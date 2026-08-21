@@ -117,7 +117,9 @@ def ingest_cmd(
             raise typer.Exit(1)
 
         ext = p.suffix.lower()
-        detected_type = doc_type if doc_type != "auto" else SUPPORTED_EXTENSIONS.get(ext, "text")
+        detected_type = (
+            doc_type if doc_type != "auto" else SUPPORTED_EXTENSIONS.get(ext, "text")
+        )
 
         if detected_type == "pdf":
             content = str(p.resolve())
@@ -171,10 +173,15 @@ def ingest_all_cmd(
         help="Folder or glob path to ingest all files from (defaults to './documents')",
     ),
     vectorless: bool = typer.Option(
-        False, "--vectorless", help="Enable vectorless tree navigation mode for all files"
+        False,
+        "--vectorless",
+        help="Enable vectorless tree navigation mode for all files",
     ),
     embedding_model: str = typer.Option(
-        "", "--embedding-model", "-e", help="Embedding model (e.g. 'gemini-embedding-2')"
+        "",
+        "--embedding-model",
+        "-e",
+        help="Embedding model (e.g. 'gemini-embedding-2')",
     ),
     embedding_dim: int = typer.Option(
         0,
@@ -210,7 +217,9 @@ def ingest_all_cmd(
                         files_to_process.append(file_entry)
 
         if not files_to_process:
-            console.print(f"[yellow]No supported documents found in '{target_path}'.[/yellow]")
+            console.print(
+                f"[yellow]No supported documents found in '{target_path}'.[/yellow]"
+            )
             return
 
         target_model = embedding_model or settings.embedding_model
@@ -282,11 +291,18 @@ def ingest_all_cmd(
 def retrieve_cmd(
     query: str = typer.Argument(..., help="Search query"),
     top_k: int = typer.Option(5, "--top-k", "-k", help="Number of chunks to return"),
-    user_id: str = typer.Option("", "--user", "-u", help="User ID for preference resolution"),
-    embedding_model: str = typer.Option(
-        "", "--embedding-model", "-e", help="Embedding model (e.g. 'gemini-embedding-2')"
+    user_id: str = typer.Option(
+        "", "--user", "-u", help="User ID for preference resolution"
     ),
-    embedding_dim: int = typer.Option(0, "--embedding-dim", "-d", help="Embedding dimension"),
+    embedding_model: str = typer.Option(
+        "",
+        "--embedding-model",
+        "-e",
+        help="Embedding model (e.g. 'gemini-embedding-2')",
+    ),
+    embedding_dim: int = typer.Option(
+        0, "--embedding-dim", "-d", help="Embedding dimension"
+    ),
     reranker: str = typer.Option(
         "",
         "--reranker",
@@ -309,7 +325,9 @@ def retrieve_cmd(
                 user_id=user_id if user_id else None,
             )
 
-        table = Table(title=f"Retrieval Results for: '{query}' (Sufficient: {res.sufficient})")
+        table = Table(
+            title=f"Retrieval Results for: '{query}' (Sufficient: {res.sufficient})"
+        )
         table.add_column("Rank", style="cyan", width=6)
         table.add_column("Document", style="magenta", width=20)
         table.add_column("Section", style="green", width=25)
@@ -387,7 +405,9 @@ def query_cmd(
         from deep_context.generation.grounded_answer import generate_grounded_answer
 
         model_label = model or settings.llm_model
-        with console.status(f"[bold green]Generating grounded answer with {model_label}..."):
+        with console.status(
+            f"[bold green]Generating grounded answer with {model_label}..."
+        ):
             grounded_res = await generate_grounded_answer(
                 query=query,
                 retrieved_chunks=retrieval_res.parent_chunks,
@@ -398,12 +418,18 @@ def query_cmd(
 
         if reasoning:
             console.print(
-                Panel(reasoning, title=f"[dim]Model Reasoning ({model_label})[/dim]", style="dim")
+                Panel(
+                    reasoning,
+                    title=f"[dim]Model Reasoning ({model_label})[/dim]",
+                    style="dim",
+                )
             )
 
         from deep_context.core.llm_client import LLMClient
 
-        active_notice = getattr(llm_client, "last_rate_limit", None) or LLMClient.global_rate_limit
+        active_notice = (
+            getattr(llm_client, "last_rate_limit", None) or LLMClient.global_rate_limit
+        )
         if active_notice:
             console.print(
                 Panel(
@@ -425,7 +451,9 @@ def query_cmd(
 
 @app.command("preferences")
 def get_preferences_cmd(
-    user_id: str = typer.Argument("default_user", help="User ID to view preferences for"),
+    user_id: str = typer.Argument(
+        "default_user", help="User ID to view preferences for"
+    ),
 ) -> None:
     """View saved embedding, reranker, and model preferences for a user."""
 
@@ -461,7 +489,10 @@ def set_preference_cmd(
         help="Preferred embedding model (e.g. 'gemini-embedding-2', 'gemini-embedding-001', 'nvidia/nv-embedqa-e5-v5')",
     ),
     embedding_dim: int = typer.Option(
-        0, "--embedding-dim", "-d", help="Preferred embedding dimension (e.g. 768, 1536, 3072)"
+        0,
+        "--embedding-dim",
+        "-d",
+        help="Preferred embedding dimension (e.g. 768, 1536, 3072)",
     ),
     reranker: str = typer.Option(
         "",
@@ -499,8 +530,16 @@ def set_preference_cmd(
                     if embedding_model
                     else ""
                 )
-                + (f"• Embedding Dim: [cyan]{embedding_dim}[/cyan]\n" if embedding_dim else "")
-                + (f"• Reranker Strategy: [magenta]{reranker}[/magenta]\n" if reranker else "")
+                + (
+                    f"• Embedding Dim: [cyan]{embedding_dim}[/cyan]\n"
+                    if embedding_dim
+                    else ""
+                )
+                + (
+                    f"• Reranker Strategy: [magenta]{reranker}[/magenta]\n"
+                    if reranker
+                    else ""
+                )
                 + (f"• LLM Model: [yellow]{llm_model}[/yellow]\n" if llm_model else ""),
                 title="Preference Saved",
             )
@@ -525,10 +564,14 @@ def rlm_cmd(
             if p.suffix.lower() == ".pdf":
                 from deep_context.ingestion.parser import DocumentParser
 
-                with console.status(f"[bold cyan]Extracting text from {p.name}...[/bold cyan]"):
+                with console.status(
+                    f"[bold cyan]Extracting text from {p.name}...[/bold cyan]"
+                ):
                     parser = DocumentParser()
                     sections = parser.parse(str(p.resolve()), doc_type="pdf")
-                    corpus = "\n\n".join(f"=== {s.title} ===\n{s.content}" for s in sections)
+                    corpus = "\n\n".join(
+                        f"=== {s.title} ===\n{s.content}" for s in sections
+                    )
             else:
                 corpus = p.read_text(encoding="utf-8", errors="ignore")
         if not corpus:
@@ -567,5 +610,111 @@ def serve_cmd(
     uvicorn.run("deep_context.api.app:app", host=host, port=port, reload=False)
 
 
-if __name__ == "__main__":
-    app()
+@app.command("scheduler")
+def scheduler_cmd(
+    poll_interval: int = typer.Option(
+        10, "--poll-interval", help="Seconds between scheduler ticks"
+    ),
+) -> None:
+    """Run the internal job scheduler loop (ingestion & index maintenance)."""
+
+    async def _run() -> None:
+        from deep_context.scheduler import register_default_jobs, run_due_jobs_once
+
+        await register_default_jobs()
+        console.print(
+            Panel(
+                "[bold green]Internal Scheduler Running[/bold green]\n"
+                "Press Ctrl+C to stop. Jobs are persisted in the 'jobs' table.",
+                title="Scheduler",
+            )
+        )
+        try:
+            while True:
+                executed = await run_due_jobs_once()
+                if executed:
+                    console.print(f"[dim]Executed jobs: {', '.join(executed)}[/dim]")
+                await asyncio.sleep(poll_interval)
+        except KeyboardInterrupt:
+            console.print("[yellow]Scheduler stopped.[/yellow]")
+        finally:
+            await close_storage()
+
+    asyncio.run(_run())
+
+
+@app.command("jobs")
+def jobs_cmd() -> None:
+    """List all registered scheduled jobs and their state."""
+
+    async def _run() -> None:
+        from deep_context.scheduler import TASKS
+
+        storage = await get_storage()
+        rows = await storage.list_jobs()
+
+        table = Table(title="Scheduled Jobs")
+        table.add_column("Name", style="cyan")
+        table.add_column("Schedule", style="magenta")
+        table.add_column("Next Run", style="green")
+        table.add_column("Status", style="bold")
+        table.add_column("Retries", style="yellow")
+
+        for j in rows:
+            table.add_row(
+                str(j["name"]),
+                str(j["schedule_cron"]),
+                str(j["next_run_at"]),
+                str(j["status"]),
+                f"{j['retries']}/{j['max_retries']}",
+            )
+
+        console.print(table)
+        console.print(f"[dim]Registered task callables: {sorted(TASKS.keys())}[/dim]")
+        await close_storage()
+
+    asyncio.run(_run())
+
+
+@app.command("agentic-query")
+def agentic_query_cmd(
+    query: str = typer.Argument(..., help="User query"),
+    max_rewrites: int = typer.Option(
+        2, "--max-rewrites", help="Maximum corrective rewrite attempts"
+    ),
+    top_k: int = typer.Option(
+        6, "--top-k", "-k", help="Chunks to retrieve per attempt"
+    ),
+) -> None:
+    """Run the corrective agentic RAG state machine (retrieve -> grade -> rewrite -> generate)."""
+
+    async def _run() -> None:
+        from deep_context.agentic.graph import run_agentic_rag
+
+        with console.status("[bold green]Running corrective agentic RAG graph..."):
+            state = await run_agentic_rag(
+                query=query, top_k=top_k, max_rewrites=max_rewrites
+            )
+
+        trace_lines = "\n".join(
+            f"• [cyan]{t.get('node')}[/cyan] {', '.join(f'{k}={v}' for k, v in t.items() if k != 'node')}"
+            for t in state.trace
+        )
+        status_color = "red" if state.abstained else "green"
+        console.print(
+            Panel(
+                f"[bold {status_color}]{'Abstained (insufficient evidence)' if state.abstained else 'Answer Generated'}[/bold {status_color}]\n"
+                f"Grade: [magenta]{state.grade_result}[/magenta] | "
+                f"Rewrites: {state.rewrite_count} | "
+                f"Support: {'✓' if state.support_passed else '✗'} "
+                f"({state.support_confidence:.0%})\n\n"
+                f"{state.answer}",
+                title="Agentic RAG Result",
+            )
+        )
+        console.print(
+            Panel(trace_lines, title="[dim]Execution Trace[/dim]", style="dim")
+        )
+        await close_storage()
+
+    asyncio.run(_run())

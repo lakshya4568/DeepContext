@@ -47,8 +47,7 @@ class SQLiteStore(StorageInterface):
         await self._conn.execute("PRAGMA foreign_keys = ON;")
 
         # Schema creation
-        await self._conn.executescript(
-            """
+        await self._conn.executescript("""
             CREATE TABLE IF NOT EXISTS documents (
                 id TEXT PRIMARY KEY,
                 tenant_id TEXT NOT NULL DEFAULT 'default',
@@ -201,8 +200,18 @@ class SQLiteStore(StorageInterface):
                 latency_ms INTEGER DEFAULT 0,
                 created_at TEXT NOT NULL
             );
-            """
-        )
+
+            CREATE TABLE IF NOT EXISTS jobs (
+                name TEXT PRIMARY KEY,
+                schedule_cron TEXT NOT NULL,
+                next_run_at TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'idle',
+                max_retries INTEGER NOT NULL DEFAULT 3,
+                retries INTEGER NOT NULL DEFAULT 0,
+                last_error TEXT,
+                last_run_at TEXT
+            );
+            """)
         await self._conn.commit()
         logger.info("Initialized SQLite database at %s", self.db_path)
 
@@ -213,7 +222,9 @@ class SQLiteStore(StorageInterface):
 
     def _get_conn(self) -> aiosqlite.Connection:
         if not self._conn:
-            raise RuntimeError("Database connection not initialized. Call initialize() first.")
+            raise RuntimeError(
+                "Database connection not initialized. Call initialize() first."
+            )
         return self._conn
 
     # -----------------------------------------------------------------------
@@ -247,7 +258,9 @@ class SQLiteStore(StorageInterface):
 
     async def get_document(self, document_id: str) -> Document | None:
         conn = self._get_conn()
-        async with conn.execute("SELECT * FROM documents WHERE id = ?", (document_id,)) as cursor:
+        async with conn.execute(
+            "SELECT * FROM documents WHERE id = ?", (document_id,)
+        ) as cursor:
             row = await cursor.fetchone()
             if not row:
                 return None
@@ -332,10 +345,15 @@ class SQLiteStore(StorageInterface):
 
     async def delete_document(self, document_id: str) -> bool:
         conn = self._get_conn()
-        await conn.execute("DELETE FROM document_tree_nodes WHERE document_id = ?", (document_id,))
-        await conn.execute("DELETE FROM chunks_fts WHERE document_id = ?", (document_id,))
         await conn.execute(
-            "DELETE FROM chunks WHERE document_id = ? AND level = 'child'", (document_id,)
+            "DELETE FROM document_tree_nodes WHERE document_id = ?", (document_id,)
+        )
+        await conn.execute(
+            "DELETE FROM chunks_fts WHERE document_id = ?", (document_id,)
+        )
+        await conn.execute(
+            "DELETE FROM chunks WHERE document_id = ? AND level = 'child'",
+            (document_id,),
         )
         await conn.execute("DELETE FROM chunks WHERE document_id = ?", (document_id,))
         await conn.execute("DELETE FROM documents WHERE id = ?", (document_id,))
@@ -441,7 +459,9 @@ class SQLiteStore(StorageInterface):
             )
             # Only index child chunks in FTS search
             if c.level == ChunkLevel.CHILD:
-                fts_params.append((c.id, c.document_id, c.content, c.section_path or ""))
+                fts_params.append(
+                    (c.id, c.document_id, c.content, c.section_path or "")
+                )
 
         await conn.executemany(
             """
@@ -467,7 +487,9 @@ class SQLiteStore(StorageInterface):
 
     async def get_chunk(self, chunk_id: str) -> Chunk | None:
         conn = self._get_conn()
-        async with conn.execute("SELECT * FROM chunks WHERE id = ?", (chunk_id,)) as cursor:
+        async with conn.execute(
+            "SELECT * FROM chunks WHERE id = ?", (chunk_id,)
+        ) as cursor:
             row = await cursor.fetchone()
             if not row:
                 return None
@@ -672,7 +694,9 @@ class SQLiteStore(StorageInterface):
         await conn.commit()
         return [n.id for n in nodes]
 
-    async def get_tree_nodes_for_document(self, document_id: str) -> list[DocumentTreeNode]:
+    async def get_tree_nodes_for_document(
+        self, document_id: str
+    ) -> list[DocumentTreeNode]:
         conn = self._get_conn()
         async with conn.execute(
             "SELECT * FROM document_tree_nodes WHERE document_id = ? ORDER BY node_order",
@@ -800,7 +824,9 @@ class SQLiteStore(StorageInterface):
                 for r in rows
             ]
 
-    async def get_preference(self, user_id: str, preference_key: str) -> dict[str, Any] | None:
+    async def get_preference(
+        self, user_id: str, preference_key: str
+    ) -> dict[str, Any] | None:
         conn = self._get_conn()
         async with conn.execute(
             "SELECT * FROM memory_preference WHERE user_id = ? AND preference_key = ?",
@@ -1072,7 +1098,9 @@ class SQLiteStore(StorageInterface):
     # Sessions, Agents & RLM Messaging
     # -----------------------------------------------------------------------
 
-    async def create_session(self, session: SessionHandle, user_id: str = "default") -> None:
+    async def create_session(
+        self, session: SessionHandle, user_id: str = "default"
+    ) -> None:
         conn = self._get_conn()
         now_iso = session.created_at.isoformat()
         budgets_json = json.dumps(
@@ -1105,7 +1133,9 @@ class SQLiteStore(StorageInterface):
 
     async def get_session(self, session_id: str) -> SessionHandle | None:
         conn = self._get_conn()
-        async with conn.execute("SELECT * FROM sessions WHERE id = ?", (session_id,)) as cursor:
+        async with conn.execute(
+            "SELECT * FROM sessions WHERE id = ?", (session_id,)
+        ) as cursor:
             row = await cursor.fetchone()
             if not row:
                 return None
@@ -1125,7 +1155,9 @@ class SQLiteStore(StorageInterface):
                 created_at=datetime.fromisoformat(row["created_at"]),
             )
 
-    async def update_session_status(self, session_id: str, status: SessionStatus) -> None:
+    async def update_session_status(
+        self, session_id: str, status: SessionStatus
+    ) -> None:
         conn = self._get_conn()
         now_iso = datetime.now(timezone.utc).isoformat()
         await conn.execute(
@@ -1167,10 +1199,14 @@ class SQLiteStore(StorageInterface):
         await conn.commit()
         return cid
 
-    async def update_rlm_child_status(self, child_session_id: str, status: ChildStatus) -> None:
+    async def update_rlm_child_status(
+        self, child_session_id: str, status: ChildStatus
+    ) -> None:
         conn = self._get_conn()
         now_iso = datetime.now(timezone.utc).isoformat()
-        completed_at = now_iso if status in (ChildStatus.COMPLETED, ChildStatus.ERROR) else None
+        completed_at = (
+            now_iso if status in (ChildStatus.COMPLETED, ChildStatus.ERROR) else None
+        )
         await conn.execute(
             "UPDATE rlm_children SET status = ?, completed_at = COALESCE(?, completed_at) WHERE child_session_id = ?",
             (status.value, completed_at, child_session_id),
@@ -1296,7 +1332,9 @@ class SQLiteStore(StorageInterface):
             params.append(event_type)
 
         where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
-        sql = f"SELECT * FROM events_trace {where_clause} ORDER BY id DESC LIMIT {limit}"
+        sql = (
+            f"SELECT * FROM events_trace {where_clause} ORDER BY id DESC LIMIT {limit}"
+        )
 
         async with conn.execute(sql, params) as cursor:
             rows = await cursor.fetchall()
@@ -1313,3 +1351,129 @@ class SQLiteStore(StorageInterface):
                 }
                 for r in rows
             ]
+
+    # -----------------------------------------------------------------------
+    # Scheduler Jobs
+    # -----------------------------------------------------------------------
+
+    async def upsert_job(
+        self,
+        name: str,
+        schedule_cron: str,
+        next_run_at: datetime,
+        max_retries: int = 3,
+    ) -> None:
+        conn = self._get_conn()
+        await conn.execute(
+            """
+            INSERT INTO jobs (name, schedule_cron, next_run_at, status, max_retries)
+            VALUES (?, ?, ?, 'idle', ?)
+            ON CONFLICT(name) DO UPDATE SET
+                schedule_cron = excluded.schedule_cron,
+                next_run_at = excluded.next_run_at,
+                max_retries = excluded.max_retries
+            """,
+            (name, schedule_cron, next_run_at.isoformat(), max_retries),
+        )
+        await conn.commit()
+
+    async def get_due_jobs(self, now: datetime) -> list[dict[str, Any]]:
+        conn = self._get_conn()
+        async with conn.execute(
+            "SELECT * FROM jobs WHERE next_run_at <= ? AND status != 'running'",
+            (now.isoformat(),),
+        ) as cursor:
+            rows = await cursor.fetchall()
+            return [dict(r) for r in rows]
+
+    async def mark_job_running(self, name: str) -> None:
+        conn = self._get_conn()
+        await conn.execute(
+            "UPDATE jobs SET status = 'running', last_run_at = ? WHERE name = ?",
+            (datetime.now(timezone.utc).isoformat(), name),
+        )
+        await conn.commit()
+
+    async def mark_job_done(self, name: str, next_run_at: datetime) -> None:
+        conn = self._get_conn()
+        await conn.execute(
+            "UPDATE jobs SET status = 'idle', retries = 0, last_error = NULL, "
+            "next_run_at = ? WHERE name = ?",
+            (next_run_at.isoformat(), name),
+        )
+        await conn.commit()
+
+    async def mark_job_failed(self, name: str, error: str) -> None:
+        conn = self._get_conn()
+        await conn.execute(
+            "UPDATE jobs SET status = 'failed', retries = retries + 1, last_error = ? "
+            "WHERE name = ?",
+            (error[:2000], name),
+        )
+        await conn.commit()
+
+    async def list_jobs(self) -> list[dict[str, Any]]:
+        conn = self._get_conn()
+        async with conn.execute("SELECT * FROM jobs ORDER BY name") as cursor:
+            rows = await cursor.fetchall()
+            return [dict(r) for r in rows]
+
+    # -----------------------------------------------------------------------
+    # Maintenance Operations (scheduler tasks)
+    # -----------------------------------------------------------------------
+
+    async def cleanup_orphaned_chunks(self) -> int:
+        conn = self._get_conn()
+        async with conn.execute(
+            "SELECT COUNT(*) as cnt FROM chunks WHERE document_id NOT IN (SELECT id FROM documents)"
+        ) as cursor:
+            row = await cursor.fetchone()
+            count = row["cnt"] if row else 0
+        if count:
+            await conn.execute(
+                "DELETE FROM chunks_fts WHERE document_id NOT IN (SELECT id FROM documents)"
+            )
+            await conn.execute(
+                "DELETE FROM chunks WHERE document_id NOT IN (SELECT id FROM documents)"
+            )
+            await conn.commit()
+        return count
+
+    async def rebuild_fts_index(self) -> int:
+        conn = self._get_conn()
+        await conn.execute("DELETE FROM chunks_fts")
+        await conn.execute("""
+            INSERT INTO chunks_fts (id, document_id, content, section_path)
+            SELECT id, document_id, content, section_path FROM chunks WHERE level = 'child'
+            """)
+        await conn.commit()
+        async with conn.execute("SELECT COUNT(*) as cnt FROM chunks_fts") as cursor:
+            row = await cursor.fetchone()
+            return row["cnt"] if row else 0
+
+    async def backfill_missing_embeddings(self) -> int:
+        """Re-embed child chunks with NULL embeddings using the active embedding client."""
+        from deep_context.core.llm_client import llm_client
+
+        conn = self._get_conn()
+        async with conn.execute(
+            "SELECT id, content FROM chunks WHERE level = 'child' AND embedding IS NULL LIMIT 500"
+        ) as cursor:
+            rows = await cursor.fetchall()
+        if not rows:
+            return 0
+
+        texts = [r["content"] for r in rows]
+        embeddings = await llm_client.get_embeddings(texts)
+        backfilled = 0
+        for r, emb in zip(rows, embeddings, strict=False):
+            if emb is None:
+                continue
+            await conn.execute(
+                "UPDATE chunks SET embedding = ? WHERE id = ?",
+                json.dumps([float(x) for x in emb]),
+                r["id"],
+            )
+            backfilled += 1
+        await conn.commit()
+        return backfilled

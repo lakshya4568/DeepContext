@@ -110,7 +110,9 @@ class DocumentTreeNode:
 @dataclass
 class RetrievalResult:
     sufficient: bool
-    parent_chunks: list[dict[str, Any]] = field(default_factory=list)  # [{content, citation, ...}]
+    parent_chunks: list[dict[str, Any]] = field(
+        default_factory=list
+    )  # [{content, citation, ...}]
     citations: list[Citation] = field(default_factory=list)
     query_shape: QueryShape | None = None
     retry_count: int = 0
@@ -141,7 +143,9 @@ class Observation:
     raw_text: str
     tenant_id: str = "default"
     user_id: str | None = None
-    source: str = "user_stated"  # 'user_stated' | 'tool_output' | 'inferred' | 'operator'
+    source: str = (
+        "user_stated"  # 'user_stated' | 'tool_output' | 'inferred' | 'operator'
+    )
 
 
 @dataclass
@@ -318,6 +322,7 @@ class RetrieveResponse(BaseModel):
     insufficiency_reason: str | None = None
     embedding_model: str | None = None
     reranker: str | None = None
+    cache_hit: bool = False
 
 
 class QueryRequest(BaseModel):
@@ -361,6 +366,7 @@ class QueryResponse(BaseModel):
     support_confidence: float = 1.0
     latency_ms: int = 0
     token_cost: int = 0
+    cache_hit: bool = False
 
 
 class RlmSessionRequest(BaseModel):

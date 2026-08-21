@@ -53,8 +53,7 @@ class PostgresStore(StorageInterface):
             await conn.execute("CREATE EXTENSION IF NOT EXISTS vector;")
             await conn.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto;")
             # Schema creation from docs/DATA_MODEL.sql
-            await conn.execute(
-                """
+            await conn.execute("""
                 CREATE TABLE IF NOT EXISTS documents (
                     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                     tenant_id TEXT NOT NULL DEFAULT 'default',
@@ -217,6 +216,19 @@ class PostgresStore(StorageInterface):
                     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
                 );
 
+                CREATE TABLE IF NOT EXISTS jobs (
+                    name TEXT PRIMARY KEY,
+                    schedule_cron TEXT NOT NULL,
+                    next_run_at TIMESTAMPTZ NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'idle',
+                    max_retries INTEGER NOT NULL DEFAULT 3,
+                    retries INTEGER NOT NULL DEFAULT 0,
+                    last_error TEXT,
+                    last_run_at TIMESTAMPTZ
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_jobs_due ON jobs (next_run_at);
+
                 -- Indexes for fast query execution & pgvector cosine similarity
                 CREATE INDEX IF NOT EXISTS idx_documents_tenant ON documents (tenant_id);
                 CREATE INDEX IF NOT EXISTS idx_documents_metadata_gin ON documents USING GIN (metadata);
@@ -236,8 +248,7 @@ class PostgresStore(StorageInterface):
                 CREATE INDEX IF NOT EXISTS idx_sessions_agent ON sessions (agent_id);
                 CREATE INDEX IF NOT EXISTS idx_sessions_parent ON sessions (parent_session_id);
                 CREATE INDEX IF NOT EXISTS idx_events_trace_session ON events_trace (session_id);
-                """
-            )
+                """)
         logger.info("Initialized Postgres database with pgvector and HNSW indexes.")
 
     async def close(self) -> None:
@@ -247,7 +258,9 @@ class PostgresStore(StorageInterface):
 
     def _get_pool(self) -> asyncpg.Pool:
         if not self._pool:
-            raise RuntimeError("Postgres pool not initialized. Call initialize() first.")
+            raise RuntimeError(
+                "Postgres pool not initialized. Call initialize() first."
+            )
         return self._pool
 
     async def insert_document(self, document: Document) -> str:
@@ -285,7 +298,9 @@ class PostgresStore(StorageInterface):
     async def get_document(self, document_id: str) -> Document | None:
         pool = self._get_pool()
         async with pool.acquire() as conn:
-            row = await conn.fetchrow("SELECT * FROM documents WHERE id = $1::uuid", document_id)
+            row = await conn.fetchrow(
+                "SELECT * FROM documents WHERE id = $1::uuid", document_id
+            )
             if not row:
                 return None
             return Document(
@@ -296,9 +311,11 @@ class PostgresStore(StorageInterface):
                 doc_type=row["doc_type"],
                 permission_scope=list(row["permission_scope"]),
                 retrieval_mode=RetrievalMode(row["retrieval_mode"]),
-                metadata=json.loads(row["metadata"])
-                if isinstance(row["metadata"], str)
-                else row["metadata"],
+                metadata=(
+                    json.loads(row["metadata"])
+                    if isinstance(row["metadata"], str)
+                    else row["metadata"]
+                ),
                 ingested_at=row["ingested_at"],
                 updated_at=row["updated_at"],
             )
@@ -323,9 +340,11 @@ class PostgresStore(StorageInterface):
                     doc_type=r["doc_type"],
                     permission_scope=list(r["permission_scope"]),
                     retrieval_mode=RetrievalMode(r["retrieval_mode"]),
-                    metadata=json.loads(r["metadata"])
-                    if isinstance(r["metadata"], str)
-                    else r["metadata"],
+                    metadata=(
+                        json.loads(r["metadata"])
+                        if isinstance(r["metadata"], str)
+                        else r["metadata"]
+                    ),
                     ingested_at=r["ingested_at"],
                     updated_at=r["updated_at"],
                 )
@@ -358,9 +377,11 @@ class PostgresStore(StorageInterface):
                     "retrieval_mode": r["retrieval_mode"],
                     "child_chunks_count": int(r["child_chunks_count"]),
                     "parent_chunks_count": int(r["parent_chunks_count"]),
-                    "created_at": r["ingested_at"].isoformat()
-                    if hasattr(r["ingested_at"], "isoformat")
-                    else str(r["ingested_at"]),
+                    "created_at": (
+                        r["ingested_at"].isoformat()
+                        if hasattr(r["ingested_at"], "isoformat")
+                        else str(r["ingested_at"])
+                    ),
                 }
                 for r in rows
             ]
@@ -368,7 +389,9 @@ class PostgresStore(StorageInterface):
     async def delete_document(self, document_id: str) -> bool:
         pool = self._get_pool()
         async with pool.acquire() as conn:
-            res = await conn.execute("DELETE FROM documents WHERE id = $1::uuid", document_id)
+            res = await conn.execute(
+                "DELETE FROM documents WHERE id = $1::uuid", document_id
+            )
             return "DELETE 1" in res
 
     async def delete_all_documents(self) -> int:
@@ -457,7 +480,11 @@ class PostgresStore(StorageInterface):
                     c.token_count,
                     c.section_path,
                     c.page_number,
-                    np.array(c.embedding, dtype=np.float32) if c.embedding is not None else None,
+                    (
+                        np.array(c.embedding, dtype=np.float32)
+                        if c.embedding is not None
+                        else None
+                    ),
                     c.created_at,
                 )
                 for c in chunks
@@ -477,19 +504,25 @@ class PostgresStore(StorageInterface):
     async def get_chunk(self, chunk_id: str) -> Chunk | None:
         pool = self._get_pool()
         async with pool.acquire() as conn:
-            row = await conn.fetchrow("SELECT * FROM chunks WHERE id = $1::uuid", chunk_id)
+            row = await conn.fetchrow(
+                "SELECT * FROM chunks WHERE id = $1::uuid", chunk_id
+            )
             if not row:
                 return None
             return Chunk(
                 id=str(row["id"]),
                 document_id=str(row["document_id"]),
-                parent_chunk_id=str(row["parent_chunk_id"]) if row["parent_chunk_id"] else None,
+                parent_chunk_id=(
+                    str(row["parent_chunk_id"]) if row["parent_chunk_id"] else None
+                ),
                 level=ChunkLevel(row["level"]),
                 content=row["content"],
                 token_count=row["token_count"],
                 section_path=row["section_path"],
                 page_number=row["page_number"],
-                embedding=list(row["embedding"]) if row["embedding"] is not None else None,
+                embedding=(
+                    list(row["embedding"]) if row["embedding"] is not None else None
+                ),
                 created_at=row["created_at"],
             )
 
@@ -498,18 +531,24 @@ class PostgresStore(StorageInterface):
             return []
         pool = self._get_pool()
         async with pool.acquire() as conn:
-            rows = await conn.fetch("SELECT * FROM chunks WHERE id = ANY($1::uuid[])", chunk_ids)
+            rows = await conn.fetch(
+                "SELECT * FROM chunks WHERE id = ANY($1::uuid[])", chunk_ids
+            )
             return [
                 Chunk(
                     id=str(r["id"]),
                     document_id=str(r["document_id"]),
-                    parent_chunk_id=str(r["parent_chunk_id"]) if r["parent_chunk_id"] else None,
+                    parent_chunk_id=(
+                        str(r["parent_chunk_id"]) if r["parent_chunk_id"] else None
+                    ),
                     level=ChunkLevel(r["level"]),
                     content=r["content"],
                     token_count=r["token_count"],
                     section_path=r["section_path"],
                     page_number=r["page_number"],
-                    embedding=list(r["embedding"]) if r["embedding"] is not None else None,
+                    embedding=(
+                        list(r["embedding"]) if r["embedding"] is not None else None
+                    ),
                     created_at=r["created_at"],
                 )
                 for r in rows
@@ -556,14 +595,22 @@ class PostgresStore(StorageInterface):
             "does",
         }
         words = [
-            w for w in re.findall(r"\w+", clean_query.lower()) if len(w) > 2 and w not in stopwords
+            w
+            for w in re.findall(r"\w+", clean_query.lower())
+            if len(w) > 2 and w not in stopwords
         ]
-        or_terms = " | ".join(words[:8]) if words else (phrase_term if phrase_term else "text")
+        or_terms = (
+            " | ".join(words[:8]) if words else (phrase_term if phrase_term else "text")
+        )
         plain_term = " ".join(words[:8]) if words else clean_query
 
         pool = self._get_pool()
         async with pool.acquire() as conn:
-            clauses = ["c.level = 'child'", "d.tenant_id = $4", "d.permission_scope && $5"]
+            clauses = [
+                "c.level = 'child'",
+                "d.tenant_id = $4",
+                "d.permission_scope && $5",
+            ]
             params: list[Any] = [
                 plain_term,
                 or_terms,
@@ -597,7 +644,9 @@ class PostgresStore(StorageInterface):
                 {
                     "id": str(r["id"]),
                     "document_id": str(r["document_id"]),
-                    "parent_chunk_id": str(r["parent_chunk_id"]) if r["parent_chunk_id"] else None,
+                    "parent_chunk_id": (
+                        str(r["parent_chunk_id"]) if r["parent_chunk_id"] else None
+                    ),
                     "content": r["content"],
                     "section_path": r["section_path"],
                     "page_number": r["page_number"],
@@ -646,14 +695,18 @@ class PostgresStore(StorageInterface):
                     "different vector dimensions" in str(e).lower()
                     or "dimension mismatch" in str(e).lower()
                 ):
-                    logger.warning("Vector search skipped due to dimension mismatch: %s", e)
+                    logger.warning(
+                        "Vector search skipped due to dimension mismatch: %s", e
+                    )
                     return []
                 raise
             return [
                 {
                     "id": str(r["id"]),
                     "document_id": str(r["document_id"]),
-                    "parent_chunk_id": str(r["parent_chunk_id"]) if r["parent_chunk_id"] else None,
+                    "parent_chunk_id": (
+                        str(r["parent_chunk_id"]) if r["parent_chunk_id"] else None
+                    ),
                     "content": r["content"],
                     "section_path": r["section_path"],
                     "page_number": r["page_number"],
@@ -692,7 +745,9 @@ class PostgresStore(StorageInterface):
             )
             return [n.id for n in nodes]
 
-    async def get_tree_nodes_for_document(self, document_id: str) -> list[DocumentTreeNode]:
+    async def get_tree_nodes_for_document(
+        self, document_id: str
+    ) -> list[DocumentTreeNode]:
         pool = self._get_pool()
         async with pool.acquire() as conn:
             rows = await conn.fetch(
@@ -703,7 +758,9 @@ class PostgresStore(StorageInterface):
                 DocumentTreeNode(
                     id=str(r["id"]),
                     document_id=str(r["document_id"]),
-                    parent_node_id=str(r["parent_node_id"]) if r["parent_node_id"] else None,
+                    parent_node_id=(
+                        str(r["parent_node_id"]) if r["parent_node_id"] else None
+                    ),
                     title=r["title"],
                     summary=r["summary"],
                     chunk_id=str(r["chunk_id"]) if r["chunk_id"] else None,
@@ -732,7 +789,9 @@ class PostgresStore(StorageInterface):
                 DocumentTreeNode(
                     id=str(r["id"]),
                     document_id=str(r["document_id"]),
-                    parent_node_id=str(r["parent_node_id"]) if r["parent_node_id"] else None,
+                    parent_node_id=(
+                        str(r["parent_node_id"]) if r["parent_node_id"] else None
+                    ),
                     title=r["title"],
                     summary=r["summary"],
                     chunk_id=str(r["chunk_id"]) if r["chunk_id"] else None,
@@ -770,9 +829,11 @@ class PostgresStore(StorageInterface):
                 "tenant_id": row["tenant_id"],
                 "user_id": row["user_id"],
                 "policy_key": row["policy_key"],
-                "policy_value": json.loads(row["policy_value"])
-                if isinstance(row["policy_value"], str)
-                else row["policy_value"],
+                "policy_value": (
+                    json.loads(row["policy_value"])
+                    if isinstance(row["policy_value"], str)
+                    else row["policy_value"]
+                ),
             }
 
     async def set_policy(
@@ -819,14 +880,18 @@ class PostgresStore(StorageInterface):
                     "tenant_id": r["tenant_id"],
                     "user_id": r["user_id"],
                     "policy_key": r["policy_key"],
-                    "policy_value": json.loads(r["policy_value"])
-                    if isinstance(r["policy_value"], str)
-                    else r["policy_value"],
+                    "policy_value": (
+                        json.loads(r["policy_value"])
+                        if isinstance(r["policy_value"], str)
+                        else r["policy_value"]
+                    ),
                 }
                 for r in rows
             ]
 
-    async def get_preference(self, user_id: str, preference_key: str) -> dict[str, Any] | None:
+    async def get_preference(
+        self, user_id: str, preference_key: str
+    ) -> dict[str, Any] | None:
         pool = self._get_pool()
         async with pool.acquire() as conn:
             row = await conn.fetchrow(
@@ -840,9 +905,11 @@ class PostgresStore(StorageInterface):
                 "id": str(row["id"]),
                 "user_id": row["user_id"],
                 "preference_key": row["preference_key"],
-                "preference_value": json.loads(row["preference_value"])
-                if isinstance(row["preference_value"], str)
-                else row["preference_value"],
+                "preference_value": (
+                    json.loads(row["preference_value"])
+                    if isinstance(row["preference_value"], str)
+                    else row["preference_value"]
+                ),
                 "confidence": row["confidence"],
                 "source": row["source"],
             }
@@ -877,15 +944,19 @@ class PostgresStore(StorageInterface):
     async def list_preferences(self, user_id: str) -> list[dict[str, Any]]:
         pool = self._get_pool()
         async with pool.acquire() as conn:
-            rows = await conn.fetch("SELECT * FROM memory_preference WHERE user_id = $1", user_id)
+            rows = await conn.fetch(
+                "SELECT * FROM memory_preference WHERE user_id = $1", user_id
+            )
             return [
                 {
                     "id": str(r["id"]),
                     "user_id": r["user_id"],
                     "preference_key": r["preference_key"],
-                    "preference_value": json.loads(r["preference_value"])
-                    if isinstance(r["preference_value"], str)
-                    else r["preference_value"],
+                    "preference_value": (
+                        json.loads(r["preference_value"])
+                        if isinstance(r["preference_value"], str)
+                        else r["preference_value"]
+                    ),
                     "confidence": r["confidence"],
                     "source": r["source"],
                 }
@@ -962,7 +1033,9 @@ class PostgresStore(StorageInterface):
                     "content": r["content"],
                     "source": r["source"],
                     "confidence": r["confidence"],
-                    "expires_at": r["expires_at"].isoformat() if r["expires_at"] else None,
+                    "expires_at": (
+                        r["expires_at"].isoformat() if r["expires_at"] else None
+                    ),
                     "score": float(r["score"]),
                 }
                 for r in rows
@@ -1058,7 +1131,9 @@ class PostgresStore(StorageInterface):
                 for r in rows
             ]
 
-    async def create_session(self, session: SessionHandle, user_id: str = "default") -> None:
+    async def create_session(
+        self, session: SessionHandle, user_id: str = "default"
+    ) -> None:
         pool = self._get_pool()
         budgets_json = json.dumps(
             {
@@ -1090,7 +1165,9 @@ class PostgresStore(StorageInterface):
     async def get_session(self, session_id: str) -> SessionHandle | None:
         pool = self._get_pool()
         async with pool.acquire() as conn:
-            row = await conn.fetchrow("SELECT * FROM sessions WHERE id = $1::uuid", session_id)
+            row = await conn.fetchrow(
+                "SELECT * FROM sessions WHERE id = $1::uuid", session_id
+            )
             if not row:
                 return None
             b_dict = (
@@ -1106,16 +1183,18 @@ class PostgresStore(StorageInterface):
             )
             return SessionHandle(
                 id=str(row["id"]),
-                parent_session_id=str(row["parent_session_id"])
-                if row["parent_session_id"]
-                else None,
+                parent_session_id=(
+                    str(row["parent_session_id"]) if row["parent_session_id"] else None
+                ),
                 depth=row["depth"],
                 budgets=budgets,
                 status=SessionStatus(row["status"]),
                 created_at=row["created_at"],
             )
 
-    async def update_session_status(self, session_id: str, status: SessionStatus) -> None:
+    async def update_session_status(
+        self, session_id: str, status: SessionStatus
+    ) -> None:
         pool = self._get_pool()
         async with pool.acquire() as conn:
             await conn.execute(
@@ -1148,7 +1227,9 @@ class PostgresStore(StorageInterface):
             )
             return str(row["id"])
 
-    async def update_rlm_child_status(self, child_session_id: str, status: ChildStatus) -> None:
+    async def update_rlm_child_status(
+        self, child_session_id: str, status: ChildStatus
+    ) -> None:
         pool = self._get_pool()
         async with pool.acquire() as conn:
             await conn.execute(
@@ -1168,7 +1249,8 @@ class PostgresStore(StorageInterface):
             target_id = None
             if message.receiver_role == "parent":
                 r = await conn.fetchrow(
-                    "SELECT parent_session_id FROM sessions WHERE id = $1::uuid", message.session_id
+                    "SELECT parent_session_id FROM sessions WHERE id = $1::uuid",
+                    message.session_id,
                 )
                 target_id = r["parent_session_id"] if r else None
             else:
@@ -1271,12 +1353,160 @@ class PostgresStore(StorageInterface):
                     "session_id": str(r["session_id"]) if r["session_id"] else None,
                     "agent_id": str(r["agent_id"]) if r["agent_id"] else None,
                     "event_type": r["event_type"],
-                    "payload": json.loads(r["payload"])
-                    if isinstance(r["payload"], str)
-                    else r["payload"],
+                    "payload": (
+                        json.loads(r["payload"])
+                        if isinstance(r["payload"], str)
+                        else r["payload"]
+                    ),
                     "token_cost": r["token_cost"],
                     "latency_ms": r["latency_ms"],
                     "created_at": r["created_at"].isoformat(),
                 }
                 for r in rows
             ]
+
+    # -----------------------------------------------------------------------
+    # Scheduler Jobs
+    # -----------------------------------------------------------------------
+
+    async def upsert_job(
+        self,
+        name: str,
+        schedule_cron: str,
+        next_run_at: datetime,
+        max_retries: int = 3,
+    ) -> None:
+        pool = self._get_pool()
+        async with pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO jobs (name, schedule_cron, next_run_at, status, max_retries)
+                VALUES ($1, $2, $3, 'idle', $4)
+                ON CONFLICT (name) DO UPDATE SET
+                    schedule_cron = EXCLUDED.schedule_cron,
+                    next_run_at = EXCLUDED.next_run_at,
+                    max_retries = EXCLUDED.max_retries
+                """,
+                name,
+                schedule_cron,
+                next_run_at,
+                max_retries,
+            )
+
+    async def get_due_jobs(self, now: datetime) -> list[dict[str, Any]]:
+        pool = self._get_pool()
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT * FROM jobs WHERE next_run_at <= $1 AND status != 'running'",
+                now,
+            )
+            return [
+                {
+                    "name": r["name"],
+                    "schedule_cron": r["schedule_cron"],
+                    "next_run_at": r["next_run_at"].isoformat(),
+                    "status": r["status"],
+                    "max_retries": r["max_retries"],
+                    "retries": r["retries"],
+                    "last_error": r["last_error"],
+                    "last_run_at": (
+                        r["last_run_at"].isoformat() if r["last_run_at"] else None
+                    ),
+                }
+                for r in rows
+            ]
+
+    async def mark_job_running(self, name: str) -> None:
+        pool = self._get_pool()
+        async with pool.acquire() as conn:
+            await conn.execute(
+                "UPDATE jobs SET status = 'running', last_run_at = now() WHERE name = $1",
+                name,
+            )
+
+    async def mark_job_done(self, name: str, next_run_at: datetime) -> None:
+        pool = self._get_pool()
+        async with pool.acquire() as conn:
+            await conn.execute(
+                "UPDATE jobs SET status = 'idle', retries = 0, last_error = NULL, "
+                "next_run_at = $2 WHERE name = $1",
+                name,
+                next_run_at,
+            )
+
+    async def mark_job_failed(self, name: str, error: str) -> None:
+        pool = self._get_pool()
+        async with pool.acquire() as conn:
+            await conn.execute(
+                "UPDATE jobs SET status = 'failed', retries = retries + 1, "
+                "last_error = $2 WHERE name = $1",
+                name,
+                error[:2000],
+            )
+
+    async def list_jobs(self) -> list[dict[str, Any]]:
+        pool = self._get_pool()
+        async with pool.acquire() as conn:
+            rows = await conn.fetch("SELECT * FROM jobs ORDER BY name")
+            return [
+                {
+                    "name": r["name"],
+                    "schedule_cron": r["schedule_cron"],
+                    "next_run_at": r["next_run_at"].isoformat(),
+                    "status": r["status"],
+                    "max_retries": r["max_retries"],
+                    "retries": r["retries"],
+                    "last_error": r["last_error"],
+                    "last_run_at": (
+                        r["last_run_at"].isoformat() if r["last_run_at"] else None
+                    ),
+                }
+                for r in rows
+            ]
+
+    # -----------------------------------------------------------------------
+    # Maintenance Operations (scheduler tasks)
+    # -----------------------------------------------------------------------
+
+    async def cleanup_orphaned_chunks(self) -> int:
+        pool = self._get_pool()
+        async with pool.acquire() as conn:
+            status = await conn.execute(
+                "DELETE FROM chunks WHERE document_id NOT IN (SELECT id FROM documents)"
+            )
+        # asyncpg returns a status string like 'DELETE 12'; extract the row count.
+        try:
+            return int(status.split()[-1])
+        except (ValueError, AttributeError):
+            return 0
+
+    async def rebuild_fts_index(self) -> int:
+        pool = self._get_pool()
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT COUNT(*) AS cnt FROM chunks WHERE level = 'child' AND tsv IS NOT NULL"
+            )
+            return row["cnt"] if row else 0
+
+    async def backfill_missing_embeddings(self) -> int:
+        from deep_context.core.llm_client import llm_client
+
+        pool = self._get_pool()
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT id, content FROM chunks WHERE level = 'child' "
+                "AND embedding IS NULL LIMIT 500"
+            )
+            if not rows:
+                return 0
+            texts = [r["content"] for r in rows]
+            embeddings = await llm_client.get_embeddings(texts)
+            backfilled = 0
+            for r, emb in zip(rows, embeddings, strict=False):
+                await conn.execute(
+                    "UPDATE chunks SET embedding = $2::vector WHERE id = $1::uuid",
+                    str(r["id"]),
+                    emb,
+                )
+                backfilled += 1
+            return backfilled

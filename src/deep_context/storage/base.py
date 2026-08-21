@@ -124,7 +124,9 @@ class StorageInterface(ABC):
         pass
 
     @abstractmethod
-    async def get_tree_nodes_for_document(self, document_id: str) -> list[DocumentTreeNode]:
+    async def get_tree_nodes_for_document(
+        self, document_id: str
+    ) -> list[DocumentTreeNode]:
         """Get all tree nodes for a given document."""
         pass
 
@@ -165,7 +167,9 @@ class StorageInterface(ABC):
         pass
 
     @abstractmethod
-    async def get_preference(self, user_id: str, preference_key: str) -> dict[str, Any] | None:
+    async def get_preference(
+        self, user_id: str, preference_key: str
+    ) -> dict[str, Any] | None:
         """Exact lookup for user preference."""
         pass
 
@@ -250,7 +254,9 @@ class StorageInterface(ABC):
     # -----------------------------------------------------------------------
 
     @abstractmethod
-    async def create_session(self, session: SessionHandle, user_id: str = "default") -> None:
+    async def create_session(
+        self, session: SessionHandle, user_id: str = "default"
+    ) -> None:
         """Create a new agent session."""
         pass
 
@@ -260,19 +266,28 @@ class StorageInterface(ABC):
         pass
 
     @abstractmethod
-    async def update_session_status(self, session_id: str, status: SessionStatus) -> None:
+    async def update_session_status(
+        self, session_id: str, status: SessionStatus
+    ) -> None:
         """Update session status."""
         pass
 
     @abstractmethod
     async def insert_rlm_child(
-        self, parent_session_id: str, child_session_id: str, name: str, model: str, depth: int
+        self,
+        parent_session_id: str,
+        child_session_id: str,
+        name: str,
+        model: str,
+        depth: int,
     ) -> str:
         """Record subagent admission handle in rlm_children table."""
         pass
 
     @abstractmethod
-    async def update_rlm_child_status(self, child_session_id: str, status: ChildStatus) -> None:
+    async def update_rlm_child_status(
+        self, child_session_id: str, status: ChildStatus
+    ) -> None:
         """Update child subagent status."""
         pass
 
@@ -305,7 +320,69 @@ class StorageInterface(ABC):
 
     @abstractmethod
     async def list_event_traces(
-        self, session_id: str | None = None, event_type: str | None = None, limit: int = 100
+        self,
+        session_id: str | None = None,
+        event_type: str | None = None,
+        limit: int = 100,
     ) -> list[dict[str, Any]]:
         """Query event trace logs."""
+        pass
+
+    # -----------------------------------------------------------------------
+    # Scheduler Jobs
+    # -----------------------------------------------------------------------
+
+    @abstractmethod
+    async def upsert_job(
+        self,
+        name: str,
+        schedule_cron: str,
+        next_run_at: datetime,
+        max_retries: int = 3,
+    ) -> None:
+        """Create or update a scheduled job definition."""
+        pass
+
+    @abstractmethod
+    async def get_due_jobs(self, now: datetime) -> list[dict[str, Any]]:
+        """Return jobs whose next_run_at <= now and status is not 'running'."""
+        pass
+
+    @abstractmethod
+    async def mark_job_running(self, name: str) -> None:
+        """Transition a job to 'running' state."""
+        pass
+
+    @abstractmethod
+    async def mark_job_done(self, name: str, next_run_at: datetime) -> None:
+        """Mark a job successful, reset retries, and schedule its next run."""
+        pass
+
+    @abstractmethod
+    async def mark_job_failed(self, name: str, error: str) -> None:
+        """Record a job failure and increment its retry counter."""
+        pass
+
+    @abstractmethod
+    async def list_jobs(self) -> list[dict[str, Any]]:
+        """List all registered jobs with their current state."""
+        pass
+
+    # -----------------------------------------------------------------------
+    # Maintenance Operations (scheduler tasks)
+    # -----------------------------------------------------------------------
+
+    @abstractmethod
+    async def cleanup_orphaned_chunks(self) -> int:
+        """Delete chunks whose parent document no longer exists. Returns removed count."""
+        pass
+
+    @abstractmethod
+    async def rebuild_fts_index(self) -> int:
+        """Rebuild full-text index entries for all child chunks. Returns entry count."""
+        pass
+
+    @abstractmethod
+    async def backfill_missing_embeddings(self) -> int:
+        """Re-embed child chunks missing embeddings. Returns backfilled count."""
         pass
