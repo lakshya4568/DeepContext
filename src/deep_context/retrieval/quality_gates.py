@@ -63,12 +63,40 @@ def protect_consensus(
     reranked: list[dict[str, Any]],
     top_k: int,
 ) -> list[dict[str, Any]]:
-    """Keep candidates that both BM25 and dense ranked in their top 10."""
-    merged = list(reranked)
-    seen = {str(item.get("id") or item.get("chunk_id")) for item in merged}
-    for candidate in original:
+    """Guarantee retention of top-consensus candidates supported by both BM25 and dense retrieval."""
+    protected = [candidate for candidate in original if is_top_consensus_candidate(candidate)]
+
+    merged: list[dict[str, Any]] = []
+    seen: set[str] = set()
+
+    for candidate in reranked:
         cid = str(candidate.get("id") or candidate.get("chunk_id") or "")
-        if is_top_consensus_candidate(candidate) and cid and cid not in seen:
+        if cid and cid not in seen:
             merged.append(candidate)
             seen.add(cid)
+
+    for candidate in protected:
+        cid = str(candidate.get("id") or candidate.get("chunk_id") or "")
+        if not cid or cid in seen:
+            continue
+
+        if len(merged) < top_k:
+            merged.append(candidate)
+            seen.add(cid)
+            continue
+
+        # Replace the weakest non-protected item if possible.
+        replacement_index = next(
+            (
+                index
+                for index in range(len(merged) - 1, -1, -1)
+                if not is_top_consensus_candidate(merged[index])
+            ),
+            None,
+        )
+
+        if replacement_index is not None:
+            merged[replacement_index] = candidate
+            seen.add(cid)
+
     return merged[:top_k]

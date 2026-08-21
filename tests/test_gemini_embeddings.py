@@ -59,7 +59,7 @@ async def test_gemini_embedding_2_live_client_call_formatting() -> None:
 
     mock_genai_client.aio.models.embed_content = AsyncMock(return_value=mock_resp)
     client._gemini_client = mock_genai_client
-    client._refresh_gemini_client = lambda: mock_genai_client
+    setattr(client, "_refresh_gemini_client", lambda: mock_genai_client)
 
     # Test batch document call
     texts = ["First chunk content", "Second chunk content"]
@@ -100,7 +100,7 @@ async def test_gemini_embedding_2_query_formatting() -> None:
     mock_resp.embeddings = [fake_emb]
     mock_genai_client.aio.models.embed_content = AsyncMock(return_value=mock_resp)
     client._gemini_client = mock_genai_client
-    client._refresh_gemini_client = lambda: mock_genai_client
+    setattr(client, "_refresh_gemini_client", lambda: mock_genai_client)
 
     emb = await client.get_embedding(
         "How does RLM handle recursive memory?",

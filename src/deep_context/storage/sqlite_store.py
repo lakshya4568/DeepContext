@@ -379,6 +379,7 @@ class SQLiteStore(StorageInterface):
         limit: int = 1000,
     ) -> list[dict[str, Any]]:
         conn = self._get_conn()
+        params: tuple[Any, ...]
         if document_id:
             query = """
                 SELECT c.id, c.document_id, c.content, c.section_path, c.page_number, d.title as document_title

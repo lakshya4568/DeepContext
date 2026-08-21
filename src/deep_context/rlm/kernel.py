@@ -55,7 +55,7 @@ class SandboxedKernel:
         kw = keyword.lower()
         corpus_data = self.namespace.get("corpus", [])
         if isinstance(corpus_data, list):
-            results = []
+            results: list[Any] = []
             for item in corpus_data:
                 if isinstance(item, dict):
                     if kw in item.get("content", "").lower():
@@ -96,7 +96,7 @@ class SandboxedKernel:
             lines = target.splitlines()
             return [line for line in lines if regex.search(line)]
         elif isinstance(target, list):
-            res = []
+            res: list[Any] = []
             for item in target:
                 if isinstance(item, dict):
                     if regex.search(item.get("content", "")):

@@ -57,3 +57,21 @@ def test_consensus_requires_bm25_and_dense_membership() -> None:
     assert is_top_consensus_candidate(both) is True
     assert is_top_consensus_candidate(bm25_only) is False
     assert is_top_consensus_candidate(dense_only) is False
+
+
+def test_protect_consensus_guarantees_retention_via_replacement() -> None:
+    original = [
+        {"id": "protected_chunk", "bm25_rank": 1, "dense_rank": 1, "content": "vital"},
+        {"id": "item1", "bm25_rank": 15, "dense_rank": 15, "content": "c1"},
+        {"id": "item2", "bm25_rank": 20, "dense_rank": 20, "content": "c2"},
+    ]
+    # Reranker filled all top_k slots with non-protected items
+    reranked = [
+        {"id": "item1", "content": "c1"},
+        {"id": "item2", "content": "c2"},
+    ]
+    merged = protect_consensus(original, reranked, top_k=2)
+    merged_ids = [c["id"] for c in merged]
+    # The protected candidate must replace the weakest non-protected item
+    assert "protected_chunk" in merged_ids
+    assert len(merged) == 2

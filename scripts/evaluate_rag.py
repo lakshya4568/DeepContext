@@ -156,7 +156,7 @@ def calculate_context_relevancy(
     if not sentences:
         return 0.0
     q_words = set(w.lower() for w in re.findall(r"\w+", query) if len(w) > 3)
-    fact_words = set()
+    fact_words: set[str] = set()
     for f in expected_facts:
         fact_words.update(w.lower() for w in re.findall(r"\w+", f) if len(w) > 3)
 
@@ -354,8 +354,10 @@ async def run_evaluation():
         ret_latency = int((time.time() - t_ret_0) * 1000)
 
         parent_page_sets = [extract_chunk_pages(p) for p in retrieval_res.parent_chunks]
-        retrieved_pages = [
-            p.get("page_number") for p in retrieval_res.parent_chunks if p.get("page_number")
+        retrieved_pages: list[int] = [
+            int(p["page_number"])
+            for p in retrieval_res.parent_chunks
+            if p.get("page_number") is not None
         ]
         context_text = "\n\n".join(p.get("content", "") for p in retrieval_res.parent_chunks)
 

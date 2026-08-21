@@ -21,14 +21,14 @@ async def test_memory_store_embedding_preferences() -> None:
         user_id="engineer_alice",
         embedding_model="gemini-embedding-2",
         embedding_dim=768,
-        reranker="gemini_semantic",
+        reranker="ecohash",
         llm_model="gemini-2.5-flash",
     )
 
     prefs = await mgr.get_embedding_preferences("engineer_alice")
     assert prefs["embedding_model"] == "gemini-embedding-2"
     assert prefs["embedding_dim"] == 768
-    assert prefs["reranker"] == "gemini_semantic"
+    assert prefs["reranker"] == "ecohash"
     assert prefs["llm_model"] == "gemini-2.5-flash"
 
 

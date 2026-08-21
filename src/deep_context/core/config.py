@@ -79,7 +79,7 @@ class Settings(BaseSettings):
     embedding_dim: int = Field(default=768, alias="EMBEDDING_DIM")  # 768 for gemini-embedding-2 MRL
     reranker_strategy: str = Field(
         default="cross_encoder", alias="RERANKER_STRATEGY"
-    )  # 'cross_encoder' | 'gemini_semantic' | 'gemini_llm' | 'rrf'
+    )  # 'cross_encoder' | 'ecohash' | 'local_cross_encoder' | 'rrf'
 
     # Reranker blend tuning (see reranker.py _blend_with_rrf docstring for regression history).
     # 0.60/0.40 is the empirically validated default: it produced 87.1% Hit@5 on the GoT

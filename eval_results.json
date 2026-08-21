@@ -4,40 +4,40 @@
     "answerable_queries": 31,
     "unanswerable_queries": 5,
     "retrieval_metrics": {
-      "hit_rate_at_1": 0.3548,
-      "hit_rate_at_3": 0.5484,
-      "hit_rate_at_5": 0.6129,
-      "hit_rate_at_8": 0.6774,
-      "mrr": 0.4594,
-      "ndcg_at_5": 0.3354,
-      "ndcg_at_8": 0.3718,
-      "context_precision": 0.4196,
+      "hit_rate_at_1": 0.4516,
+      "hit_rate_at_3": 0.6452,
+      "hit_rate_at_5": 0.7097,
+      "hit_rate_at_8": 0.8065,
+      "mrr": 0.5613,
+      "ndcg_at_5": 0.4084,
+      "ndcg_at_8": 0.4465,
+      "context_precision": 0.5219,
       "context_recall": 0.9221,
-      "context_relevancy": 0.0428
+      "context_relevancy": 0.0437
     },
     "ablation_comparison_hit_at_5": {
       "bm25_only": 0.3226,
       "vector_only": 0.3871,
       "hybrid_rrf": 0.4516,
-      "full_pipeline_reranked": 0.6129
+      "full_pipeline_reranked": 0.7097
     },
     "generation_metrics": {
-      "faithfulness": 0.8868,
-      "answer_relevancy": 0.858,
-      "factual_correctness_f1": 0.4825,
-      "semantic_similarity": 0.597,
-      "answer_completeness": 0.4334,
+      "faithfulness": 0.9054,
+      "answer_relevancy": 0.8771,
+      "factual_correctness_f1": 0.5047,
+      "semantic_similarity": 0.62,
+      "answer_completeness": 0.4468,
       "citation_precision": 1.0,
       "citation_recall": 1.0,
       "abstention_accuracy": 1.0
     },
     "latency_ms": {
-      "retrieval_p50": 1011,
-      "retrieval_p95": 2162,
-      "generation_p50": 3372,
-      "generation_p95": 9849,
-      "total_p50": 4860,
-      "total_p95": 11090
+      "retrieval_p50": 5348,
+      "retrieval_p95": 39066,
+      "generation_p50": 1871,
+      "generation_p95": 12734,
+      "total_p50": 8032,
+      "total_p95": 44484
     }
   },
   "query_results": [
@@ -64,7 +64,7 @@
         47,
         112,
         593,
-        447
+        250
       ],
       "hit_at_1": 1.0,
       "hit_at_3": 1.0,
@@ -76,12 +76,12 @@
       "context_precision": 1.0,
       "context_recall": 1.0,
       "context_relevancy": 0.008,
-      "retrieval_latency_ms": 1027,
+      "retrieval_latency_ms": 6910,
       "bm25_hit_at_5": 0.0,
       "vector_hit_at_5": 0.0,
       "hybrid_hit_at_5": 0.0,
       "reranked_hit_at_5": 1.0,
-      "generated_answer": "Based on the provided supported facts, the final answer is:\n\nThe name of Ned Stark's ancestral greatsword is Ice, it is made of Valyrian steel, and it is 400 years old.",
+      "generated_answer": "Based on the provided facts, the final answer is:\n\nThe name of Ned Stark's ancestral greatsword is Ice. It is made of Valyrian steel. The exact age of the sword's face is unknown, but the sword itself is 400 years old.",
       "reasoning": null,
       "citations": [
         {
@@ -141,24 +141,24 @@
           "page_number": 593
         },
         {
-          "chunk_id": "e8b92aa4-c7f3-43a1-95e8-96ef66a23eb1",
+          "chunk_id": "c24f85f4-1c42-42a0-a9b8-fdd0cdab8733",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 447\u2013450",
-          "page_number": 447
+          "section_path": "Pages 250\u2013254",
+          "page_number": 250
         }
       ],
       "faithfulness": 1.0,
       "answer_relevancy": 0.9,
       "factual_correctness_f1": 1.0,
-      "semantic_similarity": 0.851,
+      "semantic_similarity": 0.824,
       "answer_completeness": 1.0,
       "citation_precision": 1.0,
       "citation_recall": 1.0,
       "abstention_accuracy": 1.0,
-      "generation_latency_ms": 1210,
-      "total_latency_ms": 2237,
+      "generation_latency_ms": 1291,
+      "total_latency_ms": 8201,
       "failure_category": null
     },
     {
@@ -179,12 +179,12 @@
       "retrieved_pages": [
         681,
         686,
-        454,
-        221,
         729,
+        221,
+        540,
         100,
-        112,
-        214
+        454,
+        360
       ],
       "hit_at_1": 0.0,
       "hit_at_3": 0.0,
@@ -195,13 +195,13 @@
       "ndcg_at_8": 0.356,
       "context_precision": 0.167,
       "context_recall": 1.0,
-      "context_relevancy": 0.086,
-      "retrieval_latency_ms": 995,
+      "context_relevancy": 0.091,
+      "retrieval_latency_ms": 4508,
       "bm25_hit_at_5": 0.0,
       "vector_hit_at_5": 1.0,
       "hybrid_hit_at_5": 1.0,
       "reranked_hit_at_5": 0.0,
-      "generated_answer": "Based on the provided supported facts, the final answer is:\n\nMirri Maz Duur gave Daenerys Targaryen the three dragon eggs as a wedding gift. The specific colors of the dragon eggs are not specified in the given text.",
+      "generated_answer": "Based on the provided supported facts, the final answer is:\n\nMirri Maz Duur gave Daenerys Targaryen the three dragon eggs as a wedding gift. The colors of the dragon eggs were not specified.",
       "reasoning": null,
       "citations": [
         {
@@ -221,12 +221,12 @@
           "page_number": 686
         },
         {
-          "chunk_id": "eef8055b-700d-4931-a0f4-cd84d6ed76bc",
+          "chunk_id": "071ed502-0b4d-4720-bb60-db437a45dea1",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 454\u2013457",
-          "page_number": 454
+          "section_path": "Pages 729\u2013734",
+          "page_number": 729
         },
         {
           "chunk_id": "a1b913dc-999b-4f7f-9c10-a98df992e8e9",
@@ -237,12 +237,12 @@
           "page_number": 221
         },
         {
-          "chunk_id": "071ed502-0b4d-4720-bb60-db437a45dea1",
+          "chunk_id": "2f03cbbd-e935-4dda-8919-b50e7930f81f",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 729\u2013734",
-          "page_number": 729
+          "section_path": "Pages 540\u2013543",
+          "page_number": 540
         },
         {
           "chunk_id": "1eb53b7f-ff0b-48c5-b748-c3ad9ea6f183",
@@ -253,32 +253,32 @@
           "page_number": 100
         },
         {
-          "chunk_id": "f0254386-5e60-47b0-a9b2-985a6896987e",
+          "chunk_id": "eef8055b-700d-4931-a0f4-cd84d6ed76bc",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 112\u2013115",
-          "page_number": 112
+          "section_path": "Pages 454\u2013457",
+          "page_number": 454
         },
         {
-          "chunk_id": "3f32920a-bd4b-4a10-947f-32bd2be9ff7f",
+          "chunk_id": "711db90b-eb84-4645-b4a7-20b062ae8866",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 214\u2013216",
-          "page_number": 214
+          "section_path": "Pages 360\u2013363",
+          "page_number": 360
         }
       ],
       "faithfulness": 1.0,
-      "answer_relevancy": 0.85,
+      "answer_relevancy": 0.9,
       "factual_correctness_f1": 0.0,
-      "semantic_similarity": 0.713,
+      "semantic_similarity": 0.711,
       "answer_completeness": 0.0,
       "citation_precision": 1.0,
       "citation_recall": 1.0,
       "abstention_accuracy": 1.0,
-      "generation_latency_ms": 3142,
-      "total_latency_ms": 4137,
+      "generation_latency_ms": 3470,
+      "total_latency_ms": 7978,
       "failure_category": "Retrieval Recall Failure (Needle Missed in Top 5)"
     },
     {
@@ -301,8 +301,8 @@
         296,
         184,
         233,
-        255,
-        112,
+        237,
+        443,
         501
       ],
       "hit_at_1": 0.0,
@@ -311,16 +311,16 @@
       "hit_at_8": 1.0,
       "mrr": 0.2,
       "ndcg_at_5": 0.182,
-      "ndcg_at_8": 0.182,
-      "context_precision": 0.2,
+      "ndcg_at_8": 0.338,
+      "context_precision": 0.243,
       "context_recall": 1.0,
-      "context_relevancy": 0.041,
-      "retrieval_latency_ms": 1665,
+      "context_relevancy": 0.049,
+      "retrieval_latency_ms": 4930,
       "bm25_hit_at_5": 0.0,
       "vector_hit_at_5": 0.0,
       "hybrid_hit_at_5": 0.0,
       "reranked_hit_at_5": 1.0,
-      "generated_answer": "Based on the provided context, there is insufficient evidence to answer what Jon Arryn's dying words were according to Grand Maester Pycelle.",
+      "generated_answer": "Based on the provided context, there is insufficient evidence to answer the question \"What were Jon Arryn's dying words according to Grand Maester Pycelle?\"",
       "reasoning": null,
       "citations": [
         {
@@ -364,20 +364,20 @@
           "page_number": 233
         },
         {
-          "chunk_id": "6a7153cc-d1f4-4ad8-85da-41db3566e54e",
+          "chunk_id": "a18ecaa2-c0a8-49a6-8658-b3f524e205e4",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 255\u2013258",
-          "page_number": 255
+          "section_path": "Pages 237\u2013241",
+          "page_number": 237
         },
         {
-          "chunk_id": "f0254386-5e60-47b0-a9b2-985a6896987e",
+          "chunk_id": "d6c4dc3a-8ce0-4d1e-8648-dde90fd5e1d2",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 112\u2013115",
-          "page_number": 112
+          "section_path": "Pages 443\u2013446",
+          "page_number": 443
         },
         {
           "chunk_id": "9ce6a79f-9cc9-4ee0-a773-5ca1c3f83c1a",
@@ -391,13 +391,13 @@
       "faithfulness": 1.0,
       "answer_relevancy": 1.0,
       "factual_correctness_f1": 0.0,
-      "semantic_similarity": 0.689,
+      "semantic_similarity": 0.685,
       "answer_completeness": 0.0,
       "citation_precision": 1.0,
       "citation_recall": 1.0,
       "abstention_accuracy": 1.0,
-      "generation_latency_ms": 3863,
-      "total_latency_ms": 5528,
+      "generation_latency_ms": 1270,
+      "total_latency_ms": 6200,
       "failure_category": "Low Context Precision (Noisy Chunks Ranked High)"
     },
     {
@@ -419,11 +419,11 @@
         95,
         90,
         322,
-        242,
         205,
-        710,
-        163,
-        593
+        242,
+        593,
+        491,
+        710
       ],
       "hit_at_1": 1.0,
       "hit_at_3": 1.0,
@@ -434,13 +434,13 @@
       "ndcg_at_8": 1.0,
       "context_precision": 1.0,
       "context_recall": 0.667,
-      "context_relevancy": 0.029,
-      "retrieval_latency_ms": 1911,
+      "context_relevancy": 0.035,
+      "retrieval_latency_ms": 4224,
       "bm25_hit_at_5": 0.0,
       "vector_hit_at_5": 1.0,
       "hybrid_hit_at_5": 1.0,
       "reranked_hit_at_5": 1.0,
-      "generated_answer": "{\n  \"supported\": [\n    \"Jon gave Arya a sword named 'Needle'.\",\n    \"Jon's advice/lesson to her was to watch how people fight in the yard until she finds a practice partner.\",\n    \"He also told her to run, ride, and make herself strong.\"\n  ],\n  \"missing\": [\n    \"What Jon said about not telling Sansa\",\n    \"The exact quote about watching how others fight in the yard\"\n  ],\n  \"unanswerable\": false\n}",
+      "generated_answer": "Based on the supported facts, the final answer is:\n\nJon Snow gave Arya Needle before leaving for the Wall. \n\nAs for his first lesson to Arya, it included the following: \n- To run, ride, and make herself strong.\n- To watch how others fight in the yard.\n- To be careful and not to get hurt.\n- To be brave and strong.\n- To practice with someone else when she found one.\n- To not tell Sansa.",
       "reasoning": null,
       "citations": [
         {
@@ -468,14 +468,6 @@
           "page_number": 322
         },
         {
-          "chunk_id": "1feab8bd-b2eb-48ef-ae77-607f8a9d9c94",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 242\u2013245",
-          "page_number": 242
-        },
-        {
           "chunk_id": "1f164752-7c57-48bd-b32e-54cbefe7c7f5",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
@@ -484,20 +476,12 @@
           "page_number": 205
         },
         {
-          "chunk_id": "316b9891-cab1-417b-820a-07f58babf019",
+          "chunk_id": "1feab8bd-b2eb-48ef-ae77-607f8a9d9c94",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 710\u2013713",
-          "page_number": 710
-        },
-        {
-          "chunk_id": "81138642-2755-458a-8c07-88afe12cfc66",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 163\u2013167",
-          "page_number": 163
+          "section_path": "Pages 242\u2013245",
+          "page_number": 242
         },
         {
           "chunk_id": "71dff678-d9f2-4c5f-9273-a4dca39ecaec",
@@ -506,18 +490,34 @@
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
           "section_path": "Pages 593\u2013596",
           "page_number": 593
+        },
+        {
+          "chunk_id": "b6580f1a-211a-4f56-ba09-d9413d639ba4",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 491\u2013493",
+          "page_number": 491
+        },
+        {
+          "chunk_id": "316b9891-cab1-417b-820a-07f58babf019",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 710\u2013713",
+          "page_number": 710
         }
       ],
       "faithfulness": 1.0,
-      "answer_relevancy": 0.64,
+      "answer_relevancy": 0.82,
       "factual_correctness_f1": 0.5,
-      "semantic_similarity": 0.57,
+      "semantic_similarity": 0.613,
       "answer_completeness": 0.333,
       "citation_precision": 1.0,
       "citation_recall": 1.0,
       "abstention_accuracy": 1.0,
-      "generation_latency_ms": 20345,
-      "total_latency_ms": 22256,
+      "generation_latency_ms": 3593,
+      "total_latency_ms": 7817,
       "failure_category": null
     },
     {
@@ -536,13 +536,13 @@
       "is_unanswerable": false,
       "retrieved_pages": [
         458,
-        454,
-        217,
         645,
         357,
-        686,
+        454,
         214,
-        112
+        217,
+        681,
+        686
       ],
       "hit_at_1": 1.0,
       "hit_at_3": 1.0,
@@ -553,13 +553,13 @@
       "ndcg_at_8": 1.0,
       "context_precision": 1.0,
       "context_recall": 1.0,
-      "context_relevancy": 0.072,
-      "retrieval_latency_ms": 3741,
+      "context_relevancy": 0.07,
+      "retrieval_latency_ms": 5942,
       "bm25_hit_at_5": 0.0,
       "vector_hit_at_5": 1.0,
       "hybrid_hit_at_5": 1.0,
       "reranked_hit_at_5": 1.0,
-      "generated_answer": "Based on the provided facts, Khal Drogo executed Viserys Targaryen in Vaes Dothrak without shedding blood by melting his gold belt in a pot and pouring it over his head.",
+      "generated_answer": "Based on the provided supported facts, Khal Drogo executed Viserys Targaryen in Vaes Dothrak without shedding blood by melting his gold crown with fire. The method involved using a heavy iron stew pot to melt the gold, and then pouring the molten gold over Viserys' head. This method allowed for the execution of Viserys without causing him any physical harm or shedding of blood.",
       "reasoning": null,
       "citations": [
         {
@@ -569,22 +569,6 @@
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
           "section_path": "Pages 458\u2013461",
           "page_number": 458
-        },
-        {
-          "chunk_id": "eef8055b-700d-4931-a0f4-cd84d6ed76bc",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 454\u2013457",
-          "page_number": 454
-        },
-        {
-          "chunk_id": "1491aa11-c891-4979-83ef-8336ef7a7986",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 217\u2013220",
-          "page_number": 217
         },
         {
           "chunk_id": "880c20b2-d339-48c2-ac65-9f33e3d43d76",
@@ -603,12 +587,12 @@
           "page_number": 357
         },
         {
-          "chunk_id": "4847839a-4484-4def-827a-ce1f968ca4a0",
+          "chunk_id": "eef8055b-700d-4931-a0f4-cd84d6ed76bc",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 686\u2013689",
-          "page_number": 686
+          "section_path": "Pages 454\u2013457",
+          "page_number": 454
         },
         {
           "chunk_id": "3f32920a-bd4b-4a10-947f-32bd2be9ff7f",
@@ -619,24 +603,40 @@
           "page_number": 214
         },
         {
-          "chunk_id": "f0254386-5e60-47b0-a9b2-985a6896987e",
+          "chunk_id": "1491aa11-c891-4979-83ef-8336ef7a7986",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 112\u2013115",
-          "page_number": 112
+          "section_path": "Pages 217\u2013220",
+          "page_number": 217
+        },
+        {
+          "chunk_id": "403bae28-5a92-40a9-9860-f12eab605b14",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 681\u2013685",
+          "page_number": 681
+        },
+        {
+          "chunk_id": "4847839a-4484-4def-827a-ce1f968ca4a0",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 686\u2013689",
+          "page_number": 686
         }
       ],
-      "faithfulness": 1.0,
+      "faithfulness": 0.667,
       "answer_relevancy": 0.94,
-      "factual_correctness_f1": 0.8,
-      "semantic_similarity": 0.757,
+      "factual_correctness_f1": 0.667,
+      "semantic_similarity": 0.767,
       "answer_completeness": 0.667,
       "citation_precision": 1.0,
       "citation_recall": 1.0,
       "abstention_accuracy": 1.0,
-      "generation_latency_ms": 3367,
-      "total_latency_ms": 7108,
+      "generation_latency_ms": 1679,
+      "total_latency_ms": 7621,
       "failure_category": null
     },
     {
@@ -654,40 +654,40 @@
       ],
       "is_unanswerable": false,
       "retrieved_pages": [
-        710,
-        597,
         593,
+        597,
+        710,
         242,
         193,
-        567,
-        112,
-        513
+        517,
+        172,
+        567
       ],
-      "hit_at_1": 0.0,
+      "hit_at_1": 1.0,
       "hit_at_3": 1.0,
       "hit_at_5": 1.0,
       "hit_at_8": 1.0,
-      "mrr": 0.333,
-      "ndcg_at_5": 0.307,
-      "ndcg_at_8": 0.307,
-      "context_precision": 0.333,
+      "mrr": 1.0,
+      "ndcg_at_5": 0.613,
+      "ndcg_at_8": 0.613,
+      "context_precision": 1.0,
       "context_recall": 1.0,
-      "context_relevancy": 0.082,
-      "retrieval_latency_ms": 892,
+      "context_relevancy": 0.089,
+      "retrieval_latency_ms": 4524,
       "bm25_hit_at_5": 0.0,
       "vector_hit_at_5": 1.0,
       "hybrid_hit_at_5": 1.0,
       "reranked_hit_at_5": 1.0,
-      "generated_answer": "Based on the supported facts, I can provide the following answer:\n\nLord Commander Mormont gave Jon Snow the sword Longclaw. However, I do not have information about any change made to its pommel.",
+      "generated_answer": "Based on the supported facts, the final answer is:\n\nLord Commander Mormont gave Jon Snow a sword called Longclaw, which was made of Valyrian steel and originally had a silver bear's head pommel. The pommel was later changed to a snarling wolf's head, with chips of garnet set into the eyes.",
       "reasoning": null,
       "citations": [
         {
-          "chunk_id": "316b9891-cab1-417b-820a-07f58babf019",
+          "chunk_id": "71dff678-d9f2-4c5f-9273-a4dca39ecaec",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 710\u2013713",
-          "page_number": 710
+          "section_path": "Pages 593\u2013596",
+          "page_number": 593
         },
         {
           "chunk_id": "50ee3a06-8dbf-49b6-a237-f0b64db036ea",
@@ -698,12 +698,12 @@
           "page_number": 597
         },
         {
-          "chunk_id": "71dff678-d9f2-4c5f-9273-a4dca39ecaec",
+          "chunk_id": "316b9891-cab1-417b-820a-07f58babf019",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 593\u2013596",
-          "page_number": 593
+          "section_path": "Pages 710\u2013713",
+          "page_number": 710
         },
         {
           "chunk_id": "1feab8bd-b2eb-48ef-ae77-607f8a9d9c94",
@@ -722,41 +722,41 @@
           "page_number": 193
         },
         {
+          "chunk_id": "bb3fc8cc-5251-4092-8a95-253a8d4d9abb",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 517\u2013521",
+          "page_number": 517
+        },
+        {
+          "chunk_id": "348d8e4c-9554-4891-82b0-c347649c45d9",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 172\u2013174",
+          "page_number": 172
+        },
+        {
           "chunk_id": "3de91747-555a-4081-959d-89c6e9997436",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
           "section_path": "Pages 567\u2013570",
           "page_number": 567
-        },
-        {
-          "chunk_id": "f0254386-5e60-47b0-a9b2-985a6896987e",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 112\u2013115",
-          "page_number": 112
-        },
-        {
-          "chunk_id": "2545ed27-ab9a-4a0a-aec3-21a74328bcfe",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 513\u2013516",
-          "page_number": 513
         }
       ],
       "faithfulness": 1.0,
-      "answer_relevancy": 0.88,
-      "factual_correctness_f1": 0.0,
-      "semantic_similarity": 0.669,
-      "answer_completeness": 0.0,
+      "answer_relevancy": 0.82,
+      "factual_correctness_f1": 1.0,
+      "semantic_similarity": 0.792,
+      "answer_completeness": 1.0,
       "citation_precision": 1.0,
       "citation_recall": 1.0,
       "abstention_accuracy": 1.0,
-      "generation_latency_ms": 6810,
-      "total_latency_ms": 7702,
-      "failure_category": "Low Context Precision (Noisy Chunks Ranked High)"
+      "generation_latency_ms": 2361,
+      "total_latency_ms": 6885,
+      "failure_category": null
     },
     {
       "id": "q07_fact",
@@ -777,9 +777,9 @@
         411,
         517,
         296,
-        2,
-        168,
         193,
+        168,
+        2,
         513
       ],
       "hit_at_1": 1.0,
@@ -792,12 +792,12 @@
       "context_precision": 1.0,
       "context_recall": 1.0,
       "context_relevancy": 0.035,
-      "retrieval_latency_ms": 912,
+      "retrieval_latency_ms": 4996,
       "bm25_hit_at_5": 0.0,
       "vector_hit_at_5": 0.0,
       "hybrid_hit_at_5": 0.0,
       "reranked_hit_at_5": 1.0,
-      "generated_answer": "Based on the provided facts, the true identity of Maester Aemon at Castle Black is that he is a Targaryen, once. He is the son of Maekar, the First of his Name, and the brother of Aegon. He has taken his vows and put aside his house name, indicating that he has renounced his Targaryen heritage.",
+      "generated_answer": "Based on the supported facts, the true identity of Maester Aemon at Castle Black is that he is a Targaryen who has put aside his house name. He is a maester of the Citadel, bound in service to Castle Black and the Night's Watch. He has been a maester for a long time and has a deep understanding of the Night's Watch and its values. He is over 90 years old and has made difficult choices in his life, prioritizing honor and duty.",
       "reasoning": null,
       "citations": [
         {
@@ -833,12 +833,12 @@
           "page_number": 296
         },
         {
-          "chunk_id": "e8b2bb95-08cc-4754-b07c-7e3e462e5ad8",
+          "chunk_id": "c20288eb-c356-4ece-8c7d-9c5a3c965e1b",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 2\u20139",
-          "page_number": 2
+          "section_path": "Pages 193\u2013196",
+          "page_number": 193
         },
         {
           "chunk_id": "45ad2585-33ee-4581-ac1c-6cd2a0e182bb",
@@ -849,12 +849,12 @@
           "page_number": 168
         },
         {
-          "chunk_id": "c20288eb-c356-4ece-8c7d-9c5a3c965e1b",
+          "chunk_id": "e8b2bb95-08cc-4754-b07c-7e3e462e5ad8",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 193\u2013196",
-          "page_number": 193
+          "section_path": "Pages 2\u20139",
+          "page_number": 2
         },
         {
           "chunk_id": "2545ed27-ab9a-4a0a-aec3-21a74328bcfe",
@@ -867,14 +867,14 @@
       ],
       "faithfulness": 1.0,
       "answer_relevancy": 0.914,
-      "factual_correctness_f1": 1.0,
-      "semantic_similarity": 0.716,
-      "answer_completeness": 1.0,
+      "factual_correctness_f1": 0.5,
+      "semantic_similarity": 0.565,
+      "answer_completeness": 0.333,
       "citation_precision": 1.0,
       "citation_recall": 1.0,
       "abstention_accuracy": 1.0,
-      "generation_latency_ms": 2551,
-      "total_latency_ms": 3463,
+      "generation_latency_ms": 3638,
+      "total_latency_ms": 8634,
       "failure_category": null
     },
     {
@@ -897,29 +897,29 @@
       "retrieved_pages": [
         483,
         567,
-        429,
-        575,
-        478,
-        673,
+        73,
         564,
-        112
+        385,
+        458,
+        429,
+        137
       ],
       "hit_at_1": 0.0,
       "hit_at_3": 1.0,
       "hit_at_5": 1.0,
       "hit_at_8": 1.0,
       "mrr": 0.5,
-      "ndcg_at_5": 0.246,
-      "ndcg_at_8": 0.376,
-      "context_precision": 0.393,
+      "ndcg_at_5": 0.414,
+      "ndcg_at_8": 0.414,
+      "context_precision": 0.5,
       "context_recall": 1.0,
       "context_relevancy": 0.062,
-      "retrieval_latency_ms": 941,
+      "retrieval_latency_ms": 4404,
       "bm25_hit_at_5": 1.0,
       "vector_hit_at_5": 1.0,
       "hybrid_hit_at_5": 1.0,
       "reranked_hit_at_5": 1.0,
-      "generated_answer": "Based on the provided facts, I can only confirm that Ser Jaime Lannister replaced Ser Barristan as Lord Commander of the Kingsguard. The information about the first knight dismissed from the Kingsguard in recorded history is missing from the evidence.",
+      "generated_answer": "Based on the provided facts, I can only confirm that Ser Jaime Lannister will take the place as the Lord Commander of the Sworn Brothers of the White Swords. The information about the first knight dismissed from the Kingsguard in recorded history and who replaced him as Lord Commander is missing from the evidence.",
       "reasoning": null,
       "citations": [
         {
@@ -939,36 +939,12 @@
           "page_number": 567
         },
         {
-          "chunk_id": "b9c3554b-d446-4c25-bb0b-449a98d0a618",
+          "chunk_id": "c5bea716-4a42-4b82-997d-e00c1e2d2d4d",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 429\u2013433",
-          "page_number": 429
-        },
-        {
-          "chunk_id": "d7aa07bb-44d5-441d-9f5b-06932a664f3d",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 575\u2013579",
-          "page_number": 575
-        },
-        {
-          "chunk_id": "0d8127d3-e91a-4e6a-b271-db8c375beceb",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 478\u2013482",
-          "page_number": 478
-        },
-        {
-          "chunk_id": "a3b80b4e-d05c-4d32-bf3e-0b6d298c4ebd",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 673\u2013676",
-          "page_number": 673
+          "section_path": "Pages 73\u201376",
+          "page_number": 73
         },
         {
           "chunk_id": "9ffe83a1-5dfa-41e0-8c15-8223aad0ccb9",
@@ -979,25 +955,49 @@
           "page_number": 564
         },
         {
-          "chunk_id": "f0254386-5e60-47b0-a9b2-985a6896987e",
+          "chunk_id": "bcf66cc3-e894-4bf0-8c6a-03b2b341c6c0",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 112\u2013115",
-          "page_number": 112
+          "section_path": "Pages 385\u2013389",
+          "page_number": 385
+        },
+        {
+          "chunk_id": "7da90a35-63e3-4070-a36e-04953aa4b45d",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 458\u2013461",
+          "page_number": 458
+        },
+        {
+          "chunk_id": "b9c3554b-d446-4c25-bb0b-449a98d0a618",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 429\u2013433",
+          "page_number": 429
+        },
+        {
+          "chunk_id": "226d86f7-6c15-47cf-b8fa-42148377f7a9",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 137\u2013140",
+          "page_number": 137
         }
       ],
-      "faithfulness": 1.0,
+      "faithfulness": 0.5,
       "answer_relevancy": 1.0,
-      "factual_correctness_f1": 0.8,
-      "semantic_similarity": 0.678,
-      "answer_completeness": 0.667,
+      "factual_correctness_f1": 0.4,
+      "semantic_similarity": 0.606,
+      "answer_completeness": 0.333,
       "citation_precision": 1.0,
       "citation_recall": 1.0,
       "abstention_accuracy": 1.0,
-      "generation_latency_ms": 2413,
-      "total_latency_ms": 3354,
-      "failure_category": "Low Context Precision (Noisy Chunks Ranked High)"
+      "generation_latency_ms": 1547,
+      "total_latency_ms": 5951,
+      "failure_category": "Generation Hallucination (Low Grounding)"
     },
     {
       "id": "q09_multihop",
@@ -1022,11 +1022,11 @@
         304,
         188,
         128,
+        400,
+        163,
+        377,
         345,
-        301,
-        184,
-        395,
-        400
+        714
       ],
       "hit_at_1": 1.0,
       "hit_at_3": 1.0,
@@ -1037,13 +1037,13 @@
       "ndcg_at_8": 0.571,
       "context_precision": 0.756,
       "context_recall": 1.0,
-      "context_relevancy": 0.122,
-      "retrieval_latency_ms": 983,
+      "context_relevancy": 0.09,
+      "retrieval_latency_ms": 6307,
       "bm25_hit_at_5": 1.0,
       "vector_hit_at_5": 0.0,
       "hybrid_hit_at_5": 0.0,
       "reranked_hit_at_5": 1.0,
-      "generated_answer": "Based on the supported facts, Catelyn Stark seized Tyrion Lannister at the Crossroads Inn because she suspected him of being involved in the attempt to kill her son Bran. The specific claim made by Littlefinger that motivated her accusation was that Tyrion had won the dagger used in the attempt on Bran's life from him in a wager during a tourney.",
+      "generated_answer": "Catelyn Stark seized Tyrion Lannister at the Crossroads Inn because she suspected him of being involved in the attempt to kill Bran Stark. \n\nThe specific claim made by Littlefinger that motivated Catelyn's accusation was that Tyrion had won the dagger used in the attempt on Bran's life from him in a wager.",
       "reasoning": null,
       "citations": [
         {
@@ -1071,6 +1071,30 @@
           "page_number": 128
         },
         {
+          "chunk_id": "4e963cd5-948f-483e-8ead-7da1f37598c5",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 400\u2013402",
+          "page_number": 400
+        },
+        {
+          "chunk_id": "81138642-2755-458a-8c07-88afe12cfc66",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 163\u2013167",
+          "page_number": 163
+        },
+        {
+          "chunk_id": "18b3d992-48d2-4d9e-abf0-d9040d61779f",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 377\u2013380",
+          "page_number": 377
+        },
+        {
           "chunk_id": "f0ab63eb-7d76-4d19-aea1-3262d3d9170f",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
@@ -1079,48 +1103,24 @@
           "page_number": 345
         },
         {
-          "chunk_id": "f218105b-6d38-414e-856d-d424ce098b78",
+          "chunk_id": "fcf1ce7b-4e97-4f82-a63a-787ec9deb6f3",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 301\u2013303",
-          "page_number": 301
-        },
-        {
-          "chunk_id": "6fb38e07-ef63-43f5-b989-c5d88a1daa60",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 184\u2013187",
-          "page_number": 184
-        },
-        {
-          "chunk_id": "698619b2-3529-41ee-9b4f-0095b59a7d3b",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 395\u2013399",
-          "page_number": 395
-        },
-        {
-          "chunk_id": "4e963cd5-948f-483e-8ead-7da1f37598c5",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 400\u2013402",
-          "page_number": 400
+          "section_path": "Pages 714\u2013717",
+          "page_number": 714
         }
       ],
       "faithfulness": 1.0,
       "answer_relevancy": 0.908,
       "factual_correctness_f1": 0.8,
-      "semantic_similarity": 0.793,
+      "semantic_similarity": 0.752,
       "answer_completeness": 0.667,
       "citation_precision": 1.0,
       "citation_recall": 1.0,
       "abstention_accuracy": 1.0,
-      "generation_latency_ms": 2224,
-      "total_latency_ms": 3207,
+      "generation_latency_ms": 3934,
+      "total_latency_ms": 10241,
       "failure_category": null
     },
     {
@@ -1146,41 +1146,33 @@
       ],
       "is_unanswerable": false,
       "retrieved_pages": [
-        377,
         385,
-        400,
-        335,
+        377,
         622,
-        345,
-        403,
-        43
+        395,
+        400,
+        628,
+        338,
+        411
       ],
-      "hit_at_1": 0.0,
+      "hit_at_1": 1.0,
       "hit_at_3": 1.0,
       "hit_at_5": 1.0,
       "hit_at_8": 1.0,
-      "mrr": 0.5,
-      "ndcg_at_5": 0.384,
-      "ndcg_at_8": 0.37,
-      "context_precision": 0.532,
+      "mrr": 1.0,
+      "ndcg_at_5": 0.47,
+      "ndcg_at_8": 0.351,
+      "context_precision": 0.7,
       "context_recall": 1.0,
-      "context_relevancy": 0.047,
-      "retrieval_latency_ms": 1393,
+      "context_relevancy": 0.04,
+      "retrieval_latency_ms": 4658,
       "bm25_hit_at_5": 1.0,
       "vector_hit_at_5": 0.0,
       "hybrid_hit_at_5": 1.0,
       "reranked_hit_at_5": 1.0,
-      "generated_answer": "Based on the provided facts, I can only answer the following:\n\nTyrion won his freedom at the Eyrie by demanding a trial by combat.",
+      "generated_answer": "Based on the provided facts, I can answer the question partially. \n\nTyrion demanded a trial and was granted one by Lady Lysa Arryn. However, the details of how Tyrion won his freedom at the Eyrie and who championed him are not supported by the facts.\n\nAs for the trial by combat, it is mentioned that Tyrion demanded a champion, but was denied one by Lady Lysa Arryn. However, it is also mentioned that Bronn volunteered to be Tyrion's champion. Additionally, it is stated that Tyrion was to face Ser Vardis Egen in a trial by combat. \n\nSince the specific details of the trial by combat and how Tyrion won his freedom are not supported by the facts, I cannot provide a complete answer to the question.",
       "reasoning": null,
       "citations": [
-        {
-          "chunk_id": "18b3d992-48d2-4d9e-abf0-d9040d61779f",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 377\u2013380",
-          "page_number": 377
-        },
         {
           "chunk_id": "bcf66cc3-e894-4bf0-8c6a-03b2b341c6c0",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
@@ -1190,20 +1182,12 @@
           "page_number": 385
         },
         {
-          "chunk_id": "4e963cd5-948f-483e-8ead-7da1f37598c5",
+          "chunk_id": "18b3d992-48d2-4d9e-abf0-d9040d61779f",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 400\u2013402",
-          "page_number": 400
-        },
-        {
-          "chunk_id": "7f1db65b-1720-4508-87a3-71054fcb7cd5",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 335\u2013337",
-          "page_number": 335
+          "section_path": "Pages 377\u2013380",
+          "page_number": 377
         },
         {
           "chunk_id": "eb419eff-92c7-4861-b422-5d4f983f3719",
@@ -1214,41 +1198,57 @@
           "page_number": 622
         },
         {
-          "chunk_id": "f0ab63eb-7d76-4d19-aea1-3262d3d9170f",
+          "chunk_id": "698619b2-3529-41ee-9b4f-0095b59a7d3b",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 345\u2013348",
-          "page_number": 345
+          "section_path": "Pages 395\u2013399",
+          "page_number": 395
         },
         {
-          "chunk_id": "6f1b5ce1-ea6a-4249-a6a1-31d2f3cedd4b",
+          "chunk_id": "4e963cd5-948f-483e-8ead-7da1f37598c5",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 403\u2013406",
-          "page_number": 403
+          "section_path": "Pages 400\u2013402",
+          "page_number": 400
         },
         {
-          "chunk_id": "21f308c1-f3d2-48cf-b129-7cb952e17feb",
+          "chunk_id": "2e85715b-2c4e-48f9-a2da-6a3c4ef1470c",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 43\u201346",
-          "page_number": 43
+          "section_path": "Pages 628\u2013631",
+          "page_number": 628
+        },
+        {
+          "chunk_id": "0ce7cac9-cebb-4f71-87fc-800e01f97345",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 338\u2013341",
+          "page_number": 338
+        },
+        {
+          "chunk_id": "6be43ad0-cd6c-4a6d-8bcf-27adf28e058b",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 411\u2013415",
+          "page_number": 411
         }
       ],
-      "faithfulness": 1.0,
-      "answer_relevancy": 0.733,
-      "factual_correctness_f1": 0.4,
-      "semantic_similarity": 0.431,
-      "answer_completeness": 0.25,
+      "faithfulness": 0.714,
+      "answer_relevancy": 0.8,
+      "factual_correctness_f1": 0.732,
+      "semantic_similarity": 0.626,
+      "answer_completeness": 0.75,
       "citation_precision": 1.0,
       "citation_recall": 1.0,
       "abstention_accuracy": 1.0,
-      "generation_latency_ms": 5863,
-      "total_latency_ms": 7256,
-      "failure_category": "Factual Incompleteness / Missing Assertions"
+      "generation_latency_ms": 6337,
+      "total_latency_ms": 10995,
+      "failure_category": null
     },
     {
       "id": "q11_multihop",
@@ -1276,8 +1276,8 @@
         55,
         483,
         447,
-        60,
         43,
+        60,
         145
       ],
       "hit_at_1": 0.0,
@@ -1290,12 +1290,12 @@
       "context_precision": 0.0,
       "context_recall": 0.75,
       "context_relevancy": 0.076,
-      "retrieval_latency_ms": 1029,
+      "retrieval_latency_ms": 5869,
       "bm25_hit_at_5": 0.0,
       "vector_hit_at_5": 0.0,
       "hybrid_hit_at_5": 0.0,
       "reranked_hit_at_5": 0.0,
-      "generated_answer": "Based on the provided facts, Ned Stark realized that Joffrey, Myrcella, and Tommen were not Robert Baratheon's biological children because he suspected that they were Jaime Lannister's bastards. Specifically, he knew that Joffrey and Tommen were Jaime's bastards, and he suspected that Myrcella was also Jaime's bastard.",
+      "generated_answer": "Based on the provided facts, Ned Stark suspected that Joffrey, Myrcella, and Tommen were not Robert Baratheon's biological children because he knew that Robert Baratheon had no trueborn sons. This suspicion was further supported by the fact that Robert Baratheon's will named Eddard Stark as Lord Regent and Protector of the Realm, with Joffrey as his heir, but Ned Stark wrote 'my heir' instead of 'my son Joffrey'. Additionally, Ned Stark suspected that Joffrey and Tommen were Jaime Lannister's bastards, born of his incestuous union with the queen.",
       "reasoning": null,
       "citations": [
         {
@@ -1339,20 +1339,20 @@
           "page_number": 447
         },
         {
-          "chunk_id": "ddd78a89-4441-4cd8-94cf-9c2cae7c3f92",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 60\u201363",
-          "page_number": 60
-        },
-        {
           "chunk_id": "21f308c1-f3d2-48cf-b129-7cb952e17feb",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
           "section_path": "Pages 43\u201346",
           "page_number": 43
+        },
+        {
+          "chunk_id": "ddd78a89-4441-4cd8-94cf-9c2cae7c3f92",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 60\u201363",
+          "page_number": 60
         },
         {
           "chunk_id": "98e7550d-c38b-4f39-995f-0e70a11576c5",
@@ -1366,13 +1366,13 @@
       "faithfulness": 1.0,
       "answer_relevancy": 0.9,
       "factual_correctness_f1": 0.667,
-      "semantic_similarity": 0.635,
+      "semantic_similarity": 0.568,
       "answer_completeness": 0.5,
       "citation_precision": 1.0,
       "citation_recall": 1.0,
       "abstention_accuracy": 1.0,
-      "generation_latency_ms": 3970,
-      "total_latency_ms": 4999,
+      "generation_latency_ms": 10777,
+      "total_latency_ms": 16646,
       "failure_category": "Retrieval Recall Failure (Needle Missed in Top 5)"
     },
     {
@@ -1392,41 +1392,33 @@
       ],
       "is_unanswerable": false,
       "retrieved_pages": [
-        584,
         580,
         588,
+        584,
+        551,
         721,
         714,
-        551,
-        628,
-        632
+        632,
+        267
       ],
       "hit_at_1": 0.0,
       "hit_at_3": 1.0,
       "hit_at_5": 1.0,
       "hit_at_8": 1.0,
-      "mrr": 0.333,
-      "ndcg_at_5": 0.307,
-      "ndcg_at_8": 0.307,
-      "context_precision": 0.333,
+      "mrr": 0.5,
+      "ndcg_at_5": 0.387,
+      "ndcg_at_8": 0.387,
+      "context_precision": 0.5,
       "context_recall": 1.0,
-      "context_relevancy": 0.146,
-      "retrieval_latency_ms": 901,
+      "context_relevancy": 0.147,
+      "retrieval_latency_ms": 5700,
       "bm25_hit_at_5": 0.0,
       "vector_hit_at_5": 1.0,
       "hybrid_hit_at_5": 1.0,
       "reranked_hit_at_5": 1.0,
-      "generated_answer": "Based on the provided facts, Catelyn Stark negotiated with Lord Walder Frey to allow Robb's army to cross the Green Fork at the Twins. The specific terms of the agreement are not mentioned, and the exact conditions under which Lord Walder Frey agreed to allow Robb's army to cross the river are not specified.",
+      "generated_answer": "{\n  \"supported\": [\n    \"Catelyn says Freys have held the crossing for 600 years and 'never failed to exact their toll.'\",\n    \"Catelyn advises diplomacy over force.\",\n    \"Catelyn says 'That is what we must discover.'\",\n    \"Frey mentions oaths to the crown vs. Hoster Tully.\",\n    \"Frey complains about past slights (Hoster not attending weddings, rejecting marriage proposals for Edmure).\"\n  ],\n  \"missing\": [\n    \"Actual agreements made during the negotiation\",\n    \"The specific 'toll' that Walder Frey wants\"\n  ],\n  \"unanswerable\": false\n}",
       "reasoning": null,
       "citations": [
-        {
-          "chunk_id": "fba72046-1cde-46dd-84c1-636339147ab3",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 584\u2013587",
-          "page_number": 584
-        },
         {
           "chunk_id": "e9110fb8-9e22-4e8d-bc90-6170a791c796",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
@@ -1442,6 +1434,22 @@
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
           "section_path": "Pages 588\u2013592",
           "page_number": 588
+        },
+        {
+          "chunk_id": "fba72046-1cde-46dd-84c1-636339147ab3",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 584\u2013587",
+          "page_number": 584
+        },
+        {
+          "chunk_id": "e5436f63-2e6f-485e-bf30-7b41e510627c",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 551\u2013554",
+          "page_number": 551
         },
         {
           "chunk_id": "785a8616-a168-4a0e-9b78-ad892f344551",
@@ -1460,41 +1468,33 @@
           "page_number": 714
         },
         {
-          "chunk_id": "e5436f63-2e6f-485e-bf30-7b41e510627c",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 551\u2013554",
-          "page_number": 551
-        },
-        {
-          "chunk_id": "2e85715b-2c4e-48f9-a2da-6a3c4ef1470c",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 628\u2013631",
-          "page_number": 628
-        },
-        {
           "chunk_id": "32f9dad8-b1a9-42b4-819f-214d2c182276",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
           "section_path": "Pages 632\u2013635",
           "page_number": 632
+        },
+        {
+          "chunk_id": "d8763caa-f995-4e3b-8bbb-078a700edc5c",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 267\u2013270",
+          "page_number": 267
         }
       ],
       "faithfulness": 1.0,
-      "answer_relevancy": 0.85,
-      "factual_correctness_f1": 0.4,
-      "semantic_similarity": 0.55,
-      "answer_completeness": 0.25,
+      "answer_relevancy": 0.588,
+      "factual_correctness_f1": 0.0,
+      "semantic_similarity": 0.455,
+      "answer_completeness": 0.0,
       "citation_precision": 1.0,
       "citation_recall": 1.0,
       "abstention_accuracy": 1.0,
-      "generation_latency_ms": 2478,
-      "total_latency_ms": 3379,
-      "failure_category": "Low Context Precision (Noisy Chunks Ranked High)"
+      "generation_latency_ms": 21706,
+      "total_latency_ms": 27406,
+      "failure_category": "Factual Incompleteness / Missing Assertions"
     },
     {
       "id": "q13_multihop",
@@ -1518,29 +1518,33 @@
       "retrieved_pages": [
         710,
         175,
-        513,
+        593,
         193,
-        597,
-        188,
-        411,
-        255
+        517,
+        322,
+        242,
+        119,
+        575,
+        112,
+        90,
+        188
       ],
       "hit_at_1": 0.0,
-      "hit_at_3": 0.0,
-      "hit_at_5": 0.0,
-      "hit_at_8": 0.0,
-      "mrr": 0.0,
-      "ndcg_at_5": 0.0,
-      "ndcg_at_8": 0.0,
-      "context_precision": 0.0,
+      "hit_at_3": 1.0,
+      "hit_at_5": 1.0,
+      "hit_at_8": 1.0,
+      "mrr": 0.333,
+      "ndcg_at_5": 0.301,
+      "ndcg_at_8": 0.301,
+      "context_precision": 0.367,
       "context_recall": 1.0,
-      "context_relevancy": 0.082,
-      "retrieval_latency_ms": 980,
+      "context_relevancy": 0.054,
+      "retrieval_latency_ms": 7664,
       "bm25_hit_at_5": 1.0,
       "vector_hit_at_5": 0.0,
       "hybrid_hit_at_5": 0.0,
-      "reranked_hit_at_5": 0.0,
-      "generated_answer": "Based on the provided supported facts, the answer is:\n\nThere is no evidence that Jon Snow saved Lord Commander Mormont's life from a wight. Lord Commander Mormont was killed by wights beyond the Wall.",
+      "reranked_hit_at_5": 1.0,
+      "generated_answer": "Based on the provided context, there is insufficient evidence to answer how Jon Snow saved Lord Commander Mormont's life from a wight.",
       "reasoning": null,
       "citations": [
         {
@@ -1560,12 +1564,12 @@
           "page_number": 175
         },
         {
-          "chunk_id": "2545ed27-ab9a-4a0a-aec3-21a74328bcfe",
+          "chunk_id": "71dff678-d9f2-4c5f-9273-a4dca39ecaec",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 513\u2013516",
-          "page_number": 513
+          "section_path": "Pages 593\u2013596",
+          "page_number": 593
         },
         {
           "chunk_id": "c20288eb-c356-4ece-8c7d-9c5a3c965e1b",
@@ -1576,12 +1580,60 @@
           "page_number": 193
         },
         {
-          "chunk_id": "50ee3a06-8dbf-49b6-a237-f0b64db036ea",
+          "chunk_id": "bb3fc8cc-5251-4092-8a95-253a8d4d9abb",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 597\u2013600",
-          "page_number": 597
+          "section_path": "Pages 517\u2013521",
+          "page_number": 517
+        },
+        {
+          "chunk_id": "99c0e519-357d-4099-be29-a327ba025e7c",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 322\u2013326",
+          "page_number": 322
+        },
+        {
+          "chunk_id": "1feab8bd-b2eb-48ef-ae77-607f8a9d9c94",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 242\u2013245",
+          "page_number": 242
+        },
+        {
+          "chunk_id": "88b6ca7a-9f90-40f6-ab94-90135da61e87",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 119\u2013123",
+          "page_number": 119
+        },
+        {
+          "chunk_id": "d7aa07bb-44d5-441d-9f5b-06932a664f3d",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 575\u2013579",
+          "page_number": 575
+        },
+        {
+          "chunk_id": "f0254386-5e60-47b0-a9b2-985a6896987e",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 112\u2013115",
+          "page_number": 112
+        },
+        {
+          "chunk_id": "9b30e4e5-3bdd-4405-a9de-3f5f2f2b7db9",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 90\u201394",
+          "page_number": 90
         },
         {
           "chunk_id": "25ec77fe-7905-4265-8f49-0f5465203abd",
@@ -1590,35 +1642,19 @@
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
           "section_path": "Pages 188\u2013192",
           "page_number": 188
-        },
-        {
-          "chunk_id": "6be43ad0-cd6c-4a6d-8bcf-27adf28e058b",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 411\u2013415",
-          "page_number": 411
-        },
-        {
-          "chunk_id": "6a7153cc-d1f4-4ad8-85da-41db3566e54e",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 255\u2013258",
-          "page_number": 255
         }
       ],
       "faithfulness": 1.0,
       "answer_relevancy": 0.75,
       "factual_correctness_f1": 0.0,
-      "semantic_similarity": 0.47,
+      "semantic_similarity": 0.455,
       "answer_completeness": 0.0,
       "citation_precision": 1.0,
       "citation_recall": 1.0,
       "abstention_accuracy": 1.0,
-      "generation_latency_ms": 4952,
-      "total_latency_ms": 5932,
-      "failure_category": "Retrieval Recall Failure (Needle Missed in Top 5)"
+      "generation_latency_ms": 2688,
+      "total_latency_ms": 10352,
+      "failure_category": "Low Context Precision (Noisy Chunks Ranked High)"
     },
     {
       "id": "q14_multihop",
@@ -1639,49 +1675,33 @@
       ],
       "is_unanswerable": false,
       "retrieved_pages": [
-        721,
-        60,
         636,
+        721,
         229,
-        584,
         188,
-        575,
-        163
+        60,
+        23,
+        694,
+        584
       ],
-      "hit_at_1": 0.0,
+      "hit_at_1": 1.0,
       "hit_at_3": 1.0,
       "hit_at_5": 1.0,
       "hit_at_8": 1.0,
-      "mrr": 0.333,
-      "ndcg_at_5": 0.17,
-      "ndcg_at_8": 0.17,
-      "context_precision": 0.333,
+      "mrr": 1.0,
+      "ndcg_at_5": 0.339,
+      "ndcg_at_8": 0.339,
+      "context_precision": 1.0,
       "context_recall": 1.0,
-      "context_relevancy": 0.018,
-      "retrieval_latency_ms": 939,
+      "context_relevancy": 0.025,
+      "retrieval_latency_ms": 4445,
       "bm25_hit_at_5": 0.0,
       "vector_hit_at_5": 1.0,
       "hybrid_hit_at_5": 1.0,
       "reranked_hit_at_5": 1.0,
-      "generated_answer": "Based on the provided supported facts, I can only say that the outcome of the battle of the Whispering Wood is not known and the notable prisoner captured by Robb Stark is not mentioned. I do not have enough information to provide a final answer.",
+      "generated_answer": "Based on the provided facts, here's the information about Robb Stark's victory in the battle of the Whispering Wood:\n\nRobb Stark won the battle of the Whispering Wood. \n\nDuring the battle, Robb Stark's men captured a notable prisoner, Ser Jaime Lannister.",
       "reasoning": null,
       "citations": [
-        {
-          "chunk_id": "785a8616-a168-4a0e-9b78-ad892f344551",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 721\u2013724",
-          "page_number": 721
-        },
-        {
-          "chunk_id": "ddd78a89-4441-4cd8-94cf-9c2cae7c3f92",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 60\u201363",
-          "page_number": 60
-        },
         {
           "chunk_id": "f05b1a61-b184-41e5-bd93-2124ee026297",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
@@ -1689,6 +1709,14 @@
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
           "section_path": "Pages 636\u2013640",
           "page_number": 636
+        },
+        {
+          "chunk_id": "785a8616-a168-4a0e-9b78-ad892f344551",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 721\u2013724",
+          "page_number": 721
         },
         {
           "chunk_id": "aa61ff89-2e71-4b88-94ee-fd89166fa4fa",
@@ -1699,14 +1727,6 @@
           "page_number": 229
         },
         {
-          "chunk_id": "fba72046-1cde-46dd-84c1-636339147ab3",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 584\u2013587",
-          "page_number": 584
-        },
-        {
           "chunk_id": "25ec77fe-7905-4265-8f49-0f5465203abd",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
@@ -1715,33 +1735,49 @@
           "page_number": 188
         },
         {
-          "chunk_id": "d7aa07bb-44d5-441d-9f5b-06932a664f3d",
+          "chunk_id": "ddd78a89-4441-4cd8-94cf-9c2cae7c3f92",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 575\u2013579",
-          "page_number": 575
+          "section_path": "Pages 60\u201363",
+          "page_number": 60
         },
         {
-          "chunk_id": "81138642-2755-458a-8c07-88afe12cfc66",
+          "chunk_id": "fabc7ce1-452d-451b-b933-54e75c67357f",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 163\u2013167",
-          "page_number": 163
+          "section_path": "Pages 23\u201327",
+          "page_number": 23
+        },
+        {
+          "chunk_id": "71eb7e0b-ef5e-4c14-a83c-aa5c855a6101",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 694\u2013697",
+          "page_number": 694
+        },
+        {
+          "chunk_id": "fba72046-1cde-46dd-84c1-636339147ab3",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 584\u2013587",
+          "page_number": 584
         }
       ],
-      "faithfulness": 0.5,
+      "faithfulness": 1.0,
       "answer_relevancy": 0.867,
-      "factual_correctness_f1": 0.0,
-      "semantic_similarity": 0.388,
-      "answer_completeness": 0.0,
+      "factual_correctness_f1": 0.8,
+      "semantic_similarity": 0.513,
+      "answer_completeness": 0.667,
       "citation_precision": 1.0,
       "citation_recall": 1.0,
       "abstention_accuracy": 1.0,
-      "generation_latency_ms": 3331,
-      "total_latency_ms": 4270,
-      "failure_category": "Low Context Precision (Noisy Chunks Ranked High)"
+      "generation_latency_ms": 1909,
+      "total_latency_ms": 6354,
+      "failure_category": null
     },
     {
       "id": "q15_multihop",
@@ -1764,12 +1800,12 @@
       "retrieved_pages": [
         315,
         322,
-        491,
         112,
+        491,
         487,
-        205,
         318,
         296,
+        205,
         145,
         188,
         69,
@@ -1781,16 +1817,16 @@
       "hit_at_8": 1.0,
       "mrr": 1.0,
       "ndcg_at_5": 0.39,
-      "ndcg_at_8": 0.521,
-      "context_precision": 0.643,
+      "ndcg_at_8": 0.529,
+      "context_precision": 0.667,
       "context_recall": 0.5,
       "context_relevancy": 0.032,
-      "retrieval_latency_ms": 2114,
+      "retrieval_latency_ms": 4613,
       "bm25_hit_at_5": 0.0,
       "vector_hit_at_5": 0.0,
       "hybrid_hit_at_5": 0.0,
       "reranked_hit_at_5": 1.0,
-      "generated_answer": "Based on the provided facts, Arya overheard a secret conversation between two men in the Red Keep among the dragon skulls. They were discussing the king's reaction to the attempt on his son's life. \n\nOne of the men, Yoren, mentioned that some of the men he had been looking for had gone to Casterly Rock, which was closer to King's Landing than the Wall. Yoren also mentioned that Lord Tywin would have received the word about the men by now.\n\nYoren mentioned that the king's son was in danger and that the king would not take the attempt on his son's life lightly. He also stated that the king's reaction would be severe and that the wolf and lion would soon be at each other's throats.\n\nThe specific details of the attempt on the king's son's life, the names of the two men, the exact nature of the word that Lord Tywin would have received, and the identity of the men who had gone to Casterly Rock are not provided in the given facts.",
+      "generated_answer": "Arya overheard a secret conversation between two men in the Red Keep among the dragon skulls. The men were discussing the Night's Watch and the fact that the king's men had tried to kill the king's son. They mentioned that the king would not take this lightly and that war was likely to break out between the wolf and the lion.",
       "reasoning": null,
       "citations": [
         {
@@ -1810,14 +1846,6 @@
           "page_number": 322
         },
         {
-          "chunk_id": "b6580f1a-211a-4f56-ba09-d9413d639ba4",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 491\u2013493",
-          "page_number": 491
-        },
-        {
           "chunk_id": "f0254386-5e60-47b0-a9b2-985a6896987e",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
@@ -1826,20 +1854,20 @@
           "page_number": 112
         },
         {
+          "chunk_id": "b6580f1a-211a-4f56-ba09-d9413d639ba4",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 491\u2013493",
+          "page_number": 491
+        },
+        {
           "chunk_id": "3e2a7f0c-9d72-4c32-9ed3-701ef58417e2",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
           "section_path": "Pages 487\u2013490",
           "page_number": 487
-        },
-        {
-          "chunk_id": "1f164752-7c57-48bd-b32e-54cbefe7c7f5",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 205\u2013208",
-          "page_number": 205
         },
         {
           "chunk_id": "e46c764a-0b8c-4e19-bee1-1a2c4330c0d0",
@@ -1856,6 +1884,14 @@
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
           "section_path": "Pages 296\u2013300",
           "page_number": 296
+        },
+        {
+          "chunk_id": "1f164752-7c57-48bd-b32e-54cbefe7c7f5",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 205\u2013208",
+          "page_number": 205
         },
         {
           "chunk_id": "98e7550d-c38b-4f39-995f-0e70a11576c5",
@@ -1893,13 +1929,13 @@
       "faithfulness": 1.0,
       "answer_relevancy": 0.75,
       "factual_correctness_f1": 0.0,
-      "semantic_similarity": 0.449,
+      "semantic_similarity": 0.524,
       "answer_completeness": 0.0,
       "citation_precision": 1.0,
       "citation_recall": 1.0,
       "abstention_accuracy": 1.0,
-      "generation_latency_ms": 3764,
-      "total_latency_ms": 5878,
+      "generation_latency_ms": 3474,
+      "total_latency_ms": 8087,
       "failure_category": "Factual Incompleteness / Missing Assertions"
     },
     {
@@ -1918,41 +1954,33 @@
       ],
       "is_unanswerable": false,
       "retrieved_pages": [
-        47,
         462,
-        43,
+        390,
         112,
         458,
+        47,
+        483,
         188,
-        429,
-        390
+        43
       ],
       "hit_at_1": 0.0,
       "hit_at_3": 0.0,
       "hit_at_5": 0.0,
-      "hit_at_8": 0.0,
-      "mrr": 0.0,
+      "hit_at_8": 1.0,
+      "mrr": 0.167,
       "ndcg_at_5": 0.0,
-      "ndcg_at_8": 0.0,
-      "context_precision": 0.0,
+      "ndcg_at_8": 0.218,
+      "context_precision": 0.167,
       "context_recall": 1.0,
-      "context_relevancy": 0.04,
-      "retrieval_latency_ms": 1045,
+      "context_relevancy": 0.043,
+      "retrieval_latency_ms": 5868,
       "bm25_hit_at_5": 0.0,
       "vector_hit_at_5": 0.0,
       "hybrid_hit_at_5": 0.0,
       "reranked_hit_at_5": 0.0,
-      "generated_answer": "Based on the provided supported facts, I can only confirm the following:\n\nNed Stark was tasked with writing a letter to be used as Robert's will, making him Lord Regent and Protector of the Realm. However, the details of how Ned Stark was betrayed in the throne room after King Robert's death and who held a blade to his throat are not supported by the given facts.",
+      "generated_answer": "Based on the provided facts, I can only confirm the following:\n\nNed Stark was in the throne room after King Robert's death. However, the details of how he was betrayed and who held a blade to his throat are not supported by the given facts.",
       "reasoning": null,
       "citations": [
-        {
-          "chunk_id": "8a45ee7b-c7c4-4412-8073-b3fbecec7b43",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 47\u201350",
-          "page_number": 47
-        },
         {
           "chunk_id": "c782e2c9-9ec4-41fe-bd53-babd8c743dc6",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
@@ -1962,12 +1990,12 @@
           "page_number": 462
         },
         {
-          "chunk_id": "21f308c1-f3d2-48cf-b129-7cb952e17feb",
+          "chunk_id": "809c7cf6-dbc3-4b82-8317-6138e27c45d4",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 43\u201346",
-          "page_number": 43
+          "section_path": "Pages 390\u2013394",
+          "page_number": 390
         },
         {
           "chunk_id": "f0254386-5e60-47b0-a9b2-985a6896987e",
@@ -1986,6 +2014,22 @@
           "page_number": 458
         },
         {
+          "chunk_id": "8a45ee7b-c7c4-4412-8073-b3fbecec7b43",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 47\u201350",
+          "page_number": 47
+        },
+        {
+          "chunk_id": "1a4b4764-43ba-4b32-8a63-3127010cc73a",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 483\u2013486",
+          "page_number": 483
+        },
+        {
           "chunk_id": "25ec77fe-7905-4265-8f49-0f5465203abd",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
@@ -1994,32 +2038,24 @@
           "page_number": 188
         },
         {
-          "chunk_id": "b9c3554b-d446-4c25-bb0b-449a98d0a618",
+          "chunk_id": "21f308c1-f3d2-48cf-b129-7cb952e17feb",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 429\u2013433",
-          "page_number": 429
-        },
-        {
-          "chunk_id": "809c7cf6-dbc3-4b82-8317-6138e27c45d4",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 390\u2013394",
-          "page_number": 390
+          "section_path": "Pages 43\u201346",
+          "page_number": 43
         }
       ],
       "faithfulness": 1.0,
       "answer_relevancy": 1.0,
-      "factual_correctness_f1": 0.8,
-      "semantic_similarity": 0.521,
-      "answer_completeness": 0.667,
+      "factual_correctness_f1": 0.5,
+      "semantic_similarity": 0.437,
+      "answer_completeness": 0.333,
       "citation_precision": 1.0,
       "citation_recall": 1.0,
       "abstention_accuracy": 1.0,
-      "generation_latency_ms": 2215,
-      "total_latency_ms": 3260,
+      "generation_latency_ms": 2023,
+      "total_latency_ms": 7891,
       "failure_category": "Retrieval Recall Failure (Needle Missed in Top 5)"
     },
     {
@@ -2037,14 +2073,14 @@
       ],
       "is_unanswerable": false,
       "retrieved_pages": [
-        188,
         10,
+        188,
         710,
-        509,
         2,
-        478,
+        149,
+        250,
         517,
-        112
+        322
       ],
       "hit_at_1": 0.0,
       "hit_at_3": 0.0,
@@ -2054,24 +2090,16 @@
       "ndcg_at_5": 0.0,
       "ndcg_at_8": 0.0,
       "context_precision": 0.0,
-      "context_recall": 1.0,
+      "context_recall": 0.5,
       "context_relevancy": 0.011,
-      "retrieval_latency_ms": 917,
+      "retrieval_latency_ms": 4134,
       "bm25_hit_at_5": 0.0,
       "vector_hit_at_5": 0.0,
       "hybrid_hit_at_5": 0.0,
       "reranked_hit_at_5": 0.0,
-      "generated_answer": "Based on the provided context, there is insufficient evidence to answer.",
-      "reasoning": "failed_verification",
+      "generated_answer": "Based on the provided supported facts, the final answer is:\n\nA bizarre beast was discovered frozen in the snow with horn fragments embedded in its neck.",
+      "reasoning": null,
       "citations": [
-        {
-          "chunk_id": "25ec77fe-7905-4265-8f49-0f5465203abd",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 188\u2013192",
-          "page_number": 188
-        },
         {
           "chunk_id": "b938ef53-8d69-4663-8e3e-ae684ece136a",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
@@ -2079,6 +2107,14 @@
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
           "section_path": "Pages 10\u201313",
           "page_number": 10
+        },
+        {
+          "chunk_id": "25ec77fe-7905-4265-8f49-0f5465203abd",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 188\u2013192",
+          "page_number": 188
         },
         {
           "chunk_id": "316b9891-cab1-417b-820a-07f58babf019",
@@ -2089,14 +2125,6 @@
           "page_number": 710
         },
         {
-          "chunk_id": "40027227-dbf6-4d00-8afa-fa44965d90e8",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 509\u2013512",
-          "page_number": 509
-        },
-        {
           "chunk_id": "e8b2bb95-08cc-4754-b07c-7e3e462e5ad8",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
@@ -2105,12 +2133,20 @@
           "page_number": 2
         },
         {
-          "chunk_id": "0d8127d3-e91a-4e6a-b271-db8c375beceb",
+          "chunk_id": "1bf5afbb-1d44-4d15-ac87-78ca79bacf75",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 478\u2013482",
-          "page_number": 478
+          "section_path": "Pages 149\u2013154",
+          "page_number": 149
+        },
+        {
+          "chunk_id": "c24f85f4-1c42-42a0-a9b8-fdd0cdab8733",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 250\u2013254",
+          "page_number": 250
         },
         {
           "chunk_id": "bb3fc8cc-5251-4092-8a95-253a8d4d9abb",
@@ -2121,24 +2157,24 @@
           "page_number": 517
         },
         {
-          "chunk_id": "f0254386-5e60-47b0-a9b2-985a6896987e",
+          "chunk_id": "99c0e519-357d-4099-be29-a327ba025e7c",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 112\u2013115",
-          "page_number": 112
+          "section_path": "Pages 322\u2013326",
+          "page_number": 322
         }
       ],
-      "faithfulness": 0.0,
-      "answer_relevancy": 0.4,
+      "faithfulness": 1.0,
+      "answer_relevancy": 0.945,
       "factual_correctness_f1": 0.0,
-      "semantic_similarity": 0.336,
+      "semantic_similarity": 0.616,
       "answer_completeness": 0.0,
       "citation_precision": 1.0,
       "citation_recall": 1.0,
-      "abstention_accuracy": 0.0,
-      "generation_latency_ms": 1186,
-      "total_latency_ms": 2103,
+      "abstention_accuracy": 1.0,
+      "generation_latency_ms": 1360,
+      "total_latency_ms": 5494,
       "failure_category": "Retrieval Recall Failure (Needle Missed in Top 5)"
     },
     {
@@ -2157,13 +2193,13 @@
       "is_unanswerable": false,
       "retrieved_pages": [
         487,
+        593,
         163,
+        292,
         60,
         188,
         10,
-        255,
-        322,
-        593
+        255
       ],
       "hit_at_1": 0.0,
       "hit_at_3": 0.0,
@@ -2174,13 +2210,13 @@
       "ndcg_at_8": 0.0,
       "context_precision": 0.0,
       "context_recall": 1.0,
-      "context_relevancy": 0.018,
-      "retrieval_latency_ms": 907,
+      "context_relevancy": 0.021,
+      "retrieval_latency_ms": 4047,
       "bm25_hit_at_5": 0.0,
       "vector_hit_at_5": 1.0,
       "hybrid_hit_at_5": 1.0,
       "reranked_hit_at_5": 0.0,
-      "generated_answer": "The final answer is: A wooden sword.",
+      "generated_answer": "Based on the supported facts, the final answer is:\n\nThe Braavosi instructor, Syrio Forel, gave Arya a needle to practice her footwork and balance.",
       "reasoning": null,
       "citations": [
         {
@@ -2192,12 +2228,28 @@
           "page_number": 487
         },
         {
+          "chunk_id": "71dff678-d9f2-4c5f-9273-a4dca39ecaec",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 593\u2013596",
+          "page_number": 593
+        },
+        {
           "chunk_id": "81138642-2755-458a-8c07-88afe12cfc66",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
           "section_path": "Pages 163\u2013167",
           "page_number": 163
+        },
+        {
+          "chunk_id": "e813d4ff-a784-4201-9542-69d9a09a7d54",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 292\u2013295",
+          "page_number": 292
         },
         {
           "chunk_id": "ddd78a89-4441-4cd8-94cf-9c2cae7c3f92",
@@ -2230,34 +2282,18 @@
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
           "section_path": "Pages 255\u2013258",
           "page_number": 255
-        },
-        {
-          "chunk_id": "99c0e519-357d-4099-be29-a327ba025e7c",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 322\u2013326",
-          "page_number": 322
-        },
-        {
-          "chunk_id": "71dff678-d9f2-4c5f-9273-a4dca39ecaec",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 593\u2013596",
-          "page_number": 593
         }
       ],
       "faithfulness": 1.0,
-      "answer_relevancy": 0.4,
-      "factual_correctness_f1": 0.667,
-      "semantic_similarity": 0.432,
-      "answer_completeness": 0.5,
+      "answer_relevancy": 0.673,
+      "factual_correctness_f1": 0.0,
+      "semantic_similarity": 0.614,
+      "answer_completeness": 0.0,
       "citation_precision": 1.0,
       "citation_recall": 1.0,
       "abstention_accuracy": 1.0,
-      "generation_latency_ms": 1737,
-      "total_latency_ms": 2644,
+      "generation_latency_ms": 2204,
+      "total_latency_ms": 6251,
       "failure_category": "Retrieval Recall Failure (Needle Missed in Top 5)"
     },
     {
@@ -2275,49 +2311,33 @@
       ],
       "is_unanswerable": false,
       "retrieved_pages": [
-        517,
-        710,
         128,
         255,
-        478,
-        51,
         163,
-        184
+        491,
+        513,
+        349,
+        184,
+        710
       ],
       "hit_at_1": 0.0,
       "hit_at_3": 0.0,
       "hit_at_5": 0.0,
-      "hit_at_8": 0.0,
-      "mrr": 0.0,
+      "hit_at_8": 1.0,
+      "mrr": 0.167,
       "ndcg_at_5": 0.0,
-      "ndcg_at_8": 0.0,
-      "context_precision": 0.0,
+      "ndcg_at_8": 0.218,
+      "context_precision": 0.167,
       "context_recall": 1.0,
-      "context_relevancy": 0.005,
-      "retrieval_latency_ms": 1632,
+      "context_relevancy": 0.013,
+      "retrieval_latency_ms": 7123,
       "bm25_hit_at_5": 0.0,
       "vector_hit_at_5": 0.0,
       "hybrid_hit_at_5": 0.0,
       "reranked_hit_at_5": 0.0,
-      "generated_answer": "Based on the provided facts, the final answer is:\n\nThe master of Winterfell's household guard was slain in the capital during the rainy street ambush. The guard was sprawled bonelessly across the narrow steps, with his head twisted completely around. The guard's arm and hand were on the floor, with black fingers wriggling in a pool of moonlight. The corpse lurched forward, with no blood visible, and seemed to feel nothing. The guard was later killed again by Jon, who hacked at the corpse's neck and then used burning drapes to attack the wight.",
+      "generated_answer": "Based on the provided facts, the final answer is:\n\nThe master of Winterfell's household guard was slain in the capital during the rainy street ambush by the same person who threw Bran from the tower. This person was not a man of Winterfell, and had been hiding in the castle's stables. They had a Valyrian steel dagger with a dragonbone hilt, which was given to them. The dagger was found with ninety silver stags in a leather bag buried beneath the straw.",
       "reasoning": null,
       "citations": [
-        {
-          "chunk_id": "bb3fc8cc-5251-4092-8a95-253a8d4d9abb",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 517\u2013521",
-          "page_number": 517
-        },
-        {
-          "chunk_id": "316b9891-cab1-417b-820a-07f58babf019",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 710\u2013713",
-          "page_number": 710
-        },
         {
           "chunk_id": "b7fa462b-8b03-4ddf-8ccf-d3eee3f39c54",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
@@ -2335,22 +2355,6 @@
           "page_number": 255
         },
         {
-          "chunk_id": "0d8127d3-e91a-4e6a-b271-db8c375beceb",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 478\u2013482",
-          "page_number": 478
-        },
-        {
-          "chunk_id": "3f1098ee-b5f2-4bb4-a517-5a1ccd5b1680",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 51\u201354",
-          "page_number": 51
-        },
-        {
           "chunk_id": "81138642-2755-458a-8c07-88afe12cfc66",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
@@ -2359,24 +2363,56 @@
           "page_number": 163
         },
         {
+          "chunk_id": "b6580f1a-211a-4f56-ba09-d9413d639ba4",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 491\u2013493",
+          "page_number": 491
+        },
+        {
+          "chunk_id": "2545ed27-ab9a-4a0a-aec3-21a74328bcfe",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 513\u2013516",
+          "page_number": 513
+        },
+        {
+          "chunk_id": "c79caa33-fba0-4fcb-b1c5-a15d0851ce52",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 349\u2013352",
+          "page_number": 349
+        },
+        {
           "chunk_id": "6fb38e07-ef63-43f5-b989-c5d88a1daa60",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
           "section_path": "Pages 184\u2013187",
           "page_number": 184
+        },
+        {
+          "chunk_id": "316b9891-cab1-417b-820a-07f58babf019",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 710\u2013713",
+          "page_number": 710
         }
       ],
-      "faithfulness": 0.8,
+      "faithfulness": 1.0,
       "answer_relevancy": 1.0,
-      "factual_correctness_f1": 0.615,
-      "semantic_similarity": 0.478,
+      "factual_correctness_f1": 0.667,
+      "semantic_similarity": 0.426,
       "answer_completeness": 0.5,
       "citation_precision": 1.0,
       "citation_recall": 1.0,
       "abstention_accuracy": 1.0,
-      "generation_latency_ms": 4201,
-      "total_latency_ms": 5833,
+      "generation_latency_ms": 2370,
+      "total_latency_ms": 9493,
       "failure_category": "Retrieval Recall Failure (Needle Missed in Top 5)"
     },
     {
@@ -2397,33 +2433,33 @@
       "retrieved_pages": [
         575,
         255,
-        51,
         112,
-        458,
-        462,
-        296,
+        51,
         454,
-        681,
-        47,
-        10,
-        584
+        462,
+        710,
+        155,
+        571,
+        296,
+        390,
+        292
       ],
       "hit_at_1": 1.0,
       "hit_at_3": 1.0,
       "hit_at_5": 1.0,
       "hit_at_8": 1.0,
       "mrr": 1.0,
-      "ndcg_at_5": 0.651,
-      "ndcg_at_8": 0.818,
-      "context_precision": 0.633,
+      "ndcg_at_5": 0.469,
+      "ndcg_at_8": 0.636,
+      "context_precision": 0.667,
       "context_recall": 0.5,
-      "context_relevancy": 0.016,
-      "retrieval_latency_ms": 1344,
+      "context_relevancy": 0.017,
+      "retrieval_latency_ms": 8830,
       "bm25_hit_at_5": 0.0,
       "vector_hit_at_5": 1.0,
       "hybrid_hit_at_5": 1.0,
       "reranked_hit_at_5": 1.0,
-      "generated_answer": "Based on the provided facts, the beverage that was served to the dying monarch during his hunt that dulled his senses before the wild pig struck is wine.",
+      "generated_answer": "Based on the provided facts, the final answer is:\n\nThe beverage served to the dying monarch during his hunt that dulled his senses before the wild pig struck was the king's wine.",
       "reasoning": null,
       "citations": [
         {
@@ -2443,14 +2479,6 @@
           "page_number": 255
         },
         {
-          "chunk_id": "3f1098ee-b5f2-4bb4-a517-5a1ccd5b1680",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 51\u201354",
-          "page_number": 51
-        },
-        {
           "chunk_id": "f0254386-5e60-47b0-a9b2-985a6896987e",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
@@ -2459,28 +2487,12 @@
           "page_number": 112
         },
         {
-          "chunk_id": "7da90a35-63e3-4070-a36e-04953aa4b45d",
+          "chunk_id": "3f1098ee-b5f2-4bb4-a517-5a1ccd5b1680",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 458\u2013461",
-          "page_number": 458
-        },
-        {
-          "chunk_id": "c782e2c9-9ec4-41fe-bd53-babd8c743dc6",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 462\u2013465",
-          "page_number": 462
-        },
-        {
-          "chunk_id": "b6a1701d-423e-4658-aae5-9fdc923aff75",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 296\u2013300",
-          "page_number": 296
+          "section_path": "Pages 51\u201354",
+          "page_number": 51
         },
         {
           "chunk_id": "eef8055b-700d-4931-a0f4-cd84d6ed76bc",
@@ -2491,48 +2503,72 @@
           "page_number": 454
         },
         {
-          "chunk_id": "403bae28-5a92-40a9-9860-f12eab605b14",
+          "chunk_id": "c782e2c9-9ec4-41fe-bd53-babd8c743dc6",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 681\u2013685",
-          "page_number": 681
+          "section_path": "Pages 462\u2013465",
+          "page_number": 462
         },
         {
-          "chunk_id": "8a45ee7b-c7c4-4412-8073-b3fbecec7b43",
+          "chunk_id": "316b9891-cab1-417b-820a-07f58babf019",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 47\u201350",
-          "page_number": 47
+          "section_path": "Pages 710\u2013713",
+          "page_number": 710
         },
         {
-          "chunk_id": "b938ef53-8d69-4663-8e3e-ae684ece136a",
+          "chunk_id": "65da804b-e333-42d6-97c8-6299972b5790",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 10\u201313",
-          "page_number": 10
+          "section_path": "Pages 155\u2013158",
+          "page_number": 155
         },
         {
-          "chunk_id": "fba72046-1cde-46dd-84c1-636339147ab3",
+          "chunk_id": "1e6e42d5-729b-4190-aef1-037867e92a87",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 584\u2013587",
-          "page_number": 584
+          "section_path": "Pages 571\u2013574",
+          "page_number": 571
+        },
+        {
+          "chunk_id": "b6a1701d-423e-4658-aae5-9fdc923aff75",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 296\u2013300",
+          "page_number": 296
+        },
+        {
+          "chunk_id": "809c7cf6-dbc3-4b82-8317-6138e27c45d4",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 390\u2013394",
+          "page_number": 390
+        },
+        {
+          "chunk_id": "e813d4ff-a784-4201-9542-69d9a09a7d54",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 292\u2013295",
+          "page_number": 292
         }
       ],
       "faithfulness": 1.0,
       "answer_relevancy": 0.954,
       "factual_correctness_f1": 0.667,
-      "semantic_similarity": 0.491,
+      "semantic_similarity": 0.493,
       "answer_completeness": 0.5,
       "citation_precision": 1.0,
       "citation_recall": 1.0,
       "abstention_accuracy": 1.0,
-      "generation_latency_ms": 3377,
-      "total_latency_ms": 4721,
+      "generation_latency_ms": 1633,
+      "total_latency_ms": 10463,
       "failure_category": null
     },
     {
@@ -2549,14 +2585,14 @@
       ],
       "is_unanswerable": false,
       "retrieved_pages": [
-        462,
         555,
         429,
         43,
-        584,
+        462,
         718,
-        322,
-        567
+        567,
+        710,
+        584
       ],
       "hit_at_1": 0.0,
       "hit_at_3": 0.0,
@@ -2568,22 +2604,14 @@
       "context_precision": 0.0,
       "context_recall": 1.0,
       "context_relevancy": 0.007,
-      "retrieval_latency_ms": 821,
+      "retrieval_latency_ms": 4502,
       "bm25_hit_at_5": 0.0,
       "vector_hit_at_5": 0.0,
       "hybrid_hit_at_5": 0.0,
       "reranked_hit_at_5": 0.0,
-      "generated_answer": "The final answer is: The title was proclaimed for the young Stark leader by his assembled bannermen at the war council in Riverrun is missing from the evidence.",
+      "generated_answer": "Based on the provided context, there is insufficient evidence to answer the question about what title was proclaimed for the young Stark leader by his assembled bannermen at the war council in Riverrun.",
       "reasoning": null,
       "citations": [
-        {
-          "chunk_id": "c782e2c9-9ec4-41fe-bd53-babd8c743dc6",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 462\u2013465",
-          "page_number": 462
-        },
         {
           "chunk_id": "16e5f9c9-6f1e-4354-902c-2d44a69753a2",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
@@ -2609,12 +2637,12 @@
           "page_number": 43
         },
         {
-          "chunk_id": "fba72046-1cde-46dd-84c1-636339147ab3",
+          "chunk_id": "c782e2c9-9ec4-41fe-bd53-babd8c743dc6",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 584\u2013587",
-          "page_number": 584
+          "section_path": "Pages 462\u2013465",
+          "page_number": 462
         },
         {
           "chunk_id": "18b777f5-24e1-4e33-8e56-99d11fbeb1c9",
@@ -2625,32 +2653,40 @@
           "page_number": 718
         },
         {
-          "chunk_id": "99c0e519-357d-4099-be29-a327ba025e7c",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 322\u2013326",
-          "page_number": 322
-        },
-        {
           "chunk_id": "3de91747-555a-4081-959d-89c6e9997436",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
           "section_path": "Pages 567\u2013570",
           "page_number": 567
+        },
+        {
+          "chunk_id": "316b9891-cab1-417b-820a-07f58babf019",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 710\u2013713",
+          "page_number": 710
+        },
+        {
+          "chunk_id": "fba72046-1cde-46dd-84c1-636339147ab3",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 584\u2013587",
+          "page_number": 584
         }
       ],
       "faithfulness": 1.0,
-      "answer_relevancy": 0.94,
+      "answer_relevancy": 1.0,
       "factual_correctness_f1": 0.667,
-      "semantic_similarity": 0.54,
+      "semantic_similarity": 0.528,
       "answer_completeness": 0.5,
       "citation_precision": 1.0,
       "citation_recall": 1.0,
       "abstention_accuracy": 1.0,
-      "generation_latency_ms": 2252,
-      "total_latency_ms": 3073,
+      "generation_latency_ms": 1180,
+      "total_latency_ms": 5682,
       "failure_category": "Retrieval Recall Failure (Needle Missed in Top 5)"
     },
     {
@@ -2670,16 +2706,16 @@
       "retrieved_pages": [
         315,
         681,
-        318,
+        112,
         420,
-        43,
-        353,
-        128,
+        318,
+        491,
         710,
-        575,
         10,
-        40,
-        112
+        645,
+        425,
+        705,
+        714
       ],
       "hit_at_1": 0.0,
       "hit_at_3": 0.0,
@@ -2689,14 +2725,14 @@
       "ndcg_at_5": 0.0,
       "ndcg_at_8": 0.0,
       "context_precision": 0.0,
-      "context_recall": 0.5,
-      "context_relevancy": 0.007,
-      "retrieval_latency_ms": 2308,
+      "context_recall": 1.0,
+      "context_relevancy": 0.01,
+      "retrieval_latency_ms": 4480,
       "bm25_hit_at_5": 0.0,
       "vector_hit_at_5": 0.0,
       "hybrid_hit_at_5": 0.0,
       "reranked_hit_at_5": 0.0,
-      "generated_answer": "The final answer is: \nThere is no information available about the creature that hatched from the stone relics amidst the funeral pyre at the edge of the red wasteland, as the name of the creature, description of the stone relics, location of the funeral pyre, and the red wasteland are not provided.",
+      "generated_answer": "Based on the provided supported fact, the answer is:\n\nArya hatched from the stone relics amidst the funeral pyre at the edge of the red wasteland.\n\nHowever, since the question asks for the creature that hatched, and the supported fact only mentions Arya, the final answer would be:\n\nArya.",
       "reasoning": null,
       "citations": [
         {
@@ -2716,12 +2752,12 @@
           "page_number": 681
         },
         {
-          "chunk_id": "e46c764a-0b8c-4e19-bee1-1a2c4330c0d0",
+          "chunk_id": "f0254386-5e60-47b0-a9b2-985a6896987e",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 318\u2013321",
-          "page_number": 318
+          "section_path": "Pages 112\u2013115",
+          "page_number": 112
         },
         {
           "chunk_id": "fd248708-ffd4-442f-aa87-d589dad3f586",
@@ -2732,28 +2768,20 @@
           "page_number": 420
         },
         {
-          "chunk_id": "21f308c1-f3d2-48cf-b129-7cb952e17feb",
+          "chunk_id": "e46c764a-0b8c-4e19-bee1-1a2c4330c0d0",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 43\u201346",
-          "page_number": 43
+          "section_path": "Pages 318\u2013321",
+          "page_number": 318
         },
         {
-          "chunk_id": "9f47d1c9-b533-40f7-83eb-31679ce0df35",
+          "chunk_id": "b6580f1a-211a-4f56-ba09-d9413d639ba4",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 353\u2013356",
-          "page_number": 353
-        },
-        {
-          "chunk_id": "b7fa462b-8b03-4ddf-8ccf-d3eee3f39c54",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 128\u2013132",
-          "page_number": 128
+          "section_path": "Pages 491\u2013493",
+          "page_number": 491
         },
         {
           "chunk_id": "316b9891-cab1-417b-820a-07f58babf019",
@@ -2764,14 +2792,6 @@
           "page_number": 710
         },
         {
-          "chunk_id": "d7aa07bb-44d5-441d-9f5b-06932a664f3d",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 575\u2013579",
-          "page_number": 575
-        },
-        {
           "chunk_id": "b938ef53-8d69-4663-8e3e-ae684ece136a",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
@@ -2780,32 +2800,48 @@
           "page_number": 10
         },
         {
-          "chunk_id": "39cb3034-23f3-420b-96ba-e739f868f450",
+          "chunk_id": "880c20b2-d339-48c2-ac65-9f33e3d43d76",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 40\u201342",
-          "page_number": 40
+          "section_path": "Pages 645\u2013649",
+          "page_number": 645
         },
         {
-          "chunk_id": "f0254386-5e60-47b0-a9b2-985a6896987e",
+          "chunk_id": "88bf32e2-6186-4125-89ad-22114312cdcf",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 112\u2013115",
-          "page_number": 112
+          "section_path": "Pages 425\u2013428",
+          "page_number": 425
+        },
+        {
+          "chunk_id": "4609b643-bf09-4f86-8e8f-a2194d1517f5",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 705\u2013709",
+          "page_number": 705
+        },
+        {
+          "chunk_id": "fcf1ce7b-4e97-4f82-a63a-787ec9deb6f3",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 714\u2013717",
+          "page_number": 714
         }
       ],
-      "faithfulness": 0.0,
+      "faithfulness": 1.0,
       "answer_relevancy": 0.945,
-      "factual_correctness_f1": 0.0,
-      "semantic_similarity": 0.501,
+      "factual_correctness_f1": 0.667,
+      "semantic_similarity": 0.511,
       "answer_completeness": 0.5,
       "citation_precision": 1.0,
       "citation_recall": 1.0,
       "abstention_accuracy": 1.0,
-      "generation_latency_ms": 1283,
-      "total_latency_ms": 3591,
+      "generation_latency_ms": 1187,
+      "total_latency_ms": 5667,
       "failure_category": "Retrieval Recall Failure (Needle Missed in Top 5)"
     },
     {
@@ -2827,12 +2863,12 @@
       "is_unanswerable": false,
       "retrieved_pages": [
         112,
-        285,
-        217,
-        267,
-        322,
         184,
+        217,
         438,
+        267,
+        47,
+        285,
         296
       ],
       "hit_at_1": 0.0,
@@ -2844,13 +2880,13 @@
       "ndcg_at_8": 0.0,
       "context_precision": 0.0,
       "context_recall": 1.0,
-      "context_relevancy": 0.024,
-      "retrieval_latency_ms": 1907,
+      "context_relevancy": 0.022,
+      "retrieval_latency_ms": 26066,
       "bm25_hit_at_5": 0.0,
       "vector_hit_at_5": 0.0,
       "hybrid_hit_at_5": 0.0,
       "reranked_hit_at_5": 0.0,
-      "generated_answer": "Based on the provided facts, I can answer the question as follows:\n\nThe tournament took place in King's Landing. \nThe champion's purse was won by Jaime Lannister. \nThe controversy regarding the horse was that Jaime Lannister wore a helm fashioned in the shape of a lion's head.",
+      "generated_answer": "Based on the provided facts, here's the answer:\n\nThe tournament took place in King's Landing. Jaime Lannister won the champion's purse. The controversy regarding the horse was that Jaime Lannister sat on the Iron Throne, which was considered a treacherous act.",
       "reasoning": null,
       "citations": [
         {
@@ -2862,12 +2898,12 @@
           "page_number": 112
         },
         {
-          "chunk_id": "af9cc6f9-90f4-484e-a0ef-c8ed6d82bfe3",
+          "chunk_id": "6fb38e07-ef63-43f5-b989-c5d88a1daa60",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 285\u2013288",
-          "page_number": 285
+          "section_path": "Pages 184\u2013187",
+          "page_number": 184
         },
         {
           "chunk_id": "1491aa11-c891-4979-83ef-8336ef7a7986",
@@ -2878,6 +2914,14 @@
           "page_number": 217
         },
         {
+          "chunk_id": "1e7d0137-6dc6-4283-aba3-f792d88cbfd3",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 438\u2013442",
+          "page_number": 438
+        },
+        {
           "chunk_id": "d8763caa-f995-4e3b-8bbb-078a700edc5c",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
@@ -2886,28 +2930,20 @@
           "page_number": 267
         },
         {
-          "chunk_id": "99c0e519-357d-4099-be29-a327ba025e7c",
+          "chunk_id": "8a45ee7b-c7c4-4412-8073-b3fbecec7b43",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 322\u2013326",
-          "page_number": 322
+          "section_path": "Pages 47\u201350",
+          "page_number": 47
         },
         {
-          "chunk_id": "6fb38e07-ef63-43f5-b989-c5d88a1daa60",
+          "chunk_id": "af9cc6f9-90f4-484e-a0ef-c8ed6d82bfe3",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 184\u2013187",
-          "page_number": 184
-        },
-        {
-          "chunk_id": "1e7d0137-6dc6-4283-aba3-f792d88cbfd3",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 438\u2013442",
-          "page_number": 438
+          "section_path": "Pages 285\u2013288",
+          "page_number": 285
         },
         {
           "chunk_id": "b6a1701d-423e-4658-aae5-9fdc923aff75",
@@ -2919,15 +2955,15 @@
         }
       ],
       "faithfulness": 1.0,
-      "answer_relevancy": 0.9,
+      "answer_relevancy": 0.95,
       "factual_correctness_f1": 0.0,
-      "semantic_similarity": 0.541,
+      "semantic_similarity": 0.549,
       "answer_completeness": 0.0,
       "citation_precision": 1.0,
       "citation_recall": 1.0,
       "abstention_accuracy": 1.0,
-      "generation_latency_ms": 6226,
-      "total_latency_ms": 8133,
+      "generation_latency_ms": 1833,
+      "total_latency_ms": 27899,
       "failure_category": "Retrieval Recall Failure (Needle Missed in Top 5)"
     },
     {
@@ -2951,29 +2987,29 @@
       "retrieved_pages": [
         462,
         665,
-        47,
-        322,
-        23,
+        735,
         55,
-        188,
-        429
+        322,
+        47,
+        23,
+        188
       ],
       "hit_at_1": 0.0,
       "hit_at_3": 1.0,
       "hit_at_5": 1.0,
       "hit_at_8": 1.0,
       "mrr": 0.5,
-      "ndcg_at_5": 0.296,
-      "ndcg_at_8": 0.296,
-      "context_precision": 0.5,
+      "ndcg_at_5": 0.531,
+      "ndcg_at_8": 0.531,
+      "context_precision": 0.583,
       "context_recall": 1.0,
-      "context_relevancy": 0.013,
-      "retrieval_latency_ms": 1690,
+      "context_relevancy": 0.017,
+      "retrieval_latency_ms": 6679,
       "bm25_hit_at_5": 1.0,
       "vector_hit_at_5": 0.0,
       "hybrid_hit_at_5": 0.0,
       "reranked_hit_at_5": 1.0,
-      "generated_answer": "Based on the provided supported facts, Brandon Stark was a member of House Stark and held the following titles:\n\n1. King in the North\n2. Brandon the Shipwright\n3. The 'Hungry Wolf'\n\nHe was also a member of the Stark family that ruled the North for thousands of years.",
+      "generated_answer": "Based on the supported facts, Brandon Stark was a member of House Stark and a King in the North. He was also a Brandon, specifically referred to as Brandon the Shipwright, and a member of the Stark family who loved the sea.",
       "reasoning": null,
       "citations": [
         {
@@ -2993,28 +3029,12 @@
           "page_number": 665
         },
         {
-          "chunk_id": "8a45ee7b-c7c4-4412-8073-b3fbecec7b43",
+          "chunk_id": "183a52d2-e90b-402a-806f-78233edb88d6",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 47\u201350",
-          "page_number": 47
-        },
-        {
-          "chunk_id": "99c0e519-357d-4099-be29-a327ba025e7c",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 322\u2013326",
-          "page_number": 322
-        },
-        {
-          "chunk_id": "fabc7ce1-452d-451b-b933-54e75c67357f",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 23\u201327",
-          "page_number": 23
+          "section_path": "Pages 735\u2013747",
+          "page_number": 735
         },
         {
           "chunk_id": "8b2a8834-c527-41e6-902c-e95a569dfb1c",
@@ -3025,32 +3045,48 @@
           "page_number": 55
         },
         {
+          "chunk_id": "99c0e519-357d-4099-be29-a327ba025e7c",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 322\u2013326",
+          "page_number": 322
+        },
+        {
+          "chunk_id": "8a45ee7b-c7c4-4412-8073-b3fbecec7b43",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 47\u201350",
+          "page_number": 47
+        },
+        {
+          "chunk_id": "fabc7ce1-452d-451b-b933-54e75c67357f",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 23\u201327",
+          "page_number": 23
+        },
+        {
           "chunk_id": "25ec77fe-7905-4265-8f49-0f5465203abd",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
           "section_path": "Pages 188\u2013192",
           "page_number": 188
-        },
-        {
-          "chunk_id": "b9c3554b-d446-4c25-bb0b-449a98d0a618",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 429\u2013433",
-          "page_number": 429
         }
       ],
       "faithfulness": 1.0,
       "answer_relevancy": 0.657,
       "factual_correctness_f1": 0.889,
-      "semantic_similarity": 0.49,
+      "semantic_similarity": 0.501,
       "answer_completeness": 0.8,
       "citation_precision": 1.0,
       "citation_recall": 1.0,
       "abstention_accuracy": 1.0,
-      "generation_latency_ms": 6180,
-      "total_latency_ms": 7870,
+      "generation_latency_ms": 5751,
+      "total_latency_ms": 12430,
       "failure_category": null
     },
     {
@@ -3071,28 +3107,28 @@
         137,
         278,
         673,
-        281,
         85,
+        281,
         145,
         567,
-        429
+        40
       ],
       "hit_at_1": 0.0,
       "hit_at_3": 0.0,
       "hit_at_5": 1.0,
       "hit_at_8": 1.0,
-      "mrr": 0.25,
-      "ndcg_at_5": 0.431,
-      "ndcg_at_8": 0.431,
-      "context_precision": 0.25,
+      "mrr": 0.2,
+      "ndcg_at_5": 0.387,
+      "ndcg_at_8": 0.387,
+      "context_precision": 0.2,
       "context_recall": 1.0,
-      "context_relevancy": 0.041,
-      "retrieval_latency_ms": 1326,
+      "context_relevancy": 0.038,
+      "retrieval_latency_ms": 8111,
       "bm25_hit_at_5": 0.0,
       "vector_hit_at_5": 0.0,
       "hybrid_hit_at_5": 0.0,
       "reranked_hit_at_5": 1.0,
-      "generated_answer": "Based on the provided supported facts, Sandor Clegane acquired the horrific facial burns on the left side of his head as a result of a punishment, which involved fire.",
+      "generated_answer": "Based on the supported facts, Sandor Clegane acquired the horrific facial burns on the left side of his head through a childhood incident involving fire, which was inflicted by his brother, Gregor Clegane.",
       "reasoning": null,
       "citations": [
         {
@@ -3120,20 +3156,20 @@
           "page_number": 673
         },
         {
-          "chunk_id": "8e492e2e-1e9d-4f95-9f4e-43a10e38caf9",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 281\u2013284",
-          "page_number": 281
-        },
-        {
           "chunk_id": "5d296640-6d9f-42af-9484-f69c48f167f3",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
           "section_path": "Pages 85\u201389",
           "page_number": 85
+        },
+        {
+          "chunk_id": "8e492e2e-1e9d-4f95-9f4e-43a10e38caf9",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 281\u2013284",
+          "page_number": 281
         },
         {
           "chunk_id": "98e7550d-c38b-4f39-995f-0e70a11576c5",
@@ -3152,24 +3188,24 @@
           "page_number": 567
         },
         {
-          "chunk_id": "b9c3554b-d446-4c25-bb0b-449a98d0a618",
+          "chunk_id": "39cb3034-23f3-420b-96ba-e739f868f450",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 429\u2013433",
-          "page_number": 429
+          "section_path": "Pages 40\u201342",
+          "page_number": 40
         }
       ],
       "faithfulness": 0.0,
       "answer_relevancy": 0.933,
       "factual_correctness_f1": 0.0,
-      "semantic_similarity": 0.481,
+      "semantic_similarity": 0.563,
       "answer_completeness": 0.0,
       "citation_precision": 1.0,
       "citation_recall": 1.0,
       "abstention_accuracy": 1.0,
-      "generation_latency_ms": 5926,
-      "total_latency_ms": 7252,
+      "generation_latency_ms": 1952,
+      "total_latency_ms": 10063,
       "failure_category": "Low Context Precision (Noisy Chunks Ranked High)"
     },
     {
@@ -3207,12 +3243,12 @@
       "context_precision": 1.0,
       "context_recall": 1.0,
       "context_relevancy": 0.025,
-      "retrieval_latency_ms": 993,
+      "retrieval_latency_ms": 20520,
       "bm25_hit_at_5": 1.0,
       "vector_hit_at_5": 1.0,
       "hybrid_hit_at_5": 1.0,
       "reranked_hit_at_5": 1.0,
-      "generated_answer": "Based on the provided facts, the background of the black gatehouse fortress of Moat Cailin is that it is a formidable structure with multiple towers and a moat filled with lizard-lions. The bogs surrounding Moat Cailin are treacherous and home to various dangers, including quicksands, suckholes, and snakes.\n\nMoat Cailin is considered a deathtrap due to its strategic location and defenses. The three surviving towers command the causeway from all sides, making it difficult for attackers to approach. The bogs and moat filled with lizard-lions add to the fortress's deadly reputation. The slimy walls covered in moss may also contribute to the fortress's hazardous environment.\n\nThe towers of Moat Cailin are adorned with the Karstark sunburst, the Greatjon's giant in shattered chains, and the Stark banner, indicating the presence of the Stark army. Robb Stark has made the Gatehouse Tower his seat, and Ser Rodrik has been appointed as the castellan to hold Winterfell until their return.",
+      "generated_answer": "Based on the provided facts, the background of the black gatehouse fortress of Moat Cailin is that it is a formidable and intimidating structure. The three surviving towers of Moat Cailin command the causeway from all sides, making it a strategic location. The bogs around Moat Cailin are treacherous, filled with quicksands, snakes, and lizard-lions, making it difficult for anyone to approach the fortress.\n\nThe walls of Moat Cailin are slimy with moss, which could make it difficult for attackers to climb. Additionally, the exposed walls make it vulnerable to fire from archers in the other towers. This combination of factors makes Moat Cailin a deathtrap, as it is a challenging and potentially deadly location to attack.\n\nIt is also said that ghosts and cold vengeful spirits of the north haunt Moat Cailin at night, adding to its ominous and intimidating reputation.",
       "reasoning": null,
       "citations": [
         {
@@ -3280,16 +3316,16 @@
           "page_number": 584
         }
       ],
-      "faithfulness": 0.875,
-      "answer_relevancy": 0.933,
-      "factual_correctness_f1": 0.933,
-      "semantic_similarity": 0.616,
+      "faithfulness": 0.714,
+      "answer_relevancy": 0.867,
+      "factual_correctness_f1": 0.833,
+      "semantic_similarity": 0.693,
       "answer_completeness": 1.0,
       "citation_precision": 1.0,
       "citation_recall": 1.0,
       "abstention_accuracy": 1.0,
-      "generation_latency_ms": 18969,
-      "total_latency_ms": 19962,
+      "generation_latency_ms": 3366,
+      "total_latency_ms": 23886,
       "failure_category": null
     },
     {
@@ -3312,30 +3348,30 @@
       "is_unanswerable": false,
       "retrieved_pages": [
         645,
-        686,
+        609,
         725,
-        641,
-        636,
+        686,
         613,
+        641,
         690,
-        729
+        636
       ],
       "hit_at_1": 1.0,
       "hit_at_3": 1.0,
       "hit_at_5": 1.0,
       "hit_at_8": 1.0,
       "mrr": 1.0,
-      "ndcg_at_5": 0.553,
-      "ndcg_at_8": 0.666,
-      "context_precision": 0.81,
+      "ndcg_at_5": 0.699,
+      "ndcg_at_8": 0.812,
+      "context_precision": 0.83,
       "context_recall": 0.667,
-      "context_relevancy": 0.085,
-      "retrieval_latency_ms": 2023,
+      "context_relevancy": 0.097,
+      "retrieval_latency_ms": 43989,
       "bm25_hit_at_5": 1.0,
       "vector_hit_at_5": 1.0,
       "hybrid_hit_at_5": 1.0,
       "reranked_hit_at_5": 1.0,
-      "generated_answer": "Based on the supported facts, the role of Mirri Maz Duur was to use bloodmagic to try and save Khal Drogo's life. The bloodmagic involved using the blood of a stallion to transfer its strength to Drogo. However, the ritual ultimately failed to save his life, and his condition worsened after the ritual. \n\nThe healing result of Mirri Maz Duur's bloodmagic resulted in Khal Drogo's vegetative state and Rhaego's death.",
+      "generated_answer": "{\n  \"supported\": [\n    \"Mirri Maz Duur is a maegi (bloodmage/healer)\",\n    \"She learned bloodmagic in Asshai from a bloodmage from the Shadow Lands\",\n    \"She is a healer/godswife who performs a spell to save Drogo\",\n    \"She states: 'Only a maegi can save your rider now.'\",\n    \"She performs a bloodmagic ritual: 'This is bloodmagic, lady. Only death may pay for life.'\",\n    \"She kills a stallion and mixes its blood with Drogo's bath while chanting/singing\",\n    \"The ritual involves the phrase: 'Strength of the mount, go into the rider'\",\n    \"The ritual involves the phrase: 'Strength of the beast, go into the man.'\",\n    \"The ritual involves the phrase: 'Only death may pay for life.'\"\n  ],\n  \"missing\": [\n    \"The outcome of the healing (Drogo's vegetative state or Rhaego's death)\",\n    \"The reason for the outcome (Drogo's vegetative state or Rhaego's death)\"\n  ],\n  \"unanswerable\": false\n}",
       "reasoning": null,
       "citations": [
         {
@@ -3347,12 +3383,12 @@
           "page_number": 645
         },
         {
-          "chunk_id": "4847839a-4484-4def-827a-ce1f968ca4a0",
+          "chunk_id": "a208598e-cb37-4e00-920a-bf6c58f7ff60",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 686\u2013689",
-          "page_number": 686
+          "section_path": "Pages 609\u2013612",
+          "page_number": 609
         },
         {
           "chunk_id": "79ad668c-bbfb-4ca0-ba0f-d05bc90a7db6",
@@ -3363,20 +3399,12 @@
           "page_number": 725
         },
         {
-          "chunk_id": "b6d58714-ad8b-43be-8aac-7c94c120acff",
+          "chunk_id": "4847839a-4484-4def-827a-ce1f968ca4a0",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 641\u2013644",
-          "page_number": 641
-        },
-        {
-          "chunk_id": "f05b1a61-b184-41e5-bd93-2124ee026297",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 636\u2013640",
-          "page_number": 636
+          "section_path": "Pages 686\u2013689",
+          "page_number": 686
         },
         {
           "chunk_id": "0fa4e0e5-6c4a-44ad-a119-4545b101aba9",
@@ -3387,6 +3415,14 @@
           "page_number": 613
         },
         {
+          "chunk_id": "b6d58714-ad8b-43be-8aac-7c94c120acff",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 641\u2013644",
+          "page_number": 641
+        },
+        {
           "chunk_id": "c74de947-195a-4554-8e41-04d030783e39",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
@@ -3395,25 +3431,25 @@
           "page_number": 690
         },
         {
-          "chunk_id": "071ed502-0b4d-4720-bb60-db437a45dea1",
+          "chunk_id": "f05b1a61-b184-41e5-bd93-2124ee026297",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 729\u2013734",
-          "page_number": 729
+          "section_path": "Pages 636\u2013640",
+          "page_number": 636
         }
       ],
-      "faithfulness": 0.75,
-      "answer_relevancy": 0.95,
-      "factual_correctness_f1": 0.462,
-      "semantic_similarity": 0.635,
-      "answer_completeness": 0.333,
+      "faithfulness": 1.0,
+      "answer_relevancy": 0.8,
+      "factual_correctness_f1": 0.8,
+      "semantic_similarity": 0.587,
+      "answer_completeness": 0.667,
       "citation_precision": 1.0,
       "citation_recall": 1.0,
       "abstention_accuracy": 1.0,
-      "generation_latency_ms": 3463,
-      "total_latency_ms": 5486,
-      "failure_category": "Factual Incompleteness / Missing Assertions"
+      "generation_latency_ms": 18607,
+      "total_latency_ms": 62596,
+      "failure_category": null
     },
     {
       "id": "q28_unanswerable",
@@ -3437,7 +3473,7 @@
       "context_precision": 1.0,
       "context_recall": 0.0,
       "context_relevancy": 0.0,
-      "retrieval_latency_ms": 3,
+      "retrieval_latency_ms": 4,
       "bm25_hit_at_5": 0.0,
       "vector_hit_at_5": 0.0,
       "hybrid_hit_at_5": 0.0,
@@ -3454,7 +3490,7 @@
       "citation_recall": 1.0,
       "abstention_accuracy": 1.0,
       "generation_latency_ms": 0,
-      "total_latency_ms": 3,
+      "total_latency_ms": 4,
       "failure_category": null
     },
     {
@@ -3521,7 +3557,7 @@
       "context_precision": 1.0,
       "context_recall": 0.0,
       "context_relevancy": 0.0,
-      "retrieval_latency_ms": 1,
+      "retrieval_latency_ms": 11,
       "bm25_hit_at_5": 0.0,
       "vector_hit_at_5": 0.0,
       "hybrid_hit_at_5": 0.0,
@@ -3538,7 +3574,7 @@
       "citation_recall": 1.0,
       "abstention_accuracy": 1.0,
       "generation_latency_ms": 0,
-      "total_latency_ms": 1,
+      "total_latency_ms": 11,
       "failure_category": null
     },
     {
@@ -3563,7 +3599,7 @@
       "context_precision": 1.0,
       "context_recall": 0.0,
       "context_relevancy": 0.0,
-      "retrieval_latency_ms": 460,
+      "retrieval_latency_ms": 854,
       "bm25_hit_at_5": 0.0,
       "vector_hit_at_5": 0.0,
       "hybrid_hit_at_5": 0.0,
@@ -3580,7 +3616,7 @@
       "citation_recall": 1.0,
       "abstention_accuracy": 1.0,
       "generation_latency_ms": 0,
-      "total_latency_ms": 460,
+      "total_latency_ms": 854,
       "failure_category": null
     },
     {
@@ -3605,7 +3641,7 @@
       "context_precision": 1.0,
       "context_recall": 0.0,
       "context_relevancy": 0.0,
-      "retrieval_latency_ms": 0,
+      "retrieval_latency_ms": 1,
       "bm25_hit_at_5": 0.0,
       "vector_hit_at_5": 0.0,
       "hybrid_hit_at_5": 0.0,
@@ -3622,7 +3658,7 @@
       "citation_recall": 1.0,
       "abstention_accuracy": 1.0,
       "generation_latency_ms": 0,
-      "total_latency_ms": 0,
+      "total_latency_ms": 1,
       "failure_category": null
     },
     {
@@ -3643,12 +3679,12 @@
       "retrieved_pages": [
         735,
         462,
-        345,
         429,
+        345,
         601,
-        714,
         522,
-        501
+        748,
+        163
       ],
       "hit_at_1": 1.0,
       "hit_at_3": 1.0,
@@ -3659,13 +3695,13 @@
       "ndcg_at_8": 0.613,
       "context_precision": 1.0,
       "context_recall": 1.0,
-      "context_relevancy": 0.023,
-      "retrieval_latency_ms": 913,
+      "context_relevancy": 0.034,
+      "retrieval_latency_ms": 7698,
       "bm25_hit_at_5": 1.0,
       "vector_hit_at_5": 0.0,
       "hybrid_hit_at_5": 1.0,
       "reranked_hit_at_5": 1.0,
-      "generated_answer": "According to the supported facts, the words and sigil of House Tully are:\n\n- Words: Family, Duty, Honor\n- Sigil: A leaping trout, silver, on a field of rippling blue and red.\n\nAdditionally, the following lesser houses are sworn to Riverrun:\n\n- Darry\n- Frey\n- Mallister\n- Bracken\n- Blackwood\n- Whent\n- Ryger\n- Piper\n- Vance",
+      "generated_answer": "According to the House Tully section in the appendix, the words of House Tully are \"Family, Duty, Honor\" and their sigil is a leaping trout, silver, on a field of rippling blue and red. \n\nAdditionally, the lesser houses sworn to Riverrun include Darry, Frey, Mallister, Bracken, Blackwood, Whent, Ryger, Piper, and Vance.",
       "reasoning": null,
       "citations": [
         {
@@ -3685,20 +3721,20 @@
           "page_number": 462
         },
         {
-          "chunk_id": "f0ab63eb-7d76-4d19-aea1-3262d3d9170f",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 345\u2013348",
-          "page_number": 345
-        },
-        {
           "chunk_id": "b9c3554b-d446-4c25-bb0b-449a98d0a618",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
           "section_path": "Pages 429\u2013433",
           "page_number": 429
+        },
+        {
+          "chunk_id": "f0ab63eb-7d76-4d19-aea1-3262d3d9170f",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 345\u2013348",
+          "page_number": 345
         },
         {
           "chunk_id": "c363ef39-b965-4e61-9b35-3a10d9f27347",
@@ -3709,14 +3745,6 @@
           "page_number": 601
         },
         {
-          "chunk_id": "fcf1ce7b-4e97-4f82-a63a-787ec9deb6f3",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 714\u2013717",
-          "page_number": 714
-        },
-        {
           "chunk_id": "baf5bfb8-22dc-47df-aeeb-14fe553665e5",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
@@ -3725,24 +3753,32 @@
           "page_number": 522
         },
         {
-          "chunk_id": "9ce6a79f-9cc9-4ee0-a773-5ca1c3f83c1a",
+          "chunk_id": "9e64184a-958b-404b-89ab-88f4a3518b45",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 501\u2013504",
-          "page_number": 501
+          "section_path": "Pages 748\u2013755",
+          "page_number": 748
+        },
+        {
+          "chunk_id": "81138642-2755-458a-8c07-88afe12cfc66",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 163\u2013167",
+          "page_number": 163
         }
       ],
       "faithfulness": 1.0,
-      "answer_relevancy": 0.769,
+      "answer_relevancy": 0.862,
       "factual_correctness_f1": 1.0,
-      "semantic_similarity": 0.906,
+      "semantic_similarity": 0.984,
       "answer_completeness": 1.0,
       "citation_precision": 1.0,
       "citation_recall": 1.0,
       "abstention_accuracy": 1.0,
-      "generation_latency_ms": 4988,
-      "total_latency_ms": 5901,
+      "generation_latency_ms": 1813,
+      "total_latency_ms": 9511,
       "failure_category": null
     },
     {
@@ -3763,11 +3799,11 @@
         748,
         483,
         322,
-        462,
         28,
+        462,
+        116,
         112,
-        390,
-        429
+        390
       ],
       "hit_at_1": 1.0,
       "hit_at_3": 1.0,
@@ -3778,13 +3814,13 @@
       "ndcg_at_8": 1.0,
       "context_precision": 1.0,
       "context_recall": 1.0,
-      "context_relevancy": 0.043,
-      "retrieval_latency_ms": 1221,
+      "context_relevancy": 0.053,
+      "retrieval_latency_ms": 37426,
       "bm25_hit_at_5": 1.0,
       "vector_hit_at_5": 1.0,
       "hybrid_hit_at_5": 1.0,
       "reranked_hit_at_5": 1.0,
-      "generated_answer": "According to the supported facts, the first Targaryen king was Aegon I. His reign lasted from 1-37 years after Aegon's Landing. Aegon I's sister-wives' names were Rhaenys and Visenya.",
+      "generated_answer": "Based on the supported facts, the answer is:\n\nThe first Targaryen king was Aegon the Conqueror, Aegon the Dragon. His reign lasted from 1-37 years after Aegon's Landing. Aegon's sister-wives were Rhaenys and Visenya.",
       "reasoning": null,
       "citations": [
         {
@@ -3812,6 +3848,14 @@
           "page_number": 322
         },
         {
+          "chunk_id": "fad63be9-a6af-4048-b258-a5e8db271cc8",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 28\u201332",
+          "page_number": 28
+        },
+        {
           "chunk_id": "c782e2c9-9ec4-41fe-bd53-babd8c743dc6",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
@@ -3820,12 +3864,12 @@
           "page_number": 462
         },
         {
-          "chunk_id": "fad63be9-a6af-4048-b258-a5e8db271cc8",
+          "chunk_id": "f901c59c-9342-44a0-a610-5f208b48b6c6",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 28\u201332",
-          "page_number": 28
+          "section_path": "Pages 116\u2013118",
+          "page_number": 116
         },
         {
           "chunk_id": "f0254386-5e60-47b0-a9b2-985a6896987e",
@@ -3842,26 +3886,18 @@
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
           "section_path": "Pages 390\u2013394",
           "page_number": 390
-        },
-        {
-          "chunk_id": "b9c3554b-d446-4c25-bb0b-449a98d0a618",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 429\u2013433",
-          "page_number": 429
         }
       ],
       "faithfulness": 1.0,
-      "answer_relevancy": 0.815,
+      "answer_relevancy": 0.723,
       "factual_correctness_f1": 1.0,
-      "semantic_similarity": 0.807,
+      "semantic_similarity": 0.834,
       "answer_completeness": 1.0,
       "citation_precision": 1.0,
       "citation_recall": 1.0,
       "abstention_accuracy": 1.0,
-      "generation_latency_ms": 5002,
-      "total_latency_ms": 6223,
+      "generation_latency_ms": 1476,
+      "total_latency_ms": 38902,
       "failure_category": null
     },
     {
@@ -3883,29 +3919,29 @@
       "retrieved_pages": [
         188,
         462,
+        735,
+        55,
         60,
         322,
-        55,
-        349,
         296,
-        43
+        349
       ],
       "hit_at_1": 0.0,
-      "hit_at_3": 0.0,
-      "hit_at_5": 0.0,
-      "hit_at_8": 0.0,
-      "mrr": 0.0,
-      "ndcg_at_5": 0.0,
-      "ndcg_at_8": 0.0,
-      "context_precision": 0.0,
+      "hit_at_3": 1.0,
+      "hit_at_5": 1.0,
+      "hit_at_8": 1.0,
+      "mrr": 0.333,
+      "ndcg_at_5": 0.5,
+      "ndcg_at_8": 0.5,
+      "context_precision": 0.333,
       "context_recall": 1.0,
-      "context_relevancy": 0.018,
-      "retrieval_latency_ms": 2020,
+      "context_relevancy": 0.027,
+      "retrieval_latency_ms": 60065,
       "bm25_hit_at_5": 1.0,
       "vector_hit_at_5": 0.0,
       "hybrid_hit_at_5": 0.0,
-      "reranked_hit_at_5": 0.0,
-      "generated_answer": "Based on the supported facts, Eddard Stark's trueborn children are:\n\n1. Robb\n2. Sansa\n3. Arya\n4. Bran\n\nThe age of these children is not mentioned in the supported facts.",
+      "reranked_hit_at_5": 1.0,
+      "generated_answer": "Based on the provided supported facts, the final answer is:\n\nEddard Stark's trueborn children are: Robb, Sansa, Arya, Bran, and Jon.",
       "reasoning": null,
       "citations": [
         {
@@ -3925,6 +3961,22 @@
           "page_number": 462
         },
         {
+          "chunk_id": "183a52d2-e90b-402a-806f-78233edb88d6",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 735\u2013747",
+          "page_number": 735
+        },
+        {
+          "chunk_id": "8b2a8834-c527-41e6-902c-e95a569dfb1c",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 55\u201359",
+          "page_number": 55
+        },
+        {
           "chunk_id": "ddd78a89-4441-4cd8-94cf-9c2cae7c3f92",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
@@ -3941,22 +3993,6 @@
           "page_number": 322
         },
         {
-          "chunk_id": "8b2a8834-c527-41e6-902c-e95a569dfb1c",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 55\u201359",
-          "page_number": 55
-        },
-        {
-          "chunk_id": "c79caa33-fba0-4fcb-b1c5-a15d0851ce52",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 349\u2013352",
-          "page_number": 349
-        },
-        {
           "chunk_id": "b6a1701d-423e-4658-aae5-9fdc923aff75",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
@@ -3965,25 +4001,25 @@
           "page_number": 296
         },
         {
-          "chunk_id": "21f308c1-f3d2-48cf-b129-7cb952e17feb",
+          "chunk_id": "c79caa33-fba0-4fcb-b1c5-a15d0851ce52",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 43\u201346",
-          "page_number": 43
+          "section_path": "Pages 349\u2013352",
+          "page_number": 349
         }
       ],
       "faithfulness": 1.0,
       "answer_relevancy": 0.667,
       "factual_correctness_f1": 0.889,
-      "semantic_similarity": 0.854,
+      "semantic_similarity": 0.898,
       "answer_completeness": 0.8,
       "citation_precision": 1.0,
       "citation_recall": 1.0,
       "abstention_accuracy": 1.0,
-      "generation_latency_ms": 3758,
-      "total_latency_ms": 5778,
-      "failure_category": "Retrieval Recall Failure (Needle Missed in Top 5)"
+      "generation_latency_ms": 1166,
+      "total_latency_ms": 61231,
+      "failure_category": "Low Context Precision (Noisy Chunks Ranked High)"
     },
     {
       "id": "q36_citation",
@@ -4003,29 +4039,29 @@
       "retrieved_pages": [
         555,
         429,
-        567,
+        735,
         694,
+        729,
         145,
-        636,
-        483,
-        735
+        567,
+        483
       ],
       "hit_at_1": 0.0,
-      "hit_at_3": 0.0,
-      "hit_at_5": 0.0,
+      "hit_at_3": 1.0,
+      "hit_at_5": 1.0,
       "hit_at_8": 1.0,
-      "mrr": 0.125,
-      "ndcg_at_5": 0.0,
-      "ndcg_at_8": 0.315,
-      "context_precision": 0.125,
+      "mrr": 0.333,
+      "ndcg_at_5": 0.5,
+      "ndcg_at_8": 0.5,
+      "context_precision": 0.333,
       "context_recall": 1.0,
-      "context_relevancy": 0.014,
-      "retrieval_latency_ms": 2028,
+      "context_relevancy": 0.016,
+      "retrieval_latency_ms": 6352,
       "bm25_hit_at_5": 0.0,
       "vector_hit_at_5": 0.0,
       "hybrid_hit_at_5": 0.0,
-      "reranked_hit_at_5": 0.0,
-      "generated_answer": "Based on the supported facts, I am unable to provide the requested information about Ser Kevan Lannister's wife and children. The provided facts are incomplete and do not mention Ser Kevan Lannister's family members.",
+      "reranked_hit_at_5": 1.0,
+      "generated_answer": "Unfortunately, I am unable to verify the requested information about Ser Kevan Lannister's wife and children.",
       "reasoning": null,
       "citations": [
         {
@@ -4045,12 +4081,12 @@
           "page_number": 429
         },
         {
-          "chunk_id": "3de91747-555a-4081-959d-89c6e9997436",
+          "chunk_id": "183a52d2-e90b-402a-806f-78233edb88d6",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 567\u2013570",
-          "page_number": 567
+          "section_path": "Pages 735\u2013747",
+          "page_number": 735
         },
         {
           "chunk_id": "71eb7e0b-ef5e-4c14-a83c-aa5c855a6101",
@@ -4061,6 +4097,14 @@
           "page_number": 694
         },
         {
+          "chunk_id": "071ed502-0b4d-4720-bb60-db437a45dea1",
+          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
+          "title": "A Game of Thrones (Book 1)",
+          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
+          "section_path": "Pages 729\u2013734",
+          "page_number": 729
+        },
+        {
           "chunk_id": "98e7550d-c38b-4f39-995f-0e70a11576c5",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
@@ -4069,12 +4113,12 @@
           "page_number": 145
         },
         {
-          "chunk_id": "f05b1a61-b184-41e5-bd93-2124ee026297",
+          "chunk_id": "3de91747-555a-4081-959d-89c6e9997436",
           "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
           "title": "A Game of Thrones (Book 1)",
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 636\u2013640",
-          "page_number": 636
+          "section_path": "Pages 567\u2013570",
+          "page_number": 567
         },
         {
           "chunk_id": "1a4b4764-43ba-4b32-8a63-3127010cc73a",
@@ -4083,27 +4127,19 @@
           "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
           "section_path": "Pages 483\u2013486",
           "page_number": 483
-        },
-        {
-          "chunk_id": "183a52d2-e90b-402a-806f-78233edb88d6",
-          "document_id": "423eb01c-4aaf-4580-8dc6-cadd7a5ca4b7",
-          "title": "A Game of Thrones (Book 1)",
-          "source_uri": "/Users/proximus/Documents/antigravity/RAG/Eval 1.pdf",
-          "section_path": "Pages 735\u2013747",
-          "page_number": 735
         }
       ],
-      "faithfulness": 1.0,
+      "faithfulness": 0.0,
       "answer_relevancy": 0.743,
       "factual_correctness_f1": 0.0,
-      "semantic_similarity": 0.52,
+      "semantic_similarity": 0.531,
       "answer_completeness": 0.0,
       "citation_precision": 1.0,
       "citation_recall": 1.0,
       "abstention_accuracy": 1.0,
-      "generation_latency_ms": 5228,
-      "total_latency_ms": 7256,
-      "failure_category": "Retrieval Recall Failure (Needle Missed in Top 5)"
+      "generation_latency_ms": 975,
+      "total_latency_ms": 7327,
+      "failure_category": "Low Context Precision (Noisy Chunks Ranked High)"
     }
   ]
 }

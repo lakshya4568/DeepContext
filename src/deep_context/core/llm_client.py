@@ -284,7 +284,8 @@ class LLMClient:
                             )
                             if resp.embeddings:
                                 for emb in resp.embeddings:
-                                    all_embeddings.append(list(emb.values))
+                                    if emb.values is not None:
+                                        all_embeddings.append(list(emb.values))
                         else:
                             # gemini-embedding-001 / text-embedding-004
                             g_task_type = task_type or (
@@ -514,7 +515,7 @@ class LLMClient:
                     )
 
                 try:
-                    resp = await asyncio.wait_for(
+                    gemini_resp = await asyncio.wait_for(
                         gemini_client.aio.models.generate_content(
                             model=target_model,
                             contents=gemini_contents,
@@ -527,7 +528,7 @@ class LLMClient:
                         ),
                         timeout=timeout,
                     )
-                    raw_content = resp.text or ""
+                    raw_content = gemini_resp.text or ""
                     content, reasoning = self._parse_think_tags(raw_content, None)
                     return content, reasoning
                 except Exception as e:
@@ -550,7 +551,7 @@ class LLMClient:
             for m in nim_models:
                 for attempt in range(max_retries):
                     try:
-                        resp = await asyncio.wait_for(
+                        nim_resp: Any = await asyncio.wait_for(
                             self._client.chat.completions.create(
                                 model=m,
                                 messages=cast(Any, messages),
@@ -562,8 +563,8 @@ class LLMClient:
                             ),
                             timeout=timeout,
                         )
-                        if resp.choices and len(resp.choices) > 0:
-                            msg = resp.choices[0].message
+                        if nim_resp.choices and len(nim_resp.choices) > 0:
+                            msg = nim_resp.choices[0].message
                             raw_content = msg.content or ""
                             reasoning = getattr(msg, "reasoning_content", None)
                             content, reasoning = self._parse_think_tags(raw_content, reasoning)
@@ -584,7 +585,7 @@ class LLMClient:
             if not m or m.startswith("gemini-") or ("meta/" in m and "groq" not in m):
                 m = "qwen/qwen3.6-27b"
             try:
-                resp = await asyncio.wait_for(
+                groq_resp: Any = await asyncio.wait_for(
                     groq_client.chat.completions.create(
                         model=m,
                         messages=cast(Any, messages),
@@ -595,10 +596,10 @@ class LLMClient:
                     ),
                     timeout=timeout,
                 )
-                if resp.choices and len(resp.choices) > 0:
+                if groq_resp.choices and len(groq_resp.choices) > 0:
                     self.last_rate_limit = None
                     LLMClient.global_rate_limit = None
-                    msg = resp.choices[0].message
+                    msg = groq_resp.choices[0].message
                     raw_content = msg.content or ""
                     reasoning = getattr(msg, "reasoning_content", None)
                     content, reasoning = self._parse_think_tags(raw_content, reasoning)
@@ -623,7 +624,7 @@ class LLMClient:
         if self._client and settings.has_nvidia_key:
             target_model = "meta/llama-3.1-8b-instruct"
             try:
-                resp = await asyncio.wait_for(
+                fallback_resp: Any = await asyncio.wait_for(
                     self._client.chat.completions.create(
                         model=target_model,
                         messages=cast(Any, messages),
@@ -634,10 +635,10 @@ class LLMClient:
                     ),
                     timeout=timeout,
                 )
-                if resp.choices and len(resp.choices) > 0:
+                if fallback_resp.choices and len(fallback_resp.choices) > 0:
                     self.last_rate_limit = None
                     LLMClient.global_rate_limit = None
-                    msg = resp.choices[0].message
+                    msg = fallback_resp.choices[0].message
                     raw_content = msg.content or ""
                     reasoning = getattr(msg, "reasoning_content", None)
                     content, reasoning = self._parse_think_tags(raw_content, reasoning)
@@ -714,7 +715,7 @@ class LLMClient:
                     )
 
                 try:
-                    stream = await gemini_client.aio.models.generate_content_stream(
+                    gemini_stream = await gemini_client.aio.models.generate_content_stream(
                         model=target_model,
                         contents=gemini_contents,
                         config=genai_types.GenerateContentConfig(
@@ -725,7 +726,7 @@ class LLMClient:
                         ),
                     )
                     stream_emitted = False
-                    async for chunk in stream:
+                    async for chunk in gemini_stream:
                         text_val = chunk.text or ""
                         if text_val:
                             stream_emitted = True
@@ -745,7 +746,7 @@ class LLMClient:
 
             for m in nim_models:
                 try:
-                    stream = await self._client.chat.completions.create(
+                    nim_stream: Any = await self._client.chat.completions.create(
                         model=m,
                         messages=cast(Any, messages),
                         temperature=temperature,
@@ -754,7 +755,7 @@ class LLMClient:
                         stream=True,
                     )
                     stream_emitted = False
-                    async for chunk in stream:
+                    async for chunk in nim_stream:
                         if not getattr(chunk, "choices", None) or len(chunk.choices) == 0:
                             continue
                         delta = chunk.choices[0].delta
@@ -876,7 +877,7 @@ class LLMClient:
                 else "meta/llama-3.1-8b-instruct"
             )
             try:
-                stream = await self._client.chat.completions.create(
+                fallback_stream: Any = await self._client.chat.completions.create(
                     model=target_nim_model,
                     messages=cast(Any, messages),
                     temperature=temperature,
@@ -885,7 +886,7 @@ class LLMClient:
                     stream=True,
                 )
                 stream_emitted = False
-                async for chunk in stream:
+                async for chunk in fallback_stream:
                     if not getattr(chunk, "choices", None) or len(chunk.choices) == 0:
                         continue
                     delta = chunk.choices[0].delta

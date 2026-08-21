@@ -1,10 +1,9 @@
-"""Tests for Multi-Strategy Reranker (Cross-Encoder, Gemini Semantic, Gemini LLM)."""
+"""Tests for Multi-Strategy Reranker (Cross-Encoder, EcoHash, Local ONNX)."""
 
 import pytest
 
 from deep_context.retrieval.reranker import (
     CrossEncoderReranker,
-    GeminiSemanticReranker,
     Reranker,
 )
 
@@ -30,30 +29,6 @@ async def test_cross_encoder_reranker_exact_needle_bonus() -> None:
 
 
 @pytest.mark.asyncio
-async def test_gemini_semantic_reranker() -> None:
-    query = "Explain the RLM subagent message passing protocol"
-    candidates = [
-        {"id": "1", "content": "Recipe for baking chocolate chip cookies."},
-        {
-            "id": "2",
-            "content": "RLM subagents communicate asynchronously by sending structured messages to parent orchestrator.",
-        },
-        {"id": "3", "content": "Weather forecast for London and Tokyo."},
-    ]
-
-    reranked = await GeminiSemanticReranker.rerank(
-        query=query,
-        candidates=candidates,
-        top_k=2,
-        embedding_model="gemini-embedding-2",
-        embedding_dim=768,
-    )
-    assert len(reranked) == 2
-    assert reranked[0]["id"] == "2"
-    assert "gemini_cos_sim" in reranked[0]
-
-
-@pytest.mark.asyncio
 async def test_unified_reranker_strategy_dispatch() -> None:
     query = "Kafka event bus consumers"
     candidates = [
@@ -69,7 +44,7 @@ async def test_unified_reranker_strategy_dispatch() -> None:
     assert len(res_ce) == 2
     assert res_ce[0]["id"] == "1"
 
-    # Test gemini_semantic dispatch
-    res_sem = await Reranker.rerank(query, candidates, strategy="gemini_semantic")
-    assert len(res_sem) == 2
-    assert res_sem[0]["id"] == "1"
+    # Test bypass/rrf dispatch
+    res_bypass = await Reranker.rerank(query, candidates, strategy="rrf")
+    assert len(res_bypass) == 2
+    assert res_bypass[0]["id"] == "1"

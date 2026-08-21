@@ -54,7 +54,10 @@ class MemoryStoreManager:
                 elif isinstance(val, str):
                     result["reranker"] = val
             elif key == "llm_model":
-                result["llm_model"] = val if isinstance(val, str) else str(val)
+                if isinstance(val, dict):
+                    result["llm_model"] = val.get("model", val.get("value", result["llm_model"]))
+                elif isinstance(val, str):
+                    result["llm_model"] = val
         return result
 
     async def set_embedding_preferences(
@@ -89,7 +92,7 @@ class MemoryStoreManager:
             await self.storage.set_preference(
                 user_id=user_id,
                 preference_key="llm_model",
-                preference_value=llm_model,
+                preference_value={"model": llm_model},
                 confidence=1.0,
                 source="explicit",
             )

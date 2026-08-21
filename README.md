@@ -109,8 +109,8 @@ The platform features dynamic model routing, automatic failover, and dynamic `.e
 ### 2. Multi-Strategy Precision Reranking
 Configurable on the fly or persisted per user in typed memory:
 - **`cross_encoder` (Default):** Exact quote match + token Jaccard overlap + lexical boost.
-- **`gemini_semantic`:** Cosine similarity reranking using `gemini-embedding-2` / `gemini-embedding-001`.
-- **`gemini_llm`:** Zero-shot point-wise relevance scoring via `gemini-2.5-flash`.
+- **`ecohash` (Hosted Neural):** BGE-reranker-v2-m3 cross-encoder via EcoHash API with calibrated probabilities.
+- **`local_cross_encoder`:** Quantized INT8 BGE-reranker-v2-m3 running on ONNX Runtime with sigmoid normalization.
 
 ### 3. 4-Store Typed Memory System
 Durable memory is partitioned to prevent cross-contamination:
@@ -202,7 +202,7 @@ uv run deep-context retrieve "What is the core finding?" -k 5 -r cross_encoder
 uv run deep-context query "Explain the architecture" -m gemini-2.5-flash
 
 # 5. Manage user preferences in durable memory
-uv run deep-context set-preference --user user_42 -e gemini-embedding-2 -d 768 -r gemini_semantic
+uv run deep-context set-preference --user user_42 -e gemini-embedding-2 -d 768 -r ecohash
 uv run deep-context preferences user_42
 
 # 6. Run a Recursive Language Model (RLM) session in sandboxed REPL
@@ -217,8 +217,10 @@ uv run deep-context rlm "Scan all 195 chunks and identify every occurrence of Se
 Streams real-time status, citations, live thinking tokens, and final answer content:
 
 ```bash
-curl -N -X POST http://localhost:8000/v1/query/stream   -H "Content-Type: application/json"   -d '{
-    "query": "Identify who is speaking: "They seem ferocious enough"",
+curl -N -X POST http://localhost:8000/v1/query/stream \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "Identify who is speaking: \"They seem ferocious enough\"",
     "user_id": "user_42",
     "model": "qwen/qwen3.6-27b",
     "embedding_model": "gemini-embedding-2",
@@ -240,11 +242,13 @@ data: {"type": "done", "latency_ms": 1420, "path_taken": "hybrid_rag", "support_
 Persists embedding and reranker settings to user-specific durable memory:
 
 ```bash
-curl -X POST http://localhost:8000/v1/preferences   -H "Content-Type: application/json"   -d '{
+curl -X POST http://localhost:8000/v1/preferences \
+  -H "Content-Type: application/json" \
+  -d '{
     "user_id": "user_42",
     "embedding_model": "gemini-embedding-2",
     "embedding_dim": 768,
-    "reranker": "gemini_semantic",
+    "reranker": "ecohash",
     "llm_model": "gemini-2.5-flash"
   }'
 ```

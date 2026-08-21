@@ -291,7 +291,7 @@ def retrieve_cmd(
         "",
         "--reranker",
         "-r",
-        help="Reranker strategy ('cross_encoder', 'gemini_semantic', 'gemini_llm')",
+        help="Reranker strategy ('cross_encoder', 'ecohash', 'local_cross_encoder')",
     ),
 ) -> None:
     """Run hybrid retrieval (BM25 + Vector + RRF + Multi-Strategy Rerank)."""
@@ -354,7 +354,7 @@ def query_cmd(
         "",
         "--reranker",
         "-r",
-        help="Reranker strategy ('cross_encoder', 'gemini_semantic', 'gemini_llm')",
+        help="Reranker strategy ('cross_encoder', 'ecohash', 'local_cross_encoder')",
     ),
 ) -> None:
     """Run full intelligent grounded query answering with preference resolution."""
@@ -467,7 +467,7 @@ def set_preference_cmd(
         "",
         "--reranker",
         "-r",
-        help="Preferred reranker ('cross_encoder', 'gemini_semantic', 'gemini_llm')",
+        help="Preferred reranker ('cross_encoder', 'ecohash', 'local_cross_encoder')",
     ),
     llm_model: str = typer.Option(
         "",
