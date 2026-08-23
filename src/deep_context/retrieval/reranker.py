@@ -6,12 +6,14 @@ import math
 import re
 from typing import Any, Literal
 
+from nltk.corpus import stopwords
+
 from deep_context.core.config import settings
 from deep_context.retrieval.quality_gates import protect_consensus
 
 RerankerScoreType = Literal["logit", "probability"]
 
-STOPWORDS = {
+STOPWORDS = set(stopwords.words("english")) | {
     "a",
     "about",
     "above",
@@ -46,97 +48,6 @@ STOPWORDS = {
     "during",
     "each",
     "few",
-    "for",
-    "from",
-    "further",
-    "had",
-    "has",
-    "have",
-    "having",
-    "he",
-    "her",
-    "here",
-    "hers",
-    "herself",
-    "him",
-    "himself",
-    "his",
-    "how",
-    "i",
-    "if",
-    "in",
-    "into",
-    "is",
-    "it",
-    "its",
-    "itself",
-    "just",
-    "me",
-    "more",
-    "most",
-    "my",
-    "myself",
-    "no",
-    "nor",
-    "not",
-    "of",
-    "off",
-    "on",
-    "once",
-    "only",
-    "or",
-    "other",
-    "ought",
-    "our",
-    "ours",
-    "ourselves",
-    "out",
-    "over",
-    "own",
-    "same",
-    "she",
-    "should",
-    "so",
-    "some",
-    "such",
-    "than",
-    "that",
-    "the",
-    "their",
-    "theirs",
-    "them",
-    "themselves",
-    "then",
-    "there",
-    "these",
-    "they",
-    "this",
-    "those",
-    "through",
-    "to",
-    "too",
-    "under",
-    "until",
-    "up",
-    "very",
-    "was",
-    "we",
-    "were",
-    "what",
-    "when",
-    "where",
-    "which",
-    "while",
-    "who",
-    "whom",
-    "why",
-    "with",
-    "would",
-    "you",
-    "your",
-    "yours",
-    "yourself",
-    "yourselves",
 }
 
 
@@ -329,13 +240,20 @@ class CrossEncoderReranker:
         if len(candidates) <= top_k:
             return candidates
 
-        clean_query = query.strip().strip('"').strip("'").strip("\u201c").strip("\u201d")
+        clean_query = (
+            query.strip().strip('"').strip("'").strip("\u201c").strip("\u201d")
+        )
         q_lower = clean_query.lower()
         all_words = [w for w in re.findall(r"\w+", q_lower) if len(w) > 1]
-        content_words = [w for w in all_words if w not in STOPWORDS and len(w) > 2] or all_words
+        content_words = [
+            w for w in all_words if w not in STOPWORDS and len(w) > 2
+        ] or all_words
         q_word_set = set(content_words)
         n_grams = (
-            [f"{content_words[i]} {content_words[i + 1]}" for i in range(len(content_words) - 1)]
+            [
+                f"{content_words[i]} {content_words[i + 1]}"
+                for i in range(len(content_words) - 1)
+            ]
             if len(content_words) >= 2
             else []
         )
@@ -354,80 +272,11 @@ class CrossEncoderReranker:
                 1, len(q_word_set)
             )
             position_score = 1.0 / (1.0 + idx * 0.05)
-            raw_scores.append(0.40 * exact_bonus + 0.40 * overlap_ratio + 0.20 * position_score)
+            raw_scores.append(
+                0.40 * exact_bonus + 0.40 * overlap_ratio + 0.20 * position_score
+            )
 
         scored = _blend_with_rrf(candidates, raw_scores, score_type="probability")
-        return [item for _, item in scored[:top_k]]
-
-
-_bge_session: Any | None = None
-_bge_tokenizer: Any | None = None
-
-
-def _get_bge_reranker() -> tuple[Any, Any]:
-    """Lazy-load quantized INT8 BGE-reranker-v2-m3 ONNX model and tokenizer."""
-    global _bge_session, _bge_tokenizer
-    if _bge_session is None or _bge_tokenizer is None:
-        import onnxruntime as ort
-        from huggingface_hub import hf_hub_download
-        from transformers import AutoTokenizer
-
-        repo_id = "tss-deposium/bge-reranker-v2-m3-onnx-int8"
-        model_path = hf_hub_download(repo_id=repo_id, filename="model_quantized.onnx")
-        _bge_tokenizer = AutoTokenizer.from_pretrained(repo_id)
-
-        opts = ort.SessionOptions()
-        opts.inter_op_num_threads = 2
-        opts.intra_op_num_threads = 4
-        opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-        _bge_session = ort.InferenceSession(
-            model_path,
-            sess_options=opts,
-            providers=["CPUExecutionProvider"],
-        )
-    return _bge_session, _bge_tokenizer
-
-
-class LocalCrossEncoderReranker:
-    """Real trained cross-encoder using quantized INT8 BGE-reranker-v2-m3 (ONNX).
-
-    Unlike the heuristic CrossEncoderReranker, this model reads the query and
-    each candidate document together in a single transformer forward pass,
-    producing a learned relevance score that handles paraphrases, synonyms,
-    and semantic equivalence.
-
-    Quantized to INT8 for ~75% smaller memory footprint and fast inference.
-    """
-
-    @classmethod
-    async def rerank(
-        cls,
-        query: str,
-        candidates: list[dict[str, Any]],
-        top_k: int = 8,
-    ) -> list[dict[str, Any]]:
-        if not candidates:
-            return []
-        if len(candidates) <= 1:
-            return candidates
-
-        session, tokenizer = _get_bge_reranker()
-        pairs = [[query, str(c.get("content", ""))[:1000]] for c in candidates]
-        inputs = tokenizer(
-            pairs,
-            padding=True,
-            truncation=True,
-            max_length=512,
-            return_tensors="np",
-        )
-        ort_inputs = {
-            k: v for k, v in inputs.items() if k in [inp.name for inp in session.get_inputs()]
-        }
-        logits = session.run(None, ort_inputs)[0]
-        raw_scores: list[float] = logits.reshape(-1).tolist()
-
-        # Reuse the fixed RRF blend with explicit logit score type
-        scored = _blend_with_rrf(candidates, raw_scores, score_type="logit")
         return [item for _, item in scored[:top_k]]
 
 
@@ -445,11 +294,23 @@ class Reranker:
         embedding_dim: int | None = None,
     ) -> list[dict[str, Any]]:
         active_strategy = (
-            (strategy or settings.reranker_strategy or "cross_encoder").lower().replace("-", "_")
+            (strategy or settings.reranker_strategy or "cross_encoder")
+            .lower()
+            .replace("-", "_")
         )
         if active_strategy in ("none", "bypass", "rrf", "hybrid", "disabled"):
             ranked = candidates[:top_k]
-        elif active_strategy in ("ecohash", "ecohash_reranker", "hosted_bge"):
+        elif active_strategy in (
+            "ecohash",
+            "ecohash_reranker",
+            "hosted_bge",
+            # Legacy aliases for the removed local BGE-M3 cross-encoder now
+            # resolve to the hosted EcoHash reranker exclusively.
+            "local_cross_encoder",
+            "bge",
+            "bge_reranker",
+            "bge_m3",
+        ):
             from deep_context.retrieval.ecohash_reranker import EcoHashReranker
 
             ranked = await EcoHashReranker.rerank(
@@ -457,21 +318,6 @@ class Reranker:
                 candidates=candidates,
                 top_k=top_k,
             )
-        elif active_strategy in ("local_cross_encoder", "bge", "bge_reranker", "bge_m3"):
-            if settings.has_ecohash_key:
-                from deep_context.retrieval.ecohash_reranker import EcoHashReranker
-
-                ranked = await EcoHashReranker.rerank(
-                    query=query,
-                    candidates=candidates,
-                    top_k=top_k,
-                )
-            else:
-                ranked = await LocalCrossEncoderReranker.rerank(
-                    query=query,
-                    candidates=candidates,
-                    top_k=top_k,
-                )
         else:
             ranked = await CrossEncoderReranker.rerank(
                 query=query,

@@ -99,7 +99,7 @@ def ingest_cmd(
         "",
         "--embedding-model",
         "-e",
-        help="Embedding model (e.g. 'gemini-embedding-2', 'gemini-embedding-001', 'nvidia/nv-embedqa-e5-v5')",
+        help="Embedding model (e.g. 'gemini-embedding-2', 'nvidia/nv-embedqa-e5-v5')",
     ),
     embedding_dim: int = typer.Option(
         0,
@@ -117,9 +117,7 @@ def ingest_cmd(
             raise typer.Exit(1)
 
         ext = p.suffix.lower()
-        detected_type = (
-            doc_type if doc_type != "auto" else SUPPORTED_EXTENSIONS.get(ext, "text")
-        )
+        detected_type = doc_type if doc_type != "auto" else SUPPORTED_EXTENSIONS.get(ext, "text")
 
         if detected_type == "pdf":
             content = str(p.resolve())
@@ -217,9 +215,7 @@ def ingest_all_cmd(
                         files_to_process.append(file_entry)
 
         if not files_to_process:
-            console.print(
-                f"[yellow]No supported documents found in '{target_path}'.[/yellow]"
-            )
+            console.print(f"[yellow]No supported documents found in '{target_path}'.[/yellow]")
             return
 
         target_model = embedding_model or settings.embedding_model
@@ -291,23 +287,19 @@ def ingest_all_cmd(
 def retrieve_cmd(
     query: str = typer.Argument(..., help="Search query"),
     top_k: int = typer.Option(5, "--top-k", "-k", help="Number of chunks to return"),
-    user_id: str = typer.Option(
-        "", "--user", "-u", help="User ID for preference resolution"
-    ),
+    user_id: str = typer.Option("", "--user", "-u", help="User ID for preference resolution"),
     embedding_model: str = typer.Option(
         "",
         "--embedding-model",
         "-e",
         help="Embedding model (e.g. 'gemini-embedding-2')",
     ),
-    embedding_dim: int = typer.Option(
-        0, "--embedding-dim", "-d", help="Embedding dimension"
-    ),
+    embedding_dim: int = typer.Option(0, "--embedding-dim", "-d", help="Embedding dimension"),
     reranker: str = typer.Option(
         "",
         "--reranker",
         "-r",
-        help="Reranker strategy ('cross_encoder', 'ecohash', 'local_cross_encoder')",
+        help="Reranker strategy ('cross_encoder', 'ecohash')",
     ),
 ) -> None:
     """Run hybrid retrieval (BM25 + Vector + RRF + Multi-Strategy Rerank)."""
@@ -325,9 +317,7 @@ def retrieve_cmd(
                 user_id=user_id if user_id else None,
             )
 
-        table = Table(
-            title=f"Retrieval Results for: '{query}' (Sufficient: {res.sufficient})"
-        )
+        table = Table(title=f"Retrieval Results for: '{query}' (Sufficient: {res.sufficient})")
         table.add_column("Rank", style="cyan", width=6)
         table.add_column("Document", style="magenta", width=20)
         table.add_column("Section", style="green", width=25)
@@ -372,7 +362,7 @@ def query_cmd(
         "",
         "--reranker",
         "-r",
-        help="Reranker strategy ('cross_encoder', 'ecohash', 'local_cross_encoder')",
+        help="Reranker strategy ('cross_encoder', 'ecohash')",
     ),
 ) -> None:
     """Run full intelligent grounded query answering with preference resolution."""
@@ -405,9 +395,7 @@ def query_cmd(
         from deep_context.generation.grounded_answer import generate_grounded_answer
 
         model_label = model or settings.llm_model
-        with console.status(
-            f"[bold green]Generating grounded answer with {model_label}..."
-        ):
+        with console.status(f"[bold green]Generating grounded answer with {model_label}..."):
             grounded_res = await generate_grounded_answer(
                 query=query,
                 retrieved_chunks=retrieval_res.parent_chunks,
@@ -427,9 +415,7 @@ def query_cmd(
 
         from deep_context.core.llm_client import LLMClient
 
-        active_notice = (
-            getattr(llm_client, "last_rate_limit", None) or LLMClient.global_rate_limit
-        )
+        active_notice = getattr(llm_client, "last_rate_limit", None) or LLMClient.global_rate_limit
         if active_notice:
             console.print(
                 Panel(
@@ -451,9 +437,7 @@ def query_cmd(
 
 @app.command("preferences")
 def get_preferences_cmd(
-    user_id: str = typer.Argument(
-        "default_user", help="User ID to view preferences for"
-    ),
+    user_id: str = typer.Argument("default_user", help="User ID to view preferences for"),
 ) -> None:
     """View saved embedding, reranker, and model preferences for a user."""
 
@@ -486,7 +470,7 @@ def set_preference_cmd(
         "",
         "--embedding-model",
         "-e",
-        help="Preferred embedding model (e.g. 'gemini-embedding-2', 'gemini-embedding-001', 'nvidia/nv-embedqa-e5-v5')",
+        help="Preferred embedding model (e.g. 'gemini-embedding-2', 'nvidia/nv-embedqa-e5-v5')",
     ),
     embedding_dim: int = typer.Option(
         0,
@@ -498,7 +482,7 @@ def set_preference_cmd(
         "",
         "--reranker",
         "-r",
-        help="Preferred reranker ('cross_encoder', 'ecohash', 'local_cross_encoder')",
+        help="Preferred reranker ('cross_encoder', 'ecohash')",
     ),
     llm_model: str = typer.Option(
         "",
@@ -530,16 +514,8 @@ def set_preference_cmd(
                     if embedding_model
                     else ""
                 )
-                + (
-                    f"• Embedding Dim: [cyan]{embedding_dim}[/cyan]\n"
-                    if embedding_dim
-                    else ""
-                )
-                + (
-                    f"• Reranker Strategy: [magenta]{reranker}[/magenta]\n"
-                    if reranker
-                    else ""
-                )
+                + (f"• Embedding Dim: [cyan]{embedding_dim}[/cyan]\n" if embedding_dim else "")
+                + (f"• Reranker Strategy: [magenta]{reranker}[/magenta]\n" if reranker else "")
                 + (f"• LLM Model: [yellow]{llm_model}[/yellow]\n" if llm_model else ""),
                 title="Preference Saved",
             )
@@ -564,14 +540,10 @@ def rlm_cmd(
             if p.suffix.lower() == ".pdf":
                 from deep_context.ingestion.parser import DocumentParser
 
-                with console.status(
-                    f"[bold cyan]Extracting text from {p.name}...[/bold cyan]"
-                ):
+                with console.status(f"[bold cyan]Extracting text from {p.name}...[/bold cyan]"):
                     parser = DocumentParser()
                     sections = parser.parse(str(p.resolve()), doc_type="pdf")
-                    corpus = "\n\n".join(
-                        f"=== {s.title} ===\n{s.content}" for s in sections
-                    )
+                    corpus = "\n\n".join(f"=== {s.title} ===\n{s.content}" for s in sections)
             else:
                 corpus = p.read_text(encoding="utf-8", errors="ignore")
         if not corpus:
@@ -682,9 +654,7 @@ def agentic_query_cmd(
     max_rewrites: int = typer.Option(
         2, "--max-rewrites", help="Maximum corrective rewrite attempts"
     ),
-    top_k: int = typer.Option(
-        6, "--top-k", "-k", help="Chunks to retrieve per attempt"
-    ),
+    top_k: int = typer.Option(6, "--top-k", "-k", help="Chunks to retrieve per attempt"),
 ) -> None:
     """Run the corrective agentic RAG state machine (retrieve -> grade -> rewrite -> generate)."""
 
@@ -692,9 +662,7 @@ def agentic_query_cmd(
         from deep_context.agentic.graph import run_agentic_rag
 
         with console.status("[bold green]Running corrective agentic RAG graph..."):
-            state = await run_agentic_rag(
-                query=query, top_k=top_k, max_rewrites=max_rewrites
-            )
+            state = await run_agentic_rag(query=query, top_k=top_k, max_rewrites=max_rewrites)
 
         trace_lines = "\n".join(
             f"• [cyan]{t.get('node')}[/cyan] {', '.join(f'{k}={v}' for k, v in t.items() if k != 'node')}"
@@ -712,9 +680,7 @@ def agentic_query_cmd(
                 title="Agentic RAG Result",
             )
         )
-        console.print(
-            Panel(trace_lines, title="[dim]Execution Trace[/dim]", style="dim")
-        )
+        console.print(Panel(trace_lines, title="[dim]Execution Trace[/dim]", style="dim"))
         await close_storage()
 
     asyncio.run(_run())
