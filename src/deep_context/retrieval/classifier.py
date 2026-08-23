@@ -28,12 +28,55 @@ class QueryClassifier:
                 "aggregate",
                 "summarize everything",
                 "read all",
+                "entire document",
+                "whole document",
+                "all documents",
+                "everything in",
+                "go through",
+                "scan all",
+                "full corpus",
+                "across all",
+                "comprehensive overview",
+                "complete list",
+                "all instances",
+                "every mention",
+                "total count",
+                "how many times",
+                "exhaustive",
             )
         ):
             return QueryShape.AGGREGATION
-        if any(w in q for w in ("how do i", "how to", "steps to", "guide on", "how can")):
+        if any(
+            w in q
+            for w in (
+                "how do i",
+                "how to",
+                "steps to",
+                "guide on",
+                "how can",
+                "tutorial",
+                "walk me through",
+                "instructions for",
+                "set up",
+                "configure",
+                "install",
+                "getting started",
+                "best way to",
+                "procedure",
+            )
+        ):
             return QueryShape.HOW_TO
-        if q.count("?") > 1 or " and " in q or " vs " in q or "compare " in q:
+        if (
+            q.count("?") > 1
+            or " and " in q
+            or " vs " in q
+            or "compare " in q
+            or " versus " in q
+            or " difference between " in q
+            or " relationship between " in q
+            or " connect " in q
+            or " relate " in q
+        ):
             return QueryShape.MULTI_HOP
         if any(
             w in q
@@ -43,6 +86,14 @@ class QueryClassifier:
                 "navigate to",
                 "table of contents",
                 "section about",
+                "locate",
+                "which section",
+                "which page",
+                "what page",
+                "index of",
+                "chapter on",
+                "jump to",
+                "look up",
             )
         ):
             return QueryShape.NAVIGATION
