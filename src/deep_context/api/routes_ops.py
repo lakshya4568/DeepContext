@@ -158,3 +158,112 @@ async def invalidate_cache(namespace: str = "rag") -> dict[str, Any]:
     for ns in ("rag:ask", "rag:retrieve") if namespace == "rag" else (namespace,):
         total += await response_cache.invalidate_namespace(ns)
     return {"status": "ok", "namespace": namespace, "entries_invalidated": total}
+
+
+# ---------------------------------------------------------------------------
+# Runtime Platform Configuration & Testing
+# ---------------------------------------------------------------------------
+
+
+class ConfigUpdateRequest(BaseModel):
+    summary_enabled: bool | None = None
+    summary_model: str | None = None
+    summary_max_tokens: int | None = None
+    summary_batch_size: int | None = None
+    summary_device: str | None = None
+    embedding_model: str | None = None
+    embedding_dim: int | None = None
+    default_retrieval_mode: str | None = None
+    default_top_k: int | None = None
+    reranker_model: str | None = None
+    confidence_threshold: float | None = None
+    cache_enabled: bool | None = None
+    cache_default_ttl: int | None = None
+    agentic_max_rewrites: int | None = None
+    agentic_grade_threshold: float | None = None
+
+
+class TestSummaryRequest(BaseModel):
+    text: str
+    topic: str | None = None
+
+
+@router.get("/v1/config")
+async def get_runtime_config() -> dict[str, Any]:
+    """Retrieve full runtime platform configuration."""
+    return {
+        "summary_enabled": settings.summary_enabled,
+        "summary_model": settings.summary_model,
+        "summary_max_tokens": settings.summary_max_tokens,
+        "summary_batch_size": settings.summary_batch_size,
+        "summary_device": settings.summary_device,
+        "embedding_model": settings.embedding_model,
+        "embedding_dim": settings.embedding_dim,
+        "default_retrieval_mode": settings.default_retrieval_mode,
+        "default_top_k": settings.default_top_k,
+        "reranker_model": settings.reranker_model,
+        "confidence_threshold": settings.confidence_threshold,
+        "cache_enabled": settings.cache_enabled,
+        "cache_default_ttl": settings.cache_default_ttl,
+        "agentic_max_rewrites": settings.agentic_max_rewrites,
+        "agentic_grade_threshold": settings.agentic_grade_threshold,
+        "llm_model": settings.llm_model,
+        "llm_provider": settings.llm_provider,
+    }
+
+
+@router.post("/v1/config")
+async def update_runtime_config(req: ConfigUpdateRequest) -> dict[str, Any]:
+    """Update runtime configuration dynamically."""
+    if req.summary_enabled is not None:
+        settings.summary_enabled = req.summary_enabled
+    if req.summary_model is not None:
+        settings.summary_model = req.summary_model
+    if req.summary_max_tokens is not None:
+        settings.summary_max_tokens = req.summary_max_tokens
+    if req.summary_batch_size is not None:
+        settings.summary_batch_size = req.summary_batch_size
+    if req.summary_device is not None:
+        settings.summary_device = req.summary_device
+    if req.embedding_model is not None:
+        settings.embedding_model = req.embedding_model
+    if req.embedding_dim is not None:
+        settings.embedding_dim = req.embedding_dim
+    if req.default_retrieval_mode is not None:
+        settings.default_retrieval_mode = req.default_retrieval_mode
+    if req.default_top_k is not None:
+        settings.default_top_k = req.default_top_k
+    if req.reranker_model is not None:
+        settings.reranker_model = req.reranker_model
+    if req.confidence_threshold is not None:
+        settings.confidence_threshold = req.confidence_threshold
+    if req.cache_enabled is not None:
+        settings.cache_enabled = req.cache_enabled
+    if req.cache_default_ttl is not None:
+        settings.cache_default_ttl = req.cache_default_ttl
+    if req.agentic_max_rewrites is not None:
+        settings.agentic_max_rewrites = req.agentic_max_rewrites
+    if req.agentic_grade_threshold is not None:
+        settings.agentic_grade_threshold = req.agentic_grade_threshold
+
+    return {"status": "updated", "config": await get_runtime_config()}
+
+
+@router.post("/v1/test-summary")
+async def test_summary_generation(req: TestSummaryRequest) -> dict[str, Any]:
+    """Generate a test summary using local Qwen3 model on MPS/Metal."""
+    import time
+
+    from deep_context.ingestion.summarizer import ChunkSummarizer
+
+    summarizer = ChunkSummarizer()
+    t0 = time.time()
+    summary, tokens = await summarizer.summarize_chunk(req.text, context_prefix=req.topic)
+    elapsed_ms = int((time.time() - t0) * 1000)
+    return {
+        "summary": summary,
+        "tokens": tokens,
+        "latency_ms": elapsed_ms,
+        "model": summarizer.model_name,
+        "device": summarizer._resolve_device(),
+    }

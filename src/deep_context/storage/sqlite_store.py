@@ -71,6 +71,10 @@ class SQLiteStore(StorageInterface):
                 section_path TEXT,
                 page_number INTEGER,
                 embedding TEXT, -- JSON array of floats
+                summary_text TEXT,
+                summary_tokens INTEGER,
+                summary_model TEXT DEFAULT 'qwen3-0.6b',
+                generated_at TEXT,
                 created_at TEXT NOT NULL
             );
 
@@ -78,7 +82,8 @@ class SQLiteStore(StorageInterface):
                 id UNINDEXED,
                 document_id UNINDEXED,
                 content,
-                section_path
+                section_path,
+                summary_text
             );
 
             CREATE TABLE IF NOT EXISTS document_tree_nodes (
@@ -222,9 +227,7 @@ class SQLiteStore(StorageInterface):
 
     def _get_conn(self) -> aiosqlite.Connection:
         if not self._conn:
-            raise RuntimeError(
-                "Database connection not initialized. Call initialize() first."
-            )
+            raise RuntimeError("Database connection not initialized. Call initialize() first.")
         return self._conn
 
     # -----------------------------------------------------------------------
@@ -258,9 +261,7 @@ class SQLiteStore(StorageInterface):
 
     async def get_document(self, document_id: str) -> Document | None:
         conn = self._get_conn()
-        async with conn.execute(
-            "SELECT * FROM documents WHERE id = ?", (document_id,)
-        ) as cursor:
+        async with conn.execute("SELECT * FROM documents WHERE id = ?", (document_id,)) as cursor:
             row = await cursor.fetchone()
             if not row:
                 return None
@@ -345,12 +346,8 @@ class SQLiteStore(StorageInterface):
 
     async def delete_document(self, document_id: str) -> bool:
         conn = self._get_conn()
-        await conn.execute(
-            "DELETE FROM document_tree_nodes WHERE document_id = ?", (document_id,)
-        )
-        await conn.execute(
-            "DELETE FROM chunks_fts WHERE document_id = ?", (document_id,)
-        )
+        await conn.execute("DELETE FROM document_tree_nodes WHERE document_id = ?", (document_id,))
+        await conn.execute("DELETE FROM chunks_fts WHERE document_id = ?", (document_id,))
         await conn.execute(
             "DELETE FROM chunks WHERE document_id = ? AND level = 'child'",
             (document_id,),
@@ -400,7 +397,7 @@ class SQLiteStore(StorageInterface):
         params: tuple[Any, ...]
         if document_id:
             query = """
-                SELECT c.id, c.document_id, c.content, c.section_path, c.page_number, d.title as document_title
+                SELECT c.id, c.document_id, c.parent_chunk_id, c.content, c.section_path, c.page_number, c.summary_text, c.summary_tokens, c.summary_model, d.title as document_title
                 FROM chunks c
                 JOIN documents d ON d.id = c.document_id
                 WHERE c.document_id = ? AND c.level = ?
@@ -410,7 +407,7 @@ class SQLiteStore(StorageInterface):
             params = (document_id, level, limit)
         else:
             query = """
-                SELECT c.id, c.document_id, c.content, c.section_path, c.page_number, d.title as document_title
+                SELECT c.id, c.document_id, c.parent_chunk_id, c.content, c.section_path, c.page_number, c.summary_text, c.summary_tokens, c.summary_model, d.title as document_title
                 FROM chunks c
                 JOIN documents d ON d.id = c.document_id
                 WHERE c.level = ?
@@ -425,10 +422,14 @@ class SQLiteStore(StorageInterface):
                 {
                     "id": r["id"],
                     "document_id": r["document_id"],
+                    "parent_chunk_id": r["parent_chunk_id"],
                     "title": r["document_title"],
                     "content": r["content"],
                     "section_path": r["section_path"],
                     "page_number": r["page_number"],
+                    "summary_text": r["summary_text"] if "summary_text" in r.keys() else None,
+                    "summary_tokens": r["summary_tokens"] if "summary_tokens" in r.keys() else None,
+                    "summary_model": r["summary_model"] if "summary_model" in r.keys() else None,
                 }
                 for r in rows
             ]
@@ -454,21 +455,33 @@ class SQLiteStore(StorageInterface):
                     c.section_path,
                     c.page_number,
                     json.dumps(c.embedding) if c.embedding else None,
+                    c.summary_text,
+                    c.summary_tokens,
+                    c.summary_model,
+                    c.generated_at.isoformat() if c.generated_at else None,
                     c.created_at.isoformat(),
                 )
             )
             # Only index child chunks in FTS search
             if c.level == ChunkLevel.CHILD:
                 fts_params.append(
-                    (c.id, c.document_id, c.content, c.section_path or "")
+                    (
+                        c.id,
+                        c.document_id,
+                        c.content,
+                        c.section_path or "",
+                        c.summary_text or "",
+                    )
                 )
 
         await conn.executemany(
             """
             INSERT OR REPLACE INTO chunks (
                 id, document_id, parent_chunk_id, level, content,
-                token_count, section_path, page_number, embedding, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                token_count, section_path, page_number, embedding,
+                summary_text, summary_tokens, summary_model, generated_at,
+                created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             chunk_params,
         )
@@ -476,8 +489,8 @@ class SQLiteStore(StorageInterface):
         if fts_params:
             await conn.executemany(
                 """
-                INSERT OR REPLACE INTO chunks_fts (id, document_id, content, section_path)
-                VALUES (?, ?, ?, ?)
+                INSERT OR REPLACE INTO chunks_fts (id, document_id, content, section_path, summary_text)
+                VALUES (?, ?, ?, ?, ?)
                 """,
                 fts_params,
             )
@@ -487,9 +500,7 @@ class SQLiteStore(StorageInterface):
 
     async def get_chunk(self, chunk_id: str) -> Chunk | None:
         conn = self._get_conn()
-        async with conn.execute(
-            "SELECT * FROM chunks WHERE id = ?", (chunk_id,)
-        ) as cursor:
+        async with conn.execute("SELECT * FROM chunks WHERE id = ?", (chunk_id,)) as cursor:
             row = await cursor.fetchone()
             if not row:
                 return None
@@ -503,6 +514,14 @@ class SQLiteStore(StorageInterface):
                 section_path=row["section_path"],
                 page_number=row["page_number"],
                 embedding=json.loads(row["embedding"]) if row["embedding"] else None,
+                summary_text=row["summary_text"] if "summary_text" in row.keys() else None,
+                summary_tokens=row["summary_tokens"] if "summary_tokens" in row.keys() else None,
+                summary_model=row["summary_model"] if "summary_model" in row.keys() else None,
+                generated_at=(
+                    datetime.fromisoformat(row["generated_at"])
+                    if "generated_at" in row.keys() and row["generated_at"]
+                    else None
+                ),
                 created_at=datetime.fromisoformat(row["created_at"]),
             )
 
@@ -526,6 +545,14 @@ class SQLiteStore(StorageInterface):
                     section_path=r["section_path"],
                     page_number=r["page_number"],
                     embedding=json.loads(r["embedding"]) if r["embedding"] else None,
+                    summary_text=r["summary_text"] if "summary_text" in r.keys() else None,
+                    summary_tokens=r["summary_tokens"] if "summary_tokens" in r.keys() else None,
+                    summary_model=r["summary_model"] if "summary_model" in r.keys() else None,
+                    generated_at=(
+                        datetime.fromisoformat(r["generated_at"])
+                        if "generated_at" in r.keys() and r["generated_at"]
+                        else None
+                    ),
                     created_at=datetime.fromisoformat(r["created_at"]),
                 )
                 for r in rows
@@ -556,7 +583,7 @@ class SQLiteStore(StorageInterface):
 
         sql = """
             SELECT c.id, c.document_id, c.parent_chunk_id, c.content, c.section_path,
-                   c.page_number, d.title as document_title, d.source_uri, d.permission_scope,
+                   c.page_number, c.summary_text, d.title as document_title, d.source_uri, d.permission_scope,
                    bm25(chunks_fts) as fts_rank
             FROM chunks_fts f
             JOIN chunks c ON c.id = f.id
@@ -590,6 +617,9 @@ class SQLiteStore(StorageInterface):
                                 "content": r["content"],
                                 "section_path": r["section_path"],
                                 "page_number": r["page_number"],
+                                "summary_text": r["summary_text"]
+                                if "summary_text" in r.keys()
+                                else None,
                                 "document_title": r["document_title"],
                                 "source_uri": r["source_uri"],
                                 "score": norm_score,
@@ -610,7 +640,7 @@ class SQLiteStore(StorageInterface):
         conn = self._get_conn()
         sql = """
             SELECT c.id, c.document_id, c.parent_chunk_id, c.content, c.section_path,
-                   c.page_number, c.embedding, d.title as document_title, d.source_uri, d.permission_scope
+                   c.page_number, c.summary_text, c.embedding, d.title as document_title, d.source_uri, d.permission_scope
             FROM chunks c
             JOIN documents d ON d.id = c.document_id
             WHERE c.level = 'child' AND c.embedding IS NOT NULL AND d.tenant_id = ?
@@ -657,6 +687,9 @@ class SQLiteStore(StorageInterface):
                             "content": r["content"],
                             "section_path": r["section_path"],
                             "page_number": r["page_number"],
+                            "summary_text": r["summary_text"]
+                            if "summary_text" in r.keys()
+                            else None,
                             "document_title": r["document_title"],
                             "source_uri": r["source_uri"],
                             "score": cosine_sim,
@@ -694,9 +727,7 @@ class SQLiteStore(StorageInterface):
         await conn.commit()
         return [n.id for n in nodes]
 
-    async def get_tree_nodes_for_document(
-        self, document_id: str
-    ) -> list[DocumentTreeNode]:
+    async def get_tree_nodes_for_document(self, document_id: str) -> list[DocumentTreeNode]:
         conn = self._get_conn()
         async with conn.execute(
             "SELECT * FROM document_tree_nodes WHERE document_id = ? ORDER BY node_order",
@@ -824,9 +855,7 @@ class SQLiteStore(StorageInterface):
                 for r in rows
             ]
 
-    async def get_preference(
-        self, user_id: str, preference_key: str
-    ) -> dict[str, Any] | None:
+    async def get_preference(self, user_id: str, preference_key: str) -> dict[str, Any] | None:
         conn = self._get_conn()
         async with conn.execute(
             "SELECT * FROM memory_preference WHERE user_id = ? AND preference_key = ?",
@@ -1098,9 +1127,7 @@ class SQLiteStore(StorageInterface):
     # Sessions, Agents & RLM Messaging
     # -----------------------------------------------------------------------
 
-    async def create_session(
-        self, session: SessionHandle, user_id: str = "default"
-    ) -> None:
+    async def create_session(self, session: SessionHandle, user_id: str = "default") -> None:
         conn = self._get_conn()
         now_iso = session.created_at.isoformat()
         budgets_json = json.dumps(
@@ -1133,9 +1160,7 @@ class SQLiteStore(StorageInterface):
 
     async def get_session(self, session_id: str) -> SessionHandle | None:
         conn = self._get_conn()
-        async with conn.execute(
-            "SELECT * FROM sessions WHERE id = ?", (session_id,)
-        ) as cursor:
+        async with conn.execute("SELECT * FROM sessions WHERE id = ?", (session_id,)) as cursor:
             row = await cursor.fetchone()
             if not row:
                 return None
@@ -1155,9 +1180,7 @@ class SQLiteStore(StorageInterface):
                 created_at=datetime.fromisoformat(row["created_at"]),
             )
 
-    async def update_session_status(
-        self, session_id: str, status: SessionStatus
-    ) -> None:
+    async def update_session_status(self, session_id: str, status: SessionStatus) -> None:
         conn = self._get_conn()
         now_iso = datetime.now(timezone.utc).isoformat()
         await conn.execute(
@@ -1199,14 +1222,10 @@ class SQLiteStore(StorageInterface):
         await conn.commit()
         return cid
 
-    async def update_rlm_child_status(
-        self, child_session_id: str, status: ChildStatus
-    ) -> None:
+    async def update_rlm_child_status(self, child_session_id: str, status: ChildStatus) -> None:
         conn = self._get_conn()
         now_iso = datetime.now(timezone.utc).isoformat()
-        completed_at = (
-            now_iso if status in (ChildStatus.COMPLETED, ChildStatus.ERROR) else None
-        )
+        completed_at = now_iso if status in (ChildStatus.COMPLETED, ChildStatus.ERROR) else None
         await conn.execute(
             "UPDATE rlm_children SET status = ?, completed_at = COALESCE(?, completed_at) WHERE child_session_id = ?",
             (status.value, completed_at, child_session_id),
@@ -1332,9 +1351,7 @@ class SQLiteStore(StorageInterface):
             params.append(event_type)
 
         where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
-        sql = (
-            f"SELECT * FROM events_trace {where_clause} ORDER BY id DESC LIMIT {limit}"
-        )
+        sql = f"SELECT * FROM events_trace {where_clause} ORDER BY id DESC LIMIT {limit}"
 
         async with conn.execute(sql, params) as cursor:
             rows = await cursor.fetchall()

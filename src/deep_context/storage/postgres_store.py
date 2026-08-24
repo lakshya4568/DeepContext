@@ -78,8 +78,32 @@ class PostgresStore(StorageInterface):
                     page_number INTEGER,
                     embedding VECTOR,
                     tsv TSVECTOR GENERATED ALWAYS AS (to_tsvector('english', content)) STORED,
+                    summary_text TEXT,
+                    summary_tokens INTEGER,
+                    summary_model TEXT DEFAULT 'qwen3-0.6b',
+                    generated_at TIMESTAMPTZ,
+                    summary_tsv TSVECTOR,
                     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
                 );
+
+                ALTER TABLE chunks ADD COLUMN IF NOT EXISTS summary_text TEXT;
+                ALTER TABLE chunks ADD COLUMN IF NOT EXISTS summary_tokens INTEGER;
+                ALTER TABLE chunks ADD COLUMN IF NOT EXISTS summary_model TEXT DEFAULT 'qwen3-0.6b';
+                ALTER TABLE chunks ADD COLUMN IF NOT EXISTS generated_at TIMESTAMPTZ;
+                ALTER TABLE chunks ADD COLUMN IF NOT EXISTS summary_tsv TSVECTOR;
+                CREATE INDEX IF NOT EXISTS idx_chunks_summary_tsv ON chunks USING GIN (summary_tsv);
+
+                CREATE OR REPLACE FUNCTION update_summary_tsv() RETURNS trigger AS $$
+                BEGIN
+                  NEW.summary_tsv := to_tsvector('english', COALESCE(NEW.summary_text, ''));
+                  RETURN NEW;
+                END;
+                $$ LANGUAGE plpgsql;
+
+                DROP TRIGGER IF EXISTS trigger_update_summary_tsv ON chunks;
+                CREATE TRIGGER trigger_update_summary_tsv
+                BEFORE INSERT OR UPDATE ON chunks
+                FOR EACH ROW EXECUTE FUNCTION update_summary_tsv();
 
                 CREATE TABLE IF NOT EXISTS document_tree_nodes (
                     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -258,9 +282,7 @@ class PostgresStore(StorageInterface):
 
     def _get_pool(self) -> asyncpg.Pool:
         if not self._pool:
-            raise RuntimeError(
-                "Postgres pool not initialized. Call initialize() first."
-            )
+            raise RuntimeError("Postgres pool not initialized. Call initialize() first.")
         return self._pool
 
     async def insert_document(self, document: Document) -> str:
@@ -298,9 +320,7 @@ class PostgresStore(StorageInterface):
     async def get_document(self, document_id: str) -> Document | None:
         pool = self._get_pool()
         async with pool.acquire() as conn:
-            row = await conn.fetchrow(
-                "SELECT * FROM documents WHERE id = $1::uuid", document_id
-            )
+            row = await conn.fetchrow("SELECT * FROM documents WHERE id = $1::uuid", document_id)
             if not row:
                 return None
             return Document(
@@ -389,9 +409,7 @@ class PostgresStore(StorageInterface):
     async def delete_document(self, document_id: str) -> bool:
         pool = self._get_pool()
         async with pool.acquire() as conn:
-            res = await conn.execute(
-                "DELETE FROM documents WHERE id = $1::uuid", document_id
-            )
+            res = await conn.execute("DELETE FROM documents WHERE id = $1::uuid", document_id)
             return "DELETE 1" in res
 
     async def delete_all_documents(self) -> int:
@@ -429,7 +447,7 @@ class PostgresStore(StorageInterface):
             if document_id:
                 rows = await conn.fetch(
                     """
-                    SELECT c.id, c.document_id, c.content, c.section_path, c.page_number, d.title as document_title
+                    SELECT c.id, c.document_id, c.parent_chunk_id, c.content, c.section_path, c.page_number, c.summary_text, c.summary_tokens, c.summary_model, d.title as document_title
                     FROM chunks c
                     JOIN documents d ON d.id = c.document_id
                     WHERE c.document_id = $1::uuid AND c.level = $2
@@ -443,7 +461,7 @@ class PostgresStore(StorageInterface):
             else:
                 rows = await conn.fetch(
                     """
-                    SELECT c.id, c.document_id, c.content, c.section_path, c.page_number, d.title as document_title
+                    SELECT c.id, c.document_id, c.parent_chunk_id, c.content, c.section_path, c.page_number, c.summary_text, c.summary_tokens, c.summary_model, d.title as document_title
                     FROM chunks c
                     JOIN documents d ON d.id = c.document_id
                     WHERE c.level = $1
@@ -457,10 +475,14 @@ class PostgresStore(StorageInterface):
                 {
                     "id": str(r["id"]),
                     "document_id": str(r["document_id"]),
+                    "parent_chunk_id": str(r["parent_chunk_id"]) if r["parent_chunk_id"] else None,
                     "title": r["document_title"],
                     "content": r["content"],
                     "section_path": r["section_path"],
                     "page_number": r["page_number"],
+                    "summary_text": r.get("summary_text"),
+                    "summary_tokens": r.get("summary_tokens"),
+                    "summary_model": r.get("summary_model"),
                 }
                 for r in rows
             ]
@@ -480,11 +502,11 @@ class PostgresStore(StorageInterface):
                     c.token_count,
                     c.section_path,
                     c.page_number,
-                    (
-                        np.array(c.embedding, dtype=np.float32)
-                        if c.embedding is not None
-                        else None
-                    ),
+                    (np.array(c.embedding, dtype=np.float32) if c.embedding is not None else None),
+                    c.summary_text,
+                    c.summary_tokens,
+                    c.summary_model,
+                    c.generated_at,
                     c.created_at,
                 )
                 for c in chunks
@@ -493,9 +515,20 @@ class PostgresStore(StorageInterface):
                 """
                 INSERT INTO chunks (
                     id, document_id, parent_chunk_id, level, content,
-                    token_count, section_path, page_number, embedding, created_at
-                ) VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8, $9, $10)
-                ON CONFLICT (id) DO NOTHING;
+                    token_count, section_path, page_number, embedding,
+                    summary_text, summary_tokens, summary_model, generated_at,
+                    created_at
+                ) VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                ON CONFLICT (id) DO UPDATE SET
+                    content = EXCLUDED.content,
+                    token_count = EXCLUDED.token_count,
+                    section_path = EXCLUDED.section_path,
+                    page_number = EXCLUDED.page_number,
+                    embedding = EXCLUDED.embedding,
+                    summary_text = EXCLUDED.summary_text,
+                    summary_tokens = EXCLUDED.summary_tokens,
+                    summary_model = EXCLUDED.summary_model,
+                    generated_at = EXCLUDED.generated_at;
                 """,
                 records,
             )
@@ -504,25 +537,23 @@ class PostgresStore(StorageInterface):
     async def get_chunk(self, chunk_id: str) -> Chunk | None:
         pool = self._get_pool()
         async with pool.acquire() as conn:
-            row = await conn.fetchrow(
-                "SELECT * FROM chunks WHERE id = $1::uuid", chunk_id
-            )
+            row = await conn.fetchrow("SELECT * FROM chunks WHERE id = $1::uuid", chunk_id)
             if not row:
                 return None
             return Chunk(
                 id=str(row["id"]),
                 document_id=str(row["document_id"]),
-                parent_chunk_id=(
-                    str(row["parent_chunk_id"]) if row["parent_chunk_id"] else None
-                ),
+                parent_chunk_id=(str(row["parent_chunk_id"]) if row["parent_chunk_id"] else None),
                 level=ChunkLevel(row["level"]),
                 content=row["content"],
                 token_count=row["token_count"],
                 section_path=row["section_path"],
                 page_number=row["page_number"],
-                embedding=(
-                    list(row["embedding"]) if row["embedding"] is not None else None
-                ),
+                embedding=(list(row["embedding"]) if row["embedding"] is not None else None),
+                summary_text=row.get("summary_text"),
+                summary_tokens=row.get("summary_tokens"),
+                summary_model=row.get("summary_model"),
+                generated_at=row.get("generated_at"),
                 created_at=row["created_at"],
             )
 
@@ -531,24 +562,22 @@ class PostgresStore(StorageInterface):
             return []
         pool = self._get_pool()
         async with pool.acquire() as conn:
-            rows = await conn.fetch(
-                "SELECT * FROM chunks WHERE id = ANY($1::uuid[])", chunk_ids
-            )
+            rows = await conn.fetch("SELECT * FROM chunks WHERE id = ANY($1::uuid[])", chunk_ids)
             return [
                 Chunk(
                     id=str(r["id"]),
                     document_id=str(r["document_id"]),
-                    parent_chunk_id=(
-                        str(r["parent_chunk_id"]) if r["parent_chunk_id"] else None
-                    ),
+                    parent_chunk_id=(str(r["parent_chunk_id"]) if r["parent_chunk_id"] else None),
                     level=ChunkLevel(r["level"]),
                     content=r["content"],
                     token_count=r["token_count"],
                     section_path=r["section_path"],
                     page_number=r["page_number"],
-                    embedding=(
-                        list(r["embedding"]) if r["embedding"] is not None else None
-                    ),
+                    embedding=(list(r["embedding"]) if r["embedding"] is not None else None),
+                    summary_text=r.get("summary_text"),
+                    summary_tokens=r.get("summary_tokens"),
+                    summary_model=r.get("summary_model"),
+                    generated_at=r.get("generated_at"),
                     created_at=r["created_at"],
                 )
                 for r in rows
@@ -595,13 +624,9 @@ class PostgresStore(StorageInterface):
             "does",
         }
         words = [
-            w
-            for w in re.findall(r"\w+", clean_query.lower())
-            if len(w) > 2 and w not in stopwords
+            w for w in re.findall(r"\w+", clean_query.lower()) if len(w) > 2 and w not in stopwords
         ]
-        or_terms = (
-            " | ".join(words[:8]) if words else (phrase_term if phrase_term else "text")
-        )
+        or_terms = " | ".join(words[:8]) if words else (phrase_term if phrase_term else "text")
         plain_term = " ".join(words[:8]) if words else clean_query
 
         pool = self._get_pool()
@@ -626,16 +651,18 @@ class PostgresStore(StorageInterface):
             where_sql = " AND ".join(clauses)
             sql = f"""
                 SELECT c.id, c.document_id, c.parent_chunk_id, c.content, c.section_path,
-                       c.page_number, d.title as document_title, d.source_uri,
+                       c.page_number, c.summary_text, d.title as document_title, d.source_uri,
                        (COALESCE(ts_rank(c.tsv, plainto_tsquery('english', $1)), 0.0) +
                         COALESCE(ts_rank(c.tsv, to_tsquery('english', $2)), 0.0) +
-                        (CASE WHEN length($3) > 0 AND c.content ILIKE '%' || $3 || '%' THEN 10.0 ELSE 0.0 END)) AS score
+                        COALESCE(ts_rank(c.summary_tsv, plainto_tsquery('english', $1)), 0.0) +
+                        COALESCE(ts_rank(c.summary_tsv, to_tsquery('english', $2)), 0.0) +
+                        (CASE WHEN length($3) > 0 AND (c.content ILIKE '%' || $3 || '%' OR COALESCE(c.summary_text, '') ILIKE '%' || $3 || '%') THEN 10.0 ELSE 0.0 END)) AS score
                 FROM chunks c
                 JOIN documents d ON d.id = c.document_id
                 WHERE {where_sql} AND (
-                    (length($1) > 0 AND c.tsv @@ plainto_tsquery('english', $1)) OR
-                    (length($2) > 0 AND c.tsv @@ to_tsquery('english', $2)) OR
-                    (length($3) > 0 AND c.content ILIKE '%' || $3 || '%')
+                    (length($1) > 0 AND (c.tsv @@ plainto_tsquery('english', $1) OR (c.summary_tsv IS NOT NULL AND c.summary_tsv @@ plainto_tsquery('english', $1)))) OR
+                    (length($2) > 0 AND (c.tsv @@ to_tsquery('english', $2) OR (c.summary_tsv IS NOT NULL AND c.summary_tsv @@ to_tsquery('english', $2)))) OR
+                    (length($3) > 0 AND (c.content ILIKE '%' || $3 || '%' OR COALESCE(c.summary_text, '') ILIKE '%' || $3 || '%'))
                 )
                 ORDER BY score DESC, c.created_at DESC LIMIT {limit};
             """
@@ -650,6 +677,7 @@ class PostgresStore(StorageInterface):
                     "content": r["content"],
                     "section_path": r["section_path"],
                     "page_number": r["page_number"],
+                    "summary_text": r.get("summary_text"),
                     "document_title": r["document_title"],
                     "source_uri": r["source_uri"],
                     "score": float(r["score"]),
@@ -681,7 +709,7 @@ class PostgresStore(StorageInterface):
             where_sql = " AND ".join(clauses)
             sql = f"""
                 SELECT c.id, c.document_id, c.parent_chunk_id, c.content, c.section_path,
-                       c.page_number, d.title as document_title, d.source_uri,
+                       c.page_number, c.summary_text, d.title as document_title, d.source_uri,
                        1 - (c.embedding <=> $1) AS score
                 FROM chunks c
                 JOIN documents d ON d.id = c.document_id
@@ -695,9 +723,7 @@ class PostgresStore(StorageInterface):
                     "different vector dimensions" in str(e).lower()
                     or "dimension mismatch" in str(e).lower()
                 ):
-                    logger.warning(
-                        "Vector search skipped due to dimension mismatch: %s", e
-                    )
+                    logger.warning("Vector search skipped due to dimension mismatch: %s", e)
                     return []
                 raise
             return [
@@ -710,6 +736,7 @@ class PostgresStore(StorageInterface):
                     "content": r["content"],
                     "section_path": r["section_path"],
                     "page_number": r["page_number"],
+                    "summary_text": r.get("summary_text"),
                     "document_title": r["document_title"],
                     "source_uri": r["source_uri"],
                     "score": float(r["score"]),
@@ -745,9 +772,7 @@ class PostgresStore(StorageInterface):
             )
             return [n.id for n in nodes]
 
-    async def get_tree_nodes_for_document(
-        self, document_id: str
-    ) -> list[DocumentTreeNode]:
+    async def get_tree_nodes_for_document(self, document_id: str) -> list[DocumentTreeNode]:
         pool = self._get_pool()
         async with pool.acquire() as conn:
             rows = await conn.fetch(
@@ -758,9 +783,7 @@ class PostgresStore(StorageInterface):
                 DocumentTreeNode(
                     id=str(r["id"]),
                     document_id=str(r["document_id"]),
-                    parent_node_id=(
-                        str(r["parent_node_id"]) if r["parent_node_id"] else None
-                    ),
+                    parent_node_id=(str(r["parent_node_id"]) if r["parent_node_id"] else None),
                     title=r["title"],
                     summary=r["summary"],
                     chunk_id=str(r["chunk_id"]) if r["chunk_id"] else None,
@@ -789,9 +812,7 @@ class PostgresStore(StorageInterface):
                 DocumentTreeNode(
                     id=str(r["id"]),
                     document_id=str(r["document_id"]),
-                    parent_node_id=(
-                        str(r["parent_node_id"]) if r["parent_node_id"] else None
-                    ),
+                    parent_node_id=(str(r["parent_node_id"]) if r["parent_node_id"] else None),
                     title=r["title"],
                     summary=r["summary"],
                     chunk_id=str(r["chunk_id"]) if r["chunk_id"] else None,
@@ -889,9 +910,7 @@ class PostgresStore(StorageInterface):
                 for r in rows
             ]
 
-    async def get_preference(
-        self, user_id: str, preference_key: str
-    ) -> dict[str, Any] | None:
+    async def get_preference(self, user_id: str, preference_key: str) -> dict[str, Any] | None:
         pool = self._get_pool()
         async with pool.acquire() as conn:
             row = await conn.fetchrow(
@@ -944,9 +963,7 @@ class PostgresStore(StorageInterface):
     async def list_preferences(self, user_id: str) -> list[dict[str, Any]]:
         pool = self._get_pool()
         async with pool.acquire() as conn:
-            rows = await conn.fetch(
-                "SELECT * FROM memory_preference WHERE user_id = $1", user_id
-            )
+            rows = await conn.fetch("SELECT * FROM memory_preference WHERE user_id = $1", user_id)
             return [
                 {
                     "id": str(r["id"]),
@@ -1033,9 +1050,7 @@ class PostgresStore(StorageInterface):
                     "content": r["content"],
                     "source": r["source"],
                     "confidence": r["confidence"],
-                    "expires_at": (
-                        r["expires_at"].isoformat() if r["expires_at"] else None
-                    ),
+                    "expires_at": (r["expires_at"].isoformat() if r["expires_at"] else None),
                     "score": float(r["score"]),
                 }
                 for r in rows
@@ -1131,9 +1146,7 @@ class PostgresStore(StorageInterface):
                 for r in rows
             ]
 
-    async def create_session(
-        self, session: SessionHandle, user_id: str = "default"
-    ) -> None:
+    async def create_session(self, session: SessionHandle, user_id: str = "default") -> None:
         pool = self._get_pool()
         budgets_json = json.dumps(
             {
@@ -1165,9 +1178,7 @@ class PostgresStore(StorageInterface):
     async def get_session(self, session_id: str) -> SessionHandle | None:
         pool = self._get_pool()
         async with pool.acquire() as conn:
-            row = await conn.fetchrow(
-                "SELECT * FROM sessions WHERE id = $1::uuid", session_id
-            )
+            row = await conn.fetchrow("SELECT * FROM sessions WHERE id = $1::uuid", session_id)
             if not row:
                 return None
             b_dict = (
@@ -1192,9 +1203,7 @@ class PostgresStore(StorageInterface):
                 created_at=row["created_at"],
             )
 
-    async def update_session_status(
-        self, session_id: str, status: SessionStatus
-    ) -> None:
+    async def update_session_status(self, session_id: str, status: SessionStatus) -> None:
         pool = self._get_pool()
         async with pool.acquire() as conn:
             await conn.execute(
@@ -1227,9 +1236,7 @@ class PostgresStore(StorageInterface):
             )
             return str(row["id"])
 
-    async def update_rlm_child_status(
-        self, child_session_id: str, status: ChildStatus
-    ) -> None:
+    async def update_rlm_child_status(self, child_session_id: str, status: ChildStatus) -> None:
         pool = self._get_pool()
         async with pool.acquire() as conn:
             await conn.execute(
@@ -1354,9 +1361,7 @@ class PostgresStore(StorageInterface):
                     "agent_id": str(r["agent_id"]) if r["agent_id"] else None,
                     "event_type": r["event_type"],
                     "payload": (
-                        json.loads(r["payload"])
-                        if isinstance(r["payload"], str)
-                        else r["payload"]
+                        json.loads(r["payload"]) if isinstance(r["payload"], str) else r["payload"]
                     ),
                     "token_cost": r["token_cost"],
                     "latency_ms": r["latency_ms"],
@@ -1409,9 +1414,7 @@ class PostgresStore(StorageInterface):
                     "max_retries": r["max_retries"],
                     "retries": r["retries"],
                     "last_error": r["last_error"],
-                    "last_run_at": (
-                        r["last_run_at"].isoformat() if r["last_run_at"] else None
-                    ),
+                    "last_run_at": (r["last_run_at"].isoformat() if r["last_run_at"] else None),
                 }
                 for r in rows
             ]
@@ -1457,9 +1460,7 @@ class PostgresStore(StorageInterface):
                     "max_retries": r["max_retries"],
                     "retries": r["retries"],
                     "last_error": r["last_error"],
-                    "last_run_at": (
-                        r["last_run_at"].isoformat() if r["last_run_at"] else None
-                    ),
+                    "last_run_at": (r["last_run_at"].isoformat() if r["last_run_at"] else None),
                 }
                 for r in rows
             ]

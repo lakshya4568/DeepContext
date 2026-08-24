@@ -91,7 +91,9 @@ class PromptAssembler:
                 title = c.get("document_title", "Document")
                 sec = c.get("section_path", "")
                 content = c.get("content", "").strip()
-                block = f"[{idx}] Source: {title} | Section: {sec}\n{content}"
+                summary = c.get("summary_text")
+                summary_hdr = f" | Summary: {summary}" if summary else ""
+                block = f"[{idx}] Source: {title} | Section: {sec}{summary_hdr}\n{content}"
                 if total_chars + len(block) > char_budget:
                     remaining = char_budget - total_chars
                     if remaining > 200:

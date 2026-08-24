@@ -31,6 +31,24 @@ class TestCacheStatusEndpoint:
             assert res.json()["status"] == "ok"
 
 
+class TestConfigEndpoints:
+    def test_get_and_update_config(self) -> None:
+        with _client() as client:
+            res = client.get("/v1/config")
+            assert res.status_code == 200
+            data = res.json()
+            assert "summary_enabled" in data
+            assert "summary_model" in data
+            assert "summary_device" in data
+
+            up_res = client.post("/v1/config", json={"summary_max_tokens": 75, "default_top_k": 10})
+            assert up_res.status_code == 200
+            up_data = up_res.json()
+            assert up_data["status"] == "updated"
+            assert up_data["config"]["summary_max_tokens"] == 75
+            assert up_data["config"]["default_top_k"] == 10
+
+
 class TestSchedulerEndpoints:
     def test_list_jobs(self) -> None:
         with _client() as client:

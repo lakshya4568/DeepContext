@@ -52,16 +52,11 @@ def seeded_corpus() -> None:
 
 class TestGrading:
     def test_term_overlap_ratio(self) -> None:
-        ratio = _term_overlap_ratio(
-            "reward hacking types", "reward hacking has two types"
-        )
+        ratio = _term_overlap_ratio("reward hacking types", "reward hacking has two types")
         assert ratio > 0.5
 
     def test_term_overlap_zero_for_unrelated(self) -> None:
-        assert (
-            _term_overlap_ratio("quantum entanglement", "recipe for banana bread")
-            == 0.0
-        )
+        assert _term_overlap_ratio("quantum entanglement", "recipe for banana bread") == 0.0
 
     async def test_grade_relevant(self) -> None:
         state = RAGState(query="reward hacking")

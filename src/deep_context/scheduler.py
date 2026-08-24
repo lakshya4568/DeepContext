@@ -116,9 +116,7 @@ async def cleanup_orphaned_docs() -> None:
     """Remove chunks/FTS rows whose parent document no longer exists."""
     storage = await get_storage()
     removed = await storage.cleanup_orphaned_chunks()
-    logger.info(
-        "Scheduler cleanup_orphaned_docs removed %d orphaned chunk(s).", removed
-    )
+    logger.info("Scheduler cleanup_orphaned_docs removed %d orphaned chunk(s).", removed)
 
 
 @job("reindex_corpus")
@@ -176,9 +174,7 @@ async def run_due_jobs_once(now: datetime | None = None) -> list[str]:
                 )
             else:
                 # Retry soon rather than waiting for the next scheduled slot.
-                retry_at = current + timedelta(
-                    seconds=settings.scheduler_poll_interval * 2
-                )
+                retry_at = current + timedelta(seconds=settings.scheduler_poll_interval * 2)
                 from deep_context.storage.base import StorageInterface  # noqa: F401
 
                 await storage.upsert_job(

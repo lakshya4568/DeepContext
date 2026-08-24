@@ -1046,6 +1046,13 @@
             ></i>
             Typed Memory & Telemetry
           </button>
+          <button class="nav-tab" onclick="switchTab('config-tab')">
+            <i
+              data-lucide="sliders-horizontal"
+              style="width: 16px; height: 16px"
+            ></i>
+            Pipeline Settings & Config
+          </button>
         </div>
       </div>
     </nav>
@@ -1553,6 +1560,14 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
               </div>
             </div>
 
+            <div style="display: flex; align-items: center; gap: 10px; margin-top: 12px; margin-bottom: 12px; padding: 10px 14px; background: var(--bg-subtle); border-radius: var(--radius-sm); border: 1px solid var(--border);">
+              <input type="checkbox" id="upload-summary-checkbox" checked style="width: 16px; height: 16px; cursor: pointer;">
+              <label for="upload-summary-checkbox" style="margin: 0; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--text);">
+                <i data-lucide="cpu" style="width: 13px; height: 13px; vertical-align: -2px; margin-right: 4px; color: var(--blue);"></i>
+                Generate Qwen3 Semantic Summaries for Child Chunks (Apple Silicon MPS / Local GPU)
+              </label>
+            </div>
+
             <div style="display: flex; gap: 10px; margin-top: 10px">
               <button
                 class="btn"
@@ -1956,6 +1971,240 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
           </div>
         </div>
       </section>
+
+      <!-- ============================================================= -->
+      <!-- TAB 5: Pipeline Configuration & Settings                       -->
+      <!-- ============================================================= -->
+      <section id="config-tab" class="tab-pane">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <h2 style="font-size: 20px; font-weight: 700; color: var(--text);">Pipeline Settings & Runtime Configuration</h2>
+            <p style="font-size: 13.5px; color: var(--text-muted);">Adjust chunking limits, LLM summarization, rerankers, retrieval parameters, and test local models live.</p>
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <button class="btn btn-secondary" onclick="loadPlatformConfig()">
+              <i data-lucide="rotate-ccw" style="width: 14px; height: 14px"></i>
+              Reload Settings
+            </button>
+            <button class="btn" style="background: var(--emerald); border-color: var(--emerald);" onclick="savePlatformConfig()">
+              <i data-lucide="save" style="width: 14px; height: 14px"></i>
+              Save Configuration
+            </button>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <!-- CARD 1: LLM Semantic Chunk Summarization -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <div class="card-icon-wrap" style="background: var(--blue-bg); color: var(--blue);">
+                  <i data-lucide="cpu" style="width: 18px; height: 18px"></i>
+                </div>
+                <div>
+                  <div class="card-title">LLM Semantic Chunk Summarization</div>
+                  <div class="card-subtitle">Qwen3 local model running on Apple Silicon GPU (MPS)</div>
+                </div>
+              </div>
+            </div>
+
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: var(--bg-subtle); border-radius: var(--radius-md); border: 1px solid var(--border); margin-bottom: 16px;">
+              <div>
+                <div style="font-weight: 600; font-size: 13.5px;">Auto-Summarize on Ingestion</div>
+                <div style="font-size: 12px; color: var(--text-muted);">Generate 1-2 sentence summaries for child chunks to boost lexical recall</div>
+              </div>
+              <input type="checkbox" id="cfg-summary-enabled" style="width: 20px; height: 20px; cursor: pointer;">
+            </div>
+
+            <div class="grid-2" style="margin-bottom: 14px;">
+              <div>
+                <label><i data-lucide="box" style="width: 12px; height: 12px"></i> Local Model Name</label>
+                <input type="text" id="cfg-summary-model" value="Qwen/Qwen3-0.6B" placeholder="Qwen/Qwen3-0.6B">
+              </div>
+              <div>
+                <label><i data-lucide="hard-drive" style="width: 12px; height: 12px"></i> Compute Device</label>
+                <select id="cfg-summary-device">
+                  <option value="mps">MPS (Apple Silicon GPU / Metal)</option>
+                  <option value="cuda">CUDA (NVIDIA GPU)</option>
+                  <option value="cpu">CPU</option>
+                  <option value="auto">Auto-detect</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid-2" style="margin-bottom: 16px;">
+              <div>
+                <label><i data-lucide="hash" style="width: 12px; height: 12px"></i> Max Summary Tokens</label>
+                <input type="number" id="cfg-summary-max-tokens" value="80" min="20" max="200">
+              </div>
+              <div>
+                <label><i data-lucide="layers" style="width: 12px; height: 12px"></i> Ingest Batch Size</label>
+                <input type="number" id="cfg-summary-batch-size" value="8" min="1" max="32">
+              </div>
+            </div>
+
+            <!-- Live Summarizer Sandbox -->
+            <div style="padding: 14px; background: var(--bg-subtle); border-radius: var(--radius-md); border: 1px solid var(--border);">
+              <div style="font-weight: 600; font-size: 13px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                <i data-lucide="terminal" style="width: 14px; height: 14px; color: var(--blue);"></i>
+                Test Local Summarizer Live (MPS GPU Sandbox)
+              </div>
+              <textarea id="cfg-test-text" rows="2" placeholder="Paste sample chunk text to generate a test summary live on Apple Silicon GPU..." style="margin-bottom: 8px; font-size: 12.5px;"></textarea>
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <button class="btn btn-secondary" style="font-size: 12px; padding: 6px 12px;" onclick="runLiveSummaryTest()">
+                  <span id="cfg-test-spinner" class="spinner hidden"></span>
+                  <i data-lucide="play" style="width: 13px; height: 13px"></i>
+                  Run Summary Test
+                </button>
+                <span id="cfg-test-metrics" style="font-size: 11.5px; color: var(--text-muted); font-family: var(--font-mono);"></span>
+              </div>
+              <div id="cfg-test-result" style="display: none; margin-top: 10px; padding: 10px; background: var(--bg-surface); border-radius: var(--radius-sm); border: 1px solid var(--border); font-size: 12.5px; color: var(--text-secondary);"></div>
+            </div>
+          </div>
+
+          <!-- CARD 2: Parent-Child Hierarchical Chunking -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <div class="card-icon-wrap" style="background: var(--purple-bg); color: var(--purple);">
+                  <i data-lucide="split" style="width: 18px; height: 18px"></i>
+                </div>
+                <div>
+                  <div class="card-title">Parent-Child Chunking Strategy</div>
+                  <div class="card-subtitle">Structure-aware token boundaries and parent resolution</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="grid-2" style="margin-bottom: 14px;">
+              <div>
+                <label><i data-lucide="maximize" style="width: 12px; height: 12px"></i> Parent Max Tokens</label>
+                <input type="number" id="cfg-parent-max-tokens" value="2500" min="500" max="5000">
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Context for generation (1000-2500 tokens)</div>
+              </div>
+              <div>
+                <label><i data-lucide="minimize" style="width: 12px; height: 12px"></i> Parent Min Tokens</label>
+                <input type="number" id="cfg-parent-min-tokens" value="1000" min="200" max="2000">
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Minimum threshold before section split</div>
+              </div>
+            </div>
+
+            <div class="grid-2" style="margin-bottom: 14px;">
+              <div>
+                <label><i data-lucide="maximize-2" style="width: 12px; height: 12px"></i> Child Max Tokens</label>
+                <input type="number" id="cfg-child-max-tokens" value="600" min="100" max="1200">
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Granular vector search chunks (300-600)</div>
+              </div>
+              <div>
+                <label><i data-lucide="minimize-2" style="width: 12px; height: 12px"></i> Child Min Tokens</label>
+                <input type="number" id="cfg-child-min-tokens" value="300" min="50" max="600">
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Minimum sub-chunk length</div>
+              </div>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+              <label><i data-lucide="repeat" style="width: 12px; height: 12px"></i> Child Chunk Overlap Tokens</label>
+              <input type="number" id="cfg-child-overlap" value="60" min="0" max="200">
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Sliding window token overlap to preserve sentence boundaries</div>
+            </div>
+          </div>
+
+          <!-- CARD 3: Hybrid Retrieval & Reranker -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <div class="card-icon-wrap" style="background: var(--amber-bg); color: var(--amber);">
+                  <i data-lucide="layers" style="width: 18px; height: 18px"></i>
+                </div>
+                <div>
+                  <div class="card-title">Hybrid Retrieval & Reranker</div>
+                  <div class="card-subtitle">Reciprocal Rank Fusion and Cross-Encoder precision</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="grid-2" style="margin-bottom: 14px;">
+              <div>
+                <label><i data-lucide="compass" style="width: 12px; height: 12px"></i> Default Retrieval Mode</label>
+                <select id="cfg-retrieval-mode">
+                  <option value="hybrid">Hybrid (Dense Vector + BM25 tsvector)</option>
+                  <option value="vectorless">Vectorless PageIndex (Tree)</option>
+                </select>
+              </div>
+              <div>
+                <label><i data-lucide="list-ordered" style="width: 12px; height: 12px"></i> Top-K Candidates Limit</label>
+                <input type="number" id="cfg-top-k" value="8" min="1" max="50">
+              </div>
+            </div>
+
+            <div class="grid-2" style="margin-bottom: 14px;">
+              <div>
+                <label><i data-lucide="filter" style="width: 12px; height: 12px"></i> Cross-Encoder Reranker</label>
+                <select id="cfg-reranker-engine">
+                  <option value="ecohash_hybrid">EcoHash Hybrid Reranker (Heuristic + Local)</option>
+                  <option value="local_cross_encoder">Local Cross-Encoder (BAAI/bge-reranker-base)</option>
+                  <option value="none">None (Pure RRF Fusion)</option>
+                </select>
+              </div>
+              <div>
+                <label><i data-lucide="shield-check" style="width: 12px; height: 12px"></i> Grounding Confidence Threshold</label>
+                <input type="number" id="cfg-confidence-threshold" value="0.75" step="0.05" min="0.0" max="1.0">
+              </div>
+            </div>
+          </div>
+
+          <!-- CARD 4: Agentic Corrective RAG & Cache -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <div class="card-icon-wrap" style="background: var(--emerald-bg); color: var(--emerald);">
+                  <i data-lucide="git-branch" style="width: 18px; height: 18px"></i>
+                </div>
+                <div>
+                  <div class="card-title">Agentic RAG & System Operations</div>
+                  <div class="card-subtitle">Corrective query rewriting loop and cache persistence</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="grid-2" style="margin-bottom: 14px;">
+              <div>
+                <label><i data-lucide="rotate-cw" style="width: 12px; height: 12px"></i> Max Agentic Query Rewrites</label>
+                <input type="number" id="cfg-max-rewrites" value="2" min="0" max="5">
+              </div>
+              <div>
+                <label><i data-lucide="percent" style="width: 12px; height: 12px"></i> Relevance Grade Threshold</label>
+                <input type="number" id="cfg-grade-threshold" value="0.30" step="0.05" min="0.0" max="1.0">
+              </div>
+            </div>
+
+            <div class="grid-2" style="margin-bottom: 16px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--bg-subtle); border-radius: var(--radius-sm); border: 1px solid var(--border);">
+                <div>
+                  <div style="font-weight: 600; font-size: 13px;">Response Cache Layer</div>
+                  <div style="font-size: 11.5px; color: var(--text-muted);">Cache repeated queries</div>
+                </div>
+                <input type="checkbox" id="cfg-cache-enabled" checked style="width: 18px; height: 18px; cursor: pointer;">
+              </div>
+              <div>
+                <label><i data-lucide="clock" style="width: 12px; height: 12px"></i> Cache TTL (Seconds)</label>
+                <input type="number" id="cfg-cache-ttl" value="300" min="10" max="86400">
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+              <button class="btn btn-secondary" style="flex: 1;" onclick="resetPlatformConfigDefaults()">
+                <i data-lucide="trash-2" style="width: 14px; height: 14px"></i>
+                Restore Defaults
+              </button>
+              <button class="btn" style="flex: 1; background: var(--emerald); border-color: var(--emerald);" onclick="savePlatformConfig()">
+                <i data-lucide="check" style="width: 14px; height: 14px"></i>
+                Save All Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
     </main>
 
     <script>
@@ -1990,6 +2239,7 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
 
         if (tabId === "ingest-tab" || tabId === "haystack-tab") loadDocuments();
         if (tabId === "memory-tab") loadTelemetry();
+        if (tabId === "config-tab") loadPlatformConfig();
       }
 
       function setQuery(q) {
@@ -2492,14 +2742,15 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
           "gemini-embedding-2";
         const embDim = embModel.includes("gemini") ? 768 : 1024;
 
-        btn.disabled = true;
-        spinner.classList.remove("hidden");
+        const genSummaries =
+          document.getElementById("upload-summary-checkbox")?.checked ?? true;
 
         const formData = new FormData();
         selectedBatchFiles.forEach((f) => formData.append("files", f));
         formData.append("vectorless", mode === "vectorless" ? "true" : "false");
         formData.append("embedding_model", embModel);
         formData.append("embedding_dim", String(embDim));
+        formData.append("generate_summaries", genSummaries ? "true" : "false");
 
         try {
           const res = await fetch("/v1/upload-batch", {
@@ -2945,10 +3196,217 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
         }
       }
 
+      // -----------------------------------------------------------------------
+      // Pipeline Configuration & Settings Management
+      // -----------------------------------------------------------------------
+      async function loadPlatformConfig() {
+        try {
+          const res = await fetch("/v1/config");
+          if (!res.ok) return;
+          const cfg = await res.json();
+
+          // Summarization
+          document.getElementById("cfg-summary-enabled").checked =
+            cfg.summary_enabled ?? false;
+          document.getElementById("cfg-summary-model").value =
+            cfg.summary_model || "Qwen/Qwen3-0.6B";
+          document.getElementById("cfg-summary-device").value =
+            cfg.summary_device || "mps";
+          document.getElementById("cfg-summary-max-tokens").value =
+            cfg.summary_max_tokens || 80;
+          document.getElementById("cfg-summary-batch-size").value =
+            cfg.summary_batch_size || 8;
+
+          // Retrieval & Reranker
+          document.getElementById("cfg-retrieval-mode").value =
+            cfg.default_retrieval_mode || "hybrid";
+          document.getElementById("cfg-top-k").value = cfg.default_top_k || 8;
+          document.getElementById("cfg-reranker-engine").value =
+            cfg.reranker_model || "ecohash_hybrid";
+          document.getElementById("cfg-confidence-threshold").value =
+            cfg.confidence_threshold ?? 0.75;
+
+          // Agentic & Ops
+          document.getElementById("cfg-max-rewrites").value =
+            cfg.agentic_max_rewrites ?? 2;
+          document.getElementById("cfg-grade-threshold").value =
+            cfg.agentic_grade_threshold ?? 0.3;
+          document.getElementById("cfg-cache-enabled").checked =
+            cfg.cache_enabled ?? true;
+          document.getElementById("cfg-cache-ttl").value =
+            cfg.cache_default_ttl ?? 300;
+
+          // Also check localStorage for client-side chunking overrides
+          const localChunking = JSON.parse(
+            localStorage.getItem("deepcontext_chunking") || "{}",
+          );
+          if (localChunking.parent_max)
+            document.getElementById("cfg-parent-max-tokens").value =
+              localChunking.parent_max;
+          if (localChunking.parent_min)
+            document.getElementById("cfg-parent-min-tokens").value =
+              localChunking.parent_min;
+          if (localChunking.child_max)
+            document.getElementById("cfg-child-max-tokens").value =
+              localChunking.child_max;
+          if (localChunking.child_min)
+            document.getElementById("cfg-child-min-tokens").value =
+              localChunking.child_min;
+          if (localChunking.child_overlap)
+            document.getElementById("cfg-child-overlap").value =
+              localChunking.child_overlap;
+        } catch (e) {
+          console.warn("Failed to load platform config:", e);
+        }
+      }
+
+      async function savePlatformConfig() {
+        const payload = {
+          summary_enabled:
+            document.getElementById("cfg-summary-enabled").checked,
+          summary_model:
+            document.getElementById("cfg-summary-model").value.trim(),
+          summary_device: document.getElementById("cfg-summary-device").value,
+          summary_max_tokens: parseInt(
+            document.getElementById("cfg-summary-max-tokens").value,
+            10,
+          ),
+          summary_batch_size: parseInt(
+            document.getElementById("cfg-summary-batch-size").value,
+            10,
+          ),
+          default_retrieval_mode:
+            document.getElementById("cfg-retrieval-mode").value,
+          default_top_k: parseInt(
+            document.getElementById("cfg-top-k").value,
+            10,
+          ),
+          reranker_model:
+            document.getElementById("cfg-reranker-engine").value,
+          confidence_threshold: parseFloat(
+            document.getElementById("cfg-confidence-threshold").value,
+          ),
+          agentic_max_rewrites: parseInt(
+            document.getElementById("cfg-max-rewrites").value,
+            10,
+          ),
+          agentic_grade_threshold: parseFloat(
+            document.getElementById("cfg-grade-threshold").value,
+          ),
+          cache_enabled: document.getElementById("cfg-cache-enabled").checked,
+          cache_default_ttl: parseInt(
+            document.getElementById("cfg-cache-ttl").value,
+            10,
+          ),
+        };
+
+        const chunking = {
+          parent_max: parseInt(
+            document.getElementById("cfg-parent-max-tokens").value,
+            10,
+          ),
+          parent_min: parseInt(
+            document.getElementById("cfg-parent-min-tokens").value,
+            10,
+          ),
+          child_max: parseInt(
+            document.getElementById("cfg-child-max-tokens").value,
+            10,
+          ),
+          child_min: parseInt(
+            document.getElementById("cfg-child-min-tokens").value,
+            10,
+          ),
+          child_overlap: parseInt(
+            document.getElementById("cfg-child-overlap").value,
+            10,
+          ),
+        };
+        localStorage.setItem(
+          "deepcontext_chunking",
+          JSON.stringify(chunking),
+        );
+
+        try {
+          const res = await fetch("/v1/config", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const data = await res.json();
+          alert("Platform configuration saved successfully!");
+        } catch (e) {
+          alert("Error saving configuration: " + e.message);
+        }
+      }
+
+      function resetPlatformConfigDefaults() {
+        if (
+          !confirm("Reset all platform settings back to system defaults?")
+        )
+          return;
+        document.getElementById("cfg-summary-enabled").checked = false;
+        document.getElementById("cfg-summary-model").value =
+          "Qwen/Qwen3-0.6B";
+        document.getElementById("cfg-summary-device").value = "mps";
+        document.getElementById("cfg-summary-max-tokens").value = 80;
+        document.getElementById("cfg-summary-batch-size").value = 8;
+        document.getElementById("cfg-parent-max-tokens").value = 2500;
+        document.getElementById("cfg-parent-min-tokens").value = 1000;
+        document.getElementById("cfg-child-max-tokens").value = 600;
+        document.getElementById("cfg-child-min-tokens").value = 300;
+        document.getElementById("cfg-child-overlap").value = 60;
+        document.getElementById("cfg-retrieval-mode").value = "hybrid";
+        document.getElementById("cfg-top-k").value = 8;
+        document.getElementById("cfg-reranker-engine").value = "ecohash_hybrid";
+        document.getElementById("cfg-confidence-threshold").value = 0.75;
+        document.getElementById("cfg-max-rewrites").value = 2;
+        document.getElementById("cfg-grade-threshold").value = 0.3;
+        document.getElementById("cfg-cache-enabled").checked = true;
+        document.getElementById("cfg-cache-ttl").value = 300;
+        savePlatformConfig();
+      }
+
+      async function runLiveSummaryTest() {
+        const text =
+          document.getElementById("cfg-test-text").value.trim() ||
+          "PostgreSQL with pgvector stores 1024-dimensional dense vectors using HNSW indexes for sub-millisecond search, while BM25 tsvector handles lexical keyword queries.";
+        const spinner = document.getElementById("cfg-test-spinner");
+        const metricsSpan = document.getElementById("cfg-test-metrics");
+        const resultBox = document.getElementById("cfg-test-result");
+
+        spinner.classList.remove("hidden");
+        metricsSpan.textContent = "Generating summary on Apple Silicon GPU...";
+        resultBox.style.display = "none";
+
+        try {
+          const res = await fetch("/v1/test-summary", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              text: text,
+              topic: "Live Testing Sandbox",
+            }),
+          });
+          const data = await res.json();
+          resultBox.style.display = "block";
+          resultBox.innerHTML = `<strong>Generated Summary (${data.tokens} tokens):</strong><br>${data.summary}`;
+          metricsSpan.textContent = `Completed in ${data.latency_ms}ms on device: ${data.device.toUpperCase()}`;
+        } catch (e) {
+          resultBox.style.display = "block";
+          resultBox.textContent = "Error: " + e.message;
+          metricsSpan.textContent = "Execution failed";
+        } finally {
+          spinner.classList.add("hidden");
+          refreshIcons();
+        }
+      }
+
       // Auto-init on page load
       window.addEventListener("DOMContentLoaded", () => {
         loadDocuments();
         loadUserPreferences();
+        loadPlatformConfig();
         refreshIcons();
         checkQuotaStatus();
         setInterval(checkQuotaStatus, 30000);

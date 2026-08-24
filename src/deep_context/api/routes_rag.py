@@ -105,6 +105,7 @@ async def upload_file(
     vectorless: bool = Form(False),
     embedding_model: str = Form(""),
     embedding_dim: int = Form(0),
+    generate_summaries: bool | None = Form(None),
 ) -> IngestResponse:
     """Upload and ingest a file (PDF up to 1000 pages, Markdown, Code, TXT)."""
     filename = file.filename or "uploaded_doc"
@@ -146,6 +147,7 @@ async def upload_file(
                 retrieval_mode=mode,
                 embedding_model=target_model,
                 embedding_dim=target_dim,
+                generate_summaries=generate_summaries,
                 metadata={"filename": filename, "file_size": len(file_bytes)},
             )
             res = await ingestion_pipeline.ingest(req)
@@ -163,6 +165,7 @@ async def upload_file(
             retrieval_mode=mode,
             embedding_model=target_model,
             embedding_dim=target_dim,
+            generate_summaries=generate_summaries,
             metadata={"filename": filename, "file_size": len(file_bytes)},
         )
         return await ingestion_pipeline.ingest(req)
@@ -174,6 +177,7 @@ async def upload_batch_files(
     vectorless: bool = Form(False),
     embedding_model: str = Form(""),
     embedding_dim: int = Form(0),
+    generate_summaries: bool | None = Form(None),
 ) -> list[IngestResponse]:
     """Upload and ingest multiple files at once (PDFs, TXT, MD, Code)."""
     results: list[IngestResponse] = []
@@ -181,25 +185,23 @@ async def upload_batch_files(
     target_dim = embedding_dim or (
         768 if "gemini" in target_model.lower() else settings.embedding_dim
     )
+    mode = RetrievalMode.VECTORLESS if vectorless else RetrievalMode.HYBRID
 
-    for file in files:
-        filename = file.filename or "uploaded_doc"
-        file_bytes = await file.read()
+    for f in files:
+        filename = f.filename or "uploaded_doc"
+        file_bytes = await f.read()
+
         ext = Path(filename).suffix.lower()
-
         if ext == ".pdf":
-            detected_type = "pdf"
+            dtype = "pdf"
         elif ext in (".md", ".markdown"):
-            detected_type = "markdown"
+            dtype = "markdown"
         elif ext in (".py", ".js", ".ts", ".java", ".go", ".cpp", ".c", ".rs"):
-            detected_type = "code"
+            dtype = "code"
         else:
-            detected_type = "text"
+            dtype = "text"
 
-        doc_title = Path(filename).stem
-        mode = RetrievalMode.VECTORLESS if vectorless else RetrievalMode.HYBRID
-
-        if detected_type == "pdf":
+        if dtype == "pdf":
             import tempfile
 
             with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
@@ -208,13 +210,14 @@ async def upload_batch_files(
 
             try:
                 req = IngestRequest(
-                    title=doc_title,
+                    title=Path(filename).stem,
                     content=tmp_path,
                     doc_type="pdf",
                     source_uri=filename,
                     retrieval_mode=mode,
                     embedding_model=target_model,
                     embedding_dim=target_dim,
+                    generate_summaries=generate_summaries,
                     metadata={"filename": filename, "file_size": len(file_bytes)},
                 )
                 res = await ingestion_pipeline.ingest(req)
@@ -225,13 +228,14 @@ async def upload_batch_files(
         else:
             text_content = file_bytes.decode("utf-8", errors="replace")
             req = IngestRequest(
-                title=doc_title,
+                title=Path(filename).stem,
                 content=text_content,
-                doc_type=detected_type,
+                doc_type=dtype,
                 source_uri=filename,
                 retrieval_mode=mode,
                 embedding_model=target_model,
                 embedding_dim=target_dim,
+                generate_summaries=generate_summaries,
                 metadata={"filename": filename, "file_size": len(file_bytes)},
             )
             res = await ingestion_pipeline.ingest(req)
@@ -384,16 +388,12 @@ async def retrieve_knowledge(req: RetrieveRequest) -> RetrieveResponse:
         cache_hit=False,
     )
     if res.sufficient:
-        await response_cache.set_json(
-            "rag:retrieve", cache_payload, response.model_dump()
-        )
+        await response_cache.set_json("rag:retrieve", cache_payload, response.model_dump())
     return response
 
 
 @router.post("/v1/query", response_model=QueryResponse)
-async def query_platform(
-    req: QueryRequest, background_tasks: BackgroundTasks
-) -> QueryResponse:
+async def query_platform(req: QueryRequest, background_tasks: BackgroundTasks) -> QueryResponse:
     """End-to-end intelligent query answering with GLM-5.2 reasoning."""
     t0 = time.time()
 
@@ -457,18 +457,12 @@ async def query_platform(
         corpus_chunks: list[dict[str, Any]] = []
         if req.document_ids:
             for did in req.document_ids:
-                chunks = await storage.get_document_chunks(
-                    document_id=did, level="parent"
-                )
+                chunks = await storage.get_document_chunks(document_id=did, level="parent")
                 corpus_chunks.extend(chunks)
         else:
             corpus_chunks = await storage.get_document_chunks(level="parent")
 
-        corpus = (
-            corpus_chunks
-            if corpus_chunks
-            else [{"content": "Default document corpus."}]
-        )
+        corpus = corpus_chunks if corpus_chunks else [{"content": "Default document corpus."}]
 
         rlm_res = await orchestrator.run_session(
             task_spec=req.query,
@@ -622,17 +616,13 @@ async def query_platform_stream(
                 corpus_chunks: list[dict[str, Any]] = []
                 if req.document_ids:
                     for did in req.document_ids:
-                        chunks = await storage.get_document_chunks(
-                            document_id=did, level="parent"
-                        )
+                        chunks = await storage.get_document_chunks(document_id=did, level="parent")
                         corpus_chunks.extend(chunks)
                 else:
                     corpus_chunks = await storage.get_document_chunks(level="parent")
 
                 corpus = (
-                    corpus_chunks
-                    if corpus_chunks
-                    else [{"content": "Default document corpus."}]
+                    corpus_chunks if corpus_chunks else [{"content": "Default document corpus."}]
                 )
 
                 rlm_res = await orchestrator.run_session(
@@ -697,21 +687,13 @@ async def get_quota_status() -> dict[str, Any]:
             "configured": has_groq,
             "is_rate_limited": is_active_limited,
             "model": (
-                rate_limit.get("model", settings.llm_model)
-                if rate_limit
-                else settings.llm_model
+                rate_limit.get("model", settings.llm_model) if rate_limit else settings.llm_model
             ),
-            "message": (
-                rate_limit.get("message")
-                if rate_limit
-                else "Normal (Within daily quota)"
-            ),
+            "message": (rate_limit.get("message") if rate_limit else "Normal (Within daily quota)"),
             "retry_after": rate_limit.get("retry_after") if rate_limit else None,
             "limit": rate_limit.get("limit") if rate_limit else "200000",
             "used": rate_limit.get("used") if rate_limit else "0",
-            "quota_type": (
-                rate_limit.get("quota_type") if rate_limit else "tokens per day (TPD)"
-            ),
+            "quota_type": (rate_limit.get("quota_type") if rate_limit else "tokens per day (TPD)"),
             "last_error_at": rate_limit.get("timestamp") if rate_limit else None,
         },
         "nvidia_nim": {
@@ -762,16 +744,12 @@ async def generate_haystack(req: HaystackGenerateRequest) -> IngestResponse:
     needle_para_idx = int(total_paras * (req.depth_percent / 100.0))
     needle_para_idx = max(0, min(total_paras - 1, needle_para_idx))
 
-    sections_text: list[str] = [
-        f"# {req.topic} — Benchmark Corpus ({req.total_words} words)\n"
-    ]
+    sections_text: list[str] = [f"# {req.topic} — Benchmark Corpus ({req.total_words} words)\n"]
 
     for i in range(total_paras):
         sec_num = (i // 10) + 1
         if i % 10 == 0:
-            sections_text.append(
-                f"\n## Chapter {sec_num}: System Architecture Analysis\n"
-            )
+            sections_text.append(f"\n## Chapter {sec_num}: System Architecture Analysis\n")
 
         p = random.choice(FILLER_PARAGRAPHS)
         if i == needle_para_idx:
@@ -781,9 +759,7 @@ async def generate_haystack(req: HaystackGenerateRequest) -> IngestResponse:
         sections_text.append(p + "\n")
 
     full_text = "\n".join(sections_text)
-    doc_title = (
-        f"Haystack Corpus ({req.total_words} words @ {req.depth_percent:.0f}% depth)"
-    )
+    doc_title = f"Haystack Corpus ({req.total_words} words @ {req.depth_percent:.0f}% depth)"
 
     ingest_req = IngestRequest(
         title=doc_title,
@@ -835,9 +811,7 @@ async def benchmark_haystack(
     needle_clean = req.needle.strip().lower()
 
     # Stage 1: BM25 FTS5
-    bm25_results = await storage.search_bm25(
-        query=req.query, filters=filters, limit=100
-    )
+    bm25_results = await storage.search_bm25(query=req.query, filters=filters, limit=100)
     bm25_found = False
     bm25_rank = None
     bm25_score = None
@@ -871,9 +845,7 @@ async def benchmark_haystack(
     q_emb = await llm_client.get_embedding(
         req.query, model=active_emb, dim=active_dim, is_query=True
     )
-    vec_results = await storage.search_vector(
-        query_embedding=q_emb, filters=filters, limit=100
-    )
+    vec_results = await storage.search_vector(query_embedding=q_emb, filters=filters, limit=100)
     vec_found = False
     vec_rank = None
     vec_sim = None
@@ -1000,16 +972,12 @@ async def benchmark_haystack(
 
     # Stage 6: Generation & Verification
     assembler = PromptAssembler(storage)
-    focused_chunks = (
-        [matched_parent] if matched_parent else retrieval_res.parent_chunks[:2]
-    )
+    focused_chunks = [matched_parent] if matched_parent else retrieval_res.parent_chunks[:2]
     messages = await assembler.assemble_messages(
         query=req.query,
         retrieved_chunks=focused_chunks,
     )
-    answer, reasoning = await llm_client.complete(
-        messages, temperature=0.3, enable_thinking=True
-    )
+    answer, reasoning = await llm_client.complete(messages, temperature=0.3, enable_thinking=True)
 
     passed = needle_clean in answer.lower() or needle_clean in (
         matched_parent["content"].lower() if matched_parent else ""

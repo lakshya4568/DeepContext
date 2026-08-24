@@ -53,14 +53,32 @@ CREATE TABLE chunks (
     page_number     INTEGER,
     embedding       VECTOR(1536),                 -- NULL for parent-only rows if you don't embed parents
     tsv             TSVECTOR GENERATED ALWAYS AS (to_tsvector('english', content)) STORED,
+    summary_text    TEXT,                         -- LLM-generated semantic summary
+    summary_tokens  INTEGER,
+    summary_model   TEXT DEFAULT 'qwen3-0.6b',
+    generated_at    TIMESTAMPTZ,
+    summary_tsv     TSVECTOR,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX idx_chunks_document ON chunks (document_id);
 CREATE INDEX idx_chunks_parent ON chunks (parent_chunk_id);
 CREATE INDEX idx_chunks_tsv ON chunks USING GIN (tsv);
+CREATE INDEX idx_chunks_summary_tsv ON chunks USING GIN (summary_tsv);
 -- ivfflat is fine below ~1M rows; see TECH_STACK.md §3 for the switch point.
 CREATE INDEX idx_chunks_embedding ON chunks USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+
+CREATE OR REPLACE FUNCTION update_summary_tsv() RETURNS trigger AS $$
+BEGIN
+  NEW.summary_tsv := to_tsvector('english', COALESCE(NEW.summary_text, ''));
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_update_summary_tsv ON chunks;
+CREATE TRIGGER trigger_update_summary_tsv 
+BEFORE INSERT OR UPDATE ON chunks
+FOR EACH ROW EXECUTE FUNCTION update_summary_tsv();
 
 -- Optional vectorless/tree index (FR6) for PageIndex-style structured
 -- navigation. One row per (document, tree node); leaves reference chunks.

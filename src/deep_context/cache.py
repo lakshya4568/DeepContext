@@ -70,9 +70,7 @@ class RedisCacheBackend:
         count = 0
         cursor = 0
         while True:
-            cursor, keys = await self._client.scan(
-                cursor=cursor, match=f"{prefix}*", count=100
-            )
+            cursor, keys = await self._client.scan(cursor=cursor, match=f"{prefix}*", count=100)
             if keys:
                 await self._client.delete(*keys)
                 count += len(keys)
@@ -109,13 +107,9 @@ class ResponseCache:
                 logger.info("Response cache using Redis at %s", url)
                 return self._backend
             except ImportError:
-                logger.warning(
-                    "redis package not installed; falling back to in-memory cache."
-                )
+                logger.warning("redis package not installed; falling back to in-memory cache.")
             except Exception as e:
-                logger.warning(
-                    "Failed to connect to Redis (%s); using in-memory cache.", e
-                )
+                logger.warning("Failed to connect to Redis (%s); using in-memory cache.", e)
         else:
             logger.info("CACHE_URL not set; response cache using in-memory backend.")
 
@@ -167,9 +161,7 @@ class ResponseCache:
         key = self.make_key(namespace, payload)
         effective_ttl = ttl if ttl is not None else settings.cache_default_ttl
         try:
-            await backend.set(
-                key, json.dumps(value, default=str), max(1, effective_ttl)
-            )
+            await backend.set(key, json.dumps(value, default=str), max(1, effective_ttl))
         except Exception as e:
             logger.debug("Cache set failed for %s: %s", key[:60], e)
 

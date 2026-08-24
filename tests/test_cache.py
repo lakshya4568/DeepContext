@@ -42,9 +42,7 @@ class TestCacheRoundTrip:
         cache = ResponseCache()
         assert await cache.get_json("ns", {"q": "missing"}) is None
 
-    async def test_disabled_cache_never_stores(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    async def test_disabled_cache_never_stores(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(settings, "cache_enabled", False)
         cache = ResponseCache()
         await cache.set_json("ns", {"q": "x"}, {"a": 1})

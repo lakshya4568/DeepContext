@@ -124,9 +124,7 @@ class StorageInterface(ABC):
         pass
 
     @abstractmethod
-    async def get_tree_nodes_for_document(
-        self, document_id: str
-    ) -> list[DocumentTreeNode]:
+    async def get_tree_nodes_for_document(self, document_id: str) -> list[DocumentTreeNode]:
         """Get all tree nodes for a given document."""
         pass
 
@@ -167,9 +165,7 @@ class StorageInterface(ABC):
         pass
 
     @abstractmethod
-    async def get_preference(
-        self, user_id: str, preference_key: str
-    ) -> dict[str, Any] | None:
+    async def get_preference(self, user_id: str, preference_key: str) -> dict[str, Any] | None:
         """Exact lookup for user preference."""
         pass
 
@@ -254,9 +250,7 @@ class StorageInterface(ABC):
     # -----------------------------------------------------------------------
 
     @abstractmethod
-    async def create_session(
-        self, session: SessionHandle, user_id: str = "default"
-    ) -> None:
+    async def create_session(self, session: SessionHandle, user_id: str = "default") -> None:
         """Create a new agent session."""
         pass
 
@@ -266,9 +260,7 @@ class StorageInterface(ABC):
         pass
 
     @abstractmethod
-    async def update_session_status(
-        self, session_id: str, status: SessionStatus
-    ) -> None:
+    async def update_session_status(self, session_id: str, status: SessionStatus) -> None:
         """Update session status."""
         pass
 
@@ -285,9 +277,7 @@ class StorageInterface(ABC):
         pass
 
     @abstractmethod
-    async def update_rlm_child_status(
-        self, child_session_id: str, status: ChildStatus
-    ) -> None:
+    async def update_rlm_child_status(self, child_session_id: str, status: ChildStatus) -> None:
         """Update child subagent status."""
         pass
 

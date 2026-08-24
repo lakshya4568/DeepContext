@@ -1,9 +1,11 @@
-"""End-to-end ingestion pipeline implementing workflows/01_ingestion_pipeline.md."""
+"""End-to-end ingestion pipeline combining Parent-Child chunking with local LLM summarization."""
 
 from __future__ import annotations
 
+import asyncio
 import time
 import uuid
+from dataclasses import dataclass, field
 
 from deep_context.core.config import settings
 from deep_context.core.llm_client import llm_client
@@ -19,25 +21,44 @@ from deep_context.ingestion.parser import DocumentParser
 from deep_context.ingestion.summarizer import ChunkSummarizer
 from deep_context.ingestion.tree_indexer import DocumentTreeIndexer
 from deep_context.storage import get_storage
+from deep_context.storage.base import StorageInterface
 
 
-class IngestionPipeline:
-    """Ingests raw documents, chunks hierarchically, generates embeddings, summaries, and stores them."""
+@dataclass
+class IngestionResult:
+    document_id: str
+    title: str
+    parent_chunks: int
+    child_chunks: int
+    summaries_generated: int
+    errors: list[str] = field(default_factory=list)
 
-    def __init__(self) -> None:
-        self.parser = DocumentParser()
-        self.chunker = ParentChildChunker()
-        self.summarizer = ChunkSummarizer()
+
+class SummaryIngestionPipeline:
+    """Production-grade ingestion combining structure-aware parent-child chunking and Qwen3 summaries."""
+
+    def __init__(
+        self,
+        storage: StorageInterface | None = None,
+        parser: DocumentParser | None = None,
+        chunker: ParentChildChunker | None = None,
+        summarizer: ChunkSummarizer | None = None,
+    ):
+        self.storage = storage
+        self.parser = parser or DocumentParser()
+        self.chunker = chunker or ParentChildChunker()
+        self.summarizer = summarizer or ChunkSummarizer()
 
     async def ingest(self, request: IngestRequest) -> IngestResponse:
+        """Ingests a document, creates parent-child chunks, generates LLM summaries, and embeds."""
         t0 = time.time()
-        storage = await get_storage()
+        storage = self.storage or await get_storage()
         doc_id = str(uuid.uuid4())
 
         # 1. Parse document into structure-aware sections
         sections = self.parser.parse(request.content, doc_type=request.doc_type)
 
-        # 2. Parent-child chunking
+        # 2. Parent-child hierarchical chunking
         parent_chunks, child_chunks = self.chunker.chunk_sections(doc_id, sections)
 
         # 3. Generate Qwen3 summaries for child chunks if enabled
@@ -57,7 +78,7 @@ class IngestionPipeline:
             await self.summarizer.summarize_chunks(child_chunks)
             summaries_count = sum(1 for c in child_chunks if c.summary_text)
 
-        # 4. Generate dense embeddings for child chunks using Google Gemini or NVIDIA NIM
+        # 4. Generate dense embeddings for child chunks
         emb_model = request.embedding_model or settings.embedding_model
         emb_dim = request.embedding_dim or (
             768 if "gemini" in emb_model.lower() else settings.embedding_dim
@@ -92,7 +113,7 @@ class IngestionPipeline:
             metadata=doc_metadata,
         )
 
-        # 5. Persist to storage (in order: document -> chunks -> optional tree nodes)
+        # 6. Persist to storage
         await storage.insert_document(doc)
         all_chunks = parent_chunks + child_chunks
         await storage.insert_chunks(all_chunks)
@@ -105,30 +126,20 @@ class IngestionPipeline:
 
         latency_ms = int((time.time() - t0) * 1000)
 
-        # 6. Trace event logging
+        # 7. Trace event logging
         await storage.insert_event_trace(
-            event_type="ingestion",
+            event_type="ingestion_summary",
             payload={
                 "document_id": doc_id,
                 "title": request.title,
                 "parent_chunks": len(parent_chunks),
                 "child_chunks": len(child_chunks),
+                "summaries_generated": summaries_count,
                 "retrieval_mode": request.retrieval_mode.value,
                 "embedding_model": emb_model,
                 "embedding_dim": emb_dim,
             },
             latency_ms=latency_ms,
-        )
-
-        logger.info(
-            "Successfully ingested document %s (%s) with %d parents and %d children using %s (%d-dim) in %d ms",
-            doc_id,
-            request.title,
-            len(parent_chunks),
-            len(child_chunks),
-            emb_model,
-            emb_dim,
-            latency_ms,
         )
 
         return IngestResponse(
@@ -143,5 +154,17 @@ class IngestionPipeline:
             embedding_dim=emb_dim,
         )
 
+    async def ingest_batch(
+        self,
+        requests: list[IngestRequest],
+        concurrency: int = 4,
+    ) -> list[IngestResponse]:
+        """Ingest multiple documents concurrently with bounded parallelism."""
+        semaphore = asyncio.Semaphore(concurrency)
 
-ingestion_pipeline = IngestionPipeline()
+        async def _bounded(req: IngestRequest) -> IngestResponse:
+            async with semaphore:
+                return await self.ingest(req)
+
+        tasks = [_bounded(r) for r in requests]
+        return await asyncio.gather(*tasks)

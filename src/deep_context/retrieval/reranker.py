@@ -240,20 +240,13 @@ class CrossEncoderReranker:
         if len(candidates) <= top_k:
             return candidates
 
-        clean_query = (
-            query.strip().strip('"').strip("'").strip("\u201c").strip("\u201d")
-        )
+        clean_query = query.strip().strip('"').strip("'").strip("\u201c").strip("\u201d")
         q_lower = clean_query.lower()
         all_words = [w for w in re.findall(r"\w+", q_lower) if len(w) > 1]
-        content_words = [
-            w for w in all_words if w not in STOPWORDS and len(w) > 2
-        ] or all_words
+        content_words = [w for w in all_words if w not in STOPWORDS and len(w) > 2] or all_words
         q_word_set = set(content_words)
         n_grams = (
-            [
-                f"{content_words[i]} {content_words[i + 1]}"
-                for i in range(len(content_words) - 1)
-            ]
+            [f"{content_words[i]} {content_words[i + 1]}" for i in range(len(content_words) - 1)]
             if len(content_words) >= 2
             else []
         )
@@ -272,9 +265,7 @@ class CrossEncoderReranker:
                 1, len(q_word_set)
             )
             position_score = 1.0 / (1.0 + idx * 0.05)
-            raw_scores.append(
-                0.40 * exact_bonus + 0.40 * overlap_ratio + 0.20 * position_score
-            )
+            raw_scores.append(0.40 * exact_bonus + 0.40 * overlap_ratio + 0.20 * position_score)
 
         scored = _blend_with_rrf(candidates, raw_scores, score_type="probability")
         return [item for _, item in scored[:top_k]]
@@ -294,9 +285,7 @@ class Reranker:
         embedding_dim: int | None = None,
     ) -> list[dict[str, Any]]:
         active_strategy = (
-            (strategy or settings.reranker_strategy or "cross_encoder")
-            .lower()
-            .replace("-", "_")
+            (strategy or settings.reranker_strategy or "cross_encoder").lower().replace("-", "_")
         )
         if active_strategy in ("none", "bypass", "rrf", "hybrid", "disabled"):
             ranked = candidates[:top_k]

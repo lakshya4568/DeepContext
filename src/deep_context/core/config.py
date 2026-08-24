@@ -81,9 +81,7 @@ class Settings(BaseSettings):
         default="auto", alias="EMBEDDING_PROVIDER"
     )  # 'auto' | 'gemini' | 'nvidia' | 'mock'
     embedding_model: str = Field(default="gemini-embedding-2", alias="EMBEDDING_MODEL")
-    embedding_dim: int = Field(
-        default=768, alias="EMBEDDING_DIM"
-    )  # 768 for gemini-embedding-2 MRL
+    embedding_dim: int = Field(default=768, alias="EMBEDDING_DIM")  # 768 for gemini-embedding-2 MRL
     reranker_strategy: str = Field(
         default="cross_encoder", alias="RERANKER_STRATEGY"
     )  # 'cross_encoder' | 'ecohash' | 'local_cross_encoder' | 'rrf'
@@ -93,15 +91,9 @@ class Settings(BaseSettings):
     # 36-query benchmark. A 0.70/0.30 experiment regressed Hit@5 to 61.3% across every
     # category and must not be reintroduced as the default without a fresh A/B on the
     # frozen eval script.
-    reranker_blend_rrf_weight: float = Field(
-        default=0.60, alias="RERANKER_BLEND_RRF_WEIGHT"
-    )
-    reranker_consensus_top1_count: int = Field(
-        default=3, alias="RERANKER_CONSENSUS_TOP1_COUNT"
-    )
-    reranker_consensus_top2_count: int = Field(
-        default=6, alias="RERANKER_CONSENSUS_TOP2_COUNT"
-    )
+    reranker_blend_rrf_weight: float = Field(default=0.60, alias="RERANKER_BLEND_RRF_WEIGHT")
+    reranker_consensus_top1_count: int = Field(default=3, alias="RERANKER_CONSENSUS_TOP1_COUNT")
+    reranker_consensus_top2_count: int = Field(default=6, alias="RERANKER_CONSENSUS_TOP2_COUNT")
     reranker_consensus_boost_tier1: float = Field(
         default=0.15, alias="RERANKER_CONSENSUS_BOOST_TIER1"
     )
@@ -109,15 +101,11 @@ class Settings(BaseSettings):
         default=0.0, alias="RERANKER_CONSENSUS_BOOST_TIER2"
     )
 
-    llm_provider: str = Field(
-        default="groq", alias="LLM_PROVIDER"
-    )  # 'groq' | 'nvidia' | 'gemini'
+    llm_provider: str = Field(default="groq", alias="LLM_PROVIDER")  # 'groq' | 'nvidia' | 'gemini'
     llm_model: str = Field(default="qwen/qwen3.6-27b", alias="LLM_MODEL")
 
     # Database
-    database_type: str = Field(
-        default="postgres", alias="DATABASE_TYPE"
-    )  # 'sqlite' | 'postgres'
+    database_type: str = Field(default="postgres", alias="DATABASE_TYPE")  # 'sqlite' | 'postgres'
     sqlite_db_path: str = Field(default="deep_context.db", alias="SQLITE_DB_PATH")
     postgres_dsn: str = Field(
         default="postgresql://proximus@127.0.0.1:5432/awems",
@@ -125,6 +113,8 @@ class Settings(BaseSettings):
     )
 
     # Retrieval parameters
+    default_retrieval_mode: str = Field(default="hybrid", alias="DEFAULT_RETRIEVAL_MODE")
+    reranker_model: str = Field(default="ecohash_hybrid", alias="RERANKER_MODEL")
     rrf_k: int = Field(default=60, alias="RRF_K")
     default_top_k: int = Field(default=8, alias="DEFAULT_TOP_K")
     first_stage_limit: int = Field(default=100, alias="FIRST_STAGE_LIMIT")
@@ -141,9 +131,7 @@ class Settings(BaseSettings):
     max_recursion_depth: int = Field(default=1, alias="MAX_RECURSION_DEPTH")
     max_repl_chars_per_turn: int = Field(default=8192, alias="MAX_REPL_CHARS_PER_TURN")
     max_rlm_turns: int = Field(default=30, alias="MAX_RLM_TURNS")
-    max_rlm_wall_clock_seconds: int = Field(
-        default=3600, alias="MAX_RLM_WALL_CLOCK_SECONDS"
-    )
+    max_rlm_wall_clock_seconds: int = Field(default=3600, alias="MAX_RLM_WALL_CLOCK_SECONDS")
 
     # Verification parameters
     confidence_threshold: float = 0.75
@@ -156,9 +144,7 @@ class Settings(BaseSettings):
 
     # Response cache layer (Redis-backed when available, in-memory fallback otherwise)
     cache_enabled: bool = Field(default=True, alias="CACHE_ENABLED")
-    cache_url: str = Field(
-        default="", alias="CACHE_URL"
-    )  # e.g. redis://localhost:6379/0
+    cache_url: str = Field(default="", alias="CACHE_URL")  # e.g. redis://localhost:6379/0
     cache_default_ttl: int = Field(default=300, alias="CACHE_TTL")  # seconds
     cache_namespace: str = Field(default="deepcontext", alias="CACHE_NAMESPACE")
 
@@ -172,6 +158,15 @@ class Settings(BaseSettings):
     agentic_grade_threshold: float = Field(
         default=0.30, alias="AGENTIC_GRADE_THRESHOLD"
     )  # min term-overlap ratio for a doc to count as relevant
+
+    # Summarization parameters (Qwen3 0.6B/0.8B local model)
+    summary_enabled: bool = Field(default=False, alias="SUMMARY_ENABLED")
+    summary_model: str = Field(default="Qwen/Qwen3-0.6B", alias="SUMMARY_MODEL")
+    summary_max_tokens: int = Field(default=80, alias="SUMMARY_MAX_TOKENS")
+    summary_batch_size: int = Field(default=8, alias="SUMMARY_BATCH_SIZE")
+    summary_device: str = Field(
+        default="auto", alias="SUMMARY_DEVICE"
+    )  # 'auto' | 'mps' | 'cuda' | 'cpu'
 
     # Fallback/Test helper
     allow_mock_fallback: bool = Field(default=True, alias="ALLOW_MOCK_FALLBACK")
@@ -199,10 +194,7 @@ class Settings(BaseSettings):
     @property
     def has_valid_api_key(self) -> bool:
         return (
-            self.has_gemini_key
-            or self.has_groq_key
-            or self.has_nvidia_key
-            or self.has_ecohash_key
+            self.has_gemini_key or self.has_groq_key or self.has_nvidia_key or self.has_ecohash_key
         )
 
 

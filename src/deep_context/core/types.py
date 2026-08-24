@@ -93,6 +93,10 @@ class Chunk:
     section_path: str | None = None
     page_number: int | None = None
     embedding: list[float] | None = None
+    summary_text: str | None = None
+    summary_tokens: int | None = None
+    summary_model: str | None = None
+    generated_at: datetime | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -110,9 +114,7 @@ class DocumentTreeNode:
 @dataclass
 class RetrievalResult:
     sufficient: bool
-    parent_chunks: list[dict[str, Any]] = field(
-        default_factory=list
-    )  # [{content, citation, ...}]
+    parent_chunks: list[dict[str, Any]] = field(default_factory=list)  # [{content, citation, ...}]
     citations: list[Citation] = field(default_factory=list)
     query_shape: QueryShape | None = None
     retry_count: int = 0
@@ -143,9 +145,7 @@ class Observation:
     raw_text: str
     tenant_id: str = "default"
     user_id: str | None = None
-    source: str = (
-        "user_stated"  # 'user_stated' | 'tool_output' | 'inferred' | 'operator'
-    )
+    source: str = "user_stated"  # 'user_stated' | 'tool_output' | 'inferred' | 'operator'
 
 
 @dataclass
@@ -288,6 +288,7 @@ class IngestRequest(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
     embedding_model: str | None = None
     embedding_dim: int | None = None
+    generate_summaries: bool | None = None
 
 
 class IngestResponse(BaseModel):
@@ -297,6 +298,7 @@ class IngestResponse(BaseModel):
     child_chunks_count: int
     retrieval_mode: RetrievalMode
     tree_nodes_count: int = 0
+    summaries_generated_count: int = 0
     embedding_model: str | None = None
     embedding_dim: int | None = None
 
