@@ -80,24 +80,27 @@ class PostgresStore(StorageInterface):
                     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
                 );
 
+                ALTER TABLE chunks ADD COLUMN IF NOT EXISTS search_tsv TSVECTOR;
                 ALTER TABLE chunks ADD COLUMN IF NOT EXISTS summary_text TEXT;
                 ALTER TABLE chunks ADD COLUMN IF NOT EXISTS summary_tokens INTEGER;
                 ALTER TABLE chunks ADD COLUMN IF NOT EXISTS summary_model TEXT DEFAULT 'qwen3-0.6b';
                 ALTER TABLE chunks ADD COLUMN IF NOT EXISTS generated_at TIMESTAMPTZ;
                 ALTER TABLE chunks ADD COLUMN IF NOT EXISTS summary_tsv TSVECTOR;
-                CREATE INDEX IF NOT EXISTS idx_chunks_summary_tsv ON chunks USING GIN (summary_tsv);
+                ALTER TABLE chunks ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now();
 
-                CREATE OR REPLACE FUNCTION update_summary_tsv() RETURNS trigger AS $$
+                CREATE OR REPLACE FUNCTION update_chunks_tsv() RETURNS trigger AS $$
                 BEGIN
-                  NEW.summary_tsv := to_tsvector('english', COALESCE(NEW.summary_text, ''));
+                  NEW.search_tsv :=
+                    setweight(to_tsvector('english', COALESCE(NEW.content, '')), 'B') ||
+                    setweight(to_tsvector('english', COALESCE(NEW.summary_text, '')), 'C');
                   RETURN NEW;
                 END;
                 $$ LANGUAGE plpgsql;
 
-                DROP TRIGGER IF EXISTS trigger_update_summary_tsv ON chunks;
-                CREATE TRIGGER trigger_update_summary_tsv
+                DROP TRIGGER IF EXISTS trigger_update_chunks_tsv ON chunks;
+                CREATE TRIGGER trigger_update_chunks_tsv
                 BEFORE INSERT OR UPDATE ON chunks
-                FOR EACH ROW EXECUTE FUNCTION update_summary_tsv();
+                FOR EACH ROW EXECUTE FUNCTION update_chunks_tsv();
 
                 CREATE TABLE IF NOT EXISTS memory_policy (
                     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -195,8 +198,13 @@ class PostgresStore(StorageInterface):
                 CREATE INDEX IF NOT EXISTS idx_documents_metadata_gin ON documents USING GIN (metadata);
                 CREATE INDEX IF NOT EXISTS idx_chunks_document ON chunks (document_id);
                 CREATE INDEX IF NOT EXISTS idx_chunks_parent ON chunks (parent_chunk_id);
+                CREATE INDEX IF NOT EXISTS idx_chunks_document_id ON chunks (document_id, id);
+                CREATE INDEX IF NOT EXISTS idx_chunks_parent_null ON chunks (id, document_id) WHERE parent_chunk_id IS NULL;
                 CREATE INDEX IF NOT EXISTS idx_chunks_tsv ON chunks USING GIN (tsv);
+                CREATE INDEX IF NOT EXISTS idx_chunks_search_tsv ON chunks USING GIN (search_tsv);
+                CREATE INDEX IF NOT EXISTS idx_chunks_summary_tsv ON chunks USING GIN (summary_tsv);
                 CREATE INDEX IF NOT EXISTS idx_chunks_embedding ON chunks USING hnsw (embedding vector_cosine_ops);
+                CREATE INDEX IF NOT EXISTS idx_chunks_embedding_hnsw ON chunks USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 200);
                 CREATE INDEX IF NOT EXISTS idx_memory_policy_tenant ON memory_policy (tenant_id);
                 CREATE INDEX IF NOT EXISTS idx_memory_preference_user ON memory_preference (user_id);
                 CREATE INDEX IF NOT EXISTS idx_memory_fact_scope ON memory_fact (tenant_id, user_id);
@@ -585,16 +593,16 @@ class PostgresStore(StorageInterface):
             sql = f"""
                 SELECT c.id, c.document_id, c.parent_chunk_id, c.content, c.section_path,
                        c.page_number, c.summary_text, d.title as document_title, d.source_uri,
-                       (COALESCE(ts_rank(c.tsv, plainto_tsquery('english', $1)), 0.0) +
-                        COALESCE(ts_rank(c.tsv, to_tsquery('english', $2)), 0.0) +
+                       (COALESCE(ts_rank(COALESCE(c.search_tsv, c.tsv), plainto_tsquery('english', $1)), 0.0) +
+                        COALESCE(ts_rank(COALESCE(c.search_tsv, c.tsv), to_tsquery('english', $2)), 0.0) +
                         COALESCE(ts_rank(c.summary_tsv, plainto_tsquery('english', $1)), 0.0) +
                         COALESCE(ts_rank(c.summary_tsv, to_tsquery('english', $2)), 0.0) +
                         (CASE WHEN length($3) > 0 AND (c.content ILIKE '%' || $3 || '%' OR COALESCE(c.summary_text, '') ILIKE '%' || $3 || '%') THEN 10.0 ELSE 0.0 END)) AS score
                 FROM chunks c
                 JOIN documents d ON d.id = c.document_id
                 WHERE {where_sql} AND (
-                    (length($1) > 0 AND (c.tsv @@ plainto_tsquery('english', $1) OR (c.summary_tsv IS NOT NULL AND c.summary_tsv @@ plainto_tsquery('english', $1)))) OR
-                    (length($2) > 0 AND (c.tsv @@ to_tsquery('english', $2) OR (c.summary_tsv IS NOT NULL AND c.summary_tsv @@ to_tsquery('english', $2)))) OR
+                    (length($1) > 0 AND (COALESCE(c.search_tsv, c.tsv) @@ plainto_tsquery('english', $1) OR (c.summary_tsv IS NOT NULL AND c.summary_tsv @@ plainto_tsquery('english', $1)))) OR
+                    (length($2) > 0 AND (COALESCE(c.search_tsv, c.tsv) @@ to_tsquery('english', $2) OR (c.summary_tsv IS NOT NULL AND c.summary_tsv @@ to_tsquery('english', $2)))) OR
                     (length($3) > 0 AND (c.content ILIKE '%' || $3 || '%' OR COALESCE(c.summary_text, '') ILIKE '%' || $3 || '%'))
                 )
                 ORDER BY score DESC, c.created_at DESC LIMIT {limit};
@@ -623,10 +631,17 @@ class PostgresStore(StorageInterface):
         query_embedding: list[float],
         filters: RetrievalFilters,
         limit: int = 100,
+        ef_search: int | None = None,
     ) -> list[dict[str, Any]]:
         pool = self._get_pool()
         vec = np.array(query_embedding, dtype=np.float32)
+        target_ef = ef_search or getattr(settings, "hnsw_ef_search", 100)
         async with pool.acquire() as conn:
+            if target_ef:
+                try:
+                    await conn.execute(f"SET LOCAL hnsw.ef_search = {int(target_ef)};")
+                except Exception:
+                    pass
             clauses = [
                 "c.level = 'child'",
                 "c.embedding IS NOT NULL",

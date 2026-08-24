@@ -109,6 +109,7 @@ class StorageInterface(ABC):
         query_embedding: list[float],
         filters: RetrievalFilters,
         limit: int = 100,
+        ef_search: int | None = None,
     ) -> list[dict[str, Any]]:
         """Cosine similarity vector search against child chunks."""
         pass

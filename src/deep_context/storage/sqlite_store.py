@@ -569,6 +569,7 @@ class SQLiteStore(StorageInterface):
         query_embedding: list[float],
         filters: RetrievalFilters,
         limit: int = 100,
+        ef_search: int | None = None,
     ) -> list[dict[str, Any]]:
         """Perform in-memory cosine vector search over stored child chunk embeddings."""
         conn = self._get_conn()

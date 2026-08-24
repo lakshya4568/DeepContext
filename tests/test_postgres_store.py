@@ -261,3 +261,115 @@ async def test_postgres_event_traces(pg_store: PostgresStore):
     traces = await pg_store.list_event_traces(session_id=sess_id)
     assert len(traces) >= 1
     assert traces[0]["event_type"] == "hybrid_retrieval"
+
+
+@pytest.mark.asyncio
+async def test_postgres_optimized_indexes_and_tsv_trigger(pg_store: PostgresStore):
+    doc_id = str(uuid.uuid4())
+    doc = Document(
+        id=doc_id,
+        tenant_id="idx_test_tenant",
+        title="Optimization Guide",
+        doc_type="markdown",
+        permission_scope=["default"],
+    )
+    await pg_store.insert_document(doc)
+
+    parent_id = str(uuid.uuid4())
+    parent_chunk = Chunk(
+        id=parent_id,
+        document_id=doc_id,
+        level=ChunkLevel.PARENT,
+        content="Parent chunk explaining database architecture and indexing.",
+        token_count=100,
+    )
+
+    child_id = str(uuid.uuid4())
+    child_chunk = Chunk(
+        id=child_id,
+        document_id=doc_id,
+        parent_chunk_id=parent_id,
+        level=ChunkLevel.CHILD,
+        content="Detailed technical chunk about cache invalidation algorithms.",
+        summary_text="High-level overview of deterministic LRU and TTL cache pruning.",
+        summary_model="qwen3-0.6b",
+        token_count=30,
+    )
+
+    await pg_store.insert_chunks([parent_chunk, child_chunk])
+
+    # 1. Test search_tsv trigger automatically populated search_tsv
+    pool = pg_store._get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT search_tsv IS NOT NULL as has_search_tsv FROM chunks WHERE id = $1::uuid",
+            child_id,
+        )
+        assert row is not None
+        assert row["has_search_tsv"] is True
+
+    # 2. Test search_bm25 matches terms from content AND summary_text via search_tsv
+    filters = RetrievalFilters(tenant_id="idx_test_tenant", permission_scope=["default"])
+
+    # Query matching summary_text
+    res_summary = await pg_store.search_bm25("deterministic LRU", filters=filters)
+    assert len(res_summary) >= 1
+    assert res_summary[0]["id"] == child_id
+
+    # Query matching content
+    res_content = await pg_store.search_bm25("invalidation algorithms", filters=filters)
+    assert len(res_content) >= 1
+    assert res_content[0]["id"] == child_id
+
+    await pg_store.delete_document(doc_id)
+
+
+@pytest.mark.asyncio
+async def test_postgres_ef_search_runtime_parameter(pg_store: PostgresStore):
+    doc_id = str(uuid.uuid4())
+    doc = Document(
+        id=doc_id,
+        tenant_id="ef_test_tenant",
+        title="EF Search Guide",
+        doc_type="markdown",
+        permission_scope=["default"],
+    )
+    await pg_store.insert_document(doc)
+
+    parent_id = str(uuid.uuid4())
+    parent_chunk = Chunk(
+        id=parent_id,
+        document_id=doc_id,
+        level=ChunkLevel.PARENT,
+        content="Parent chunk for EF search testing.",
+        token_count=50,
+    )
+
+    child_id = str(uuid.uuid4())
+    vec = [0.0] * 1024
+    vec[42] = 1.0
+    child_chunk = Chunk(
+        id=child_id,
+        document_id=doc_id,
+        parent_chunk_id=parent_id,
+        level=ChunkLevel.CHILD,
+        content="Child chunk for vector recall tuning with ef_search.",
+        token_count=20,
+        embedding=vec,
+    )
+
+    await pg_store.insert_chunks([parent_chunk, child_chunk])
+
+    filters = RetrievalFilters(tenant_id="ef_test_tenant", permission_scope=["default"])
+
+    # Test with default ef_search (from settings)
+    res1 = await pg_store.search_vector(vec, filters=filters, limit=5)
+    assert len(res1) >= 1
+    assert res1[0]["id"] == child_id
+
+    # Test with custom ef_search override (e.g. 200)
+    res2 = await pg_store.search_vector(vec, filters=filters, limit=5, ef_search=200)
+    assert len(res2) >= 1
+    assert res2[0]["id"] == child_id
+
+    await pg_store.delete_document(doc_id)

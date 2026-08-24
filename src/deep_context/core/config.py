@@ -120,6 +120,11 @@ class Settings(BaseSettings):
     first_stage_limit: int = Field(default=100, alias="FIRST_STAGE_LIMIT")
     max_retrieval_retries: int = Field(default=1, alias="MAX_RETRIEVAL_RETRIES")
 
+    # PostgreSQL HNSW Vector Indexing parameters
+    hnsw_ef_search: int = Field(default=100, alias="HNSW_EF_SEARCH")
+    hnsw_m: int = Field(default=16, alias="HNSW_M")
+    hnsw_ef_construction: int = Field(default=200, alias="HNSW_EF_CONSTRUCTION")
+
     # Ingestion parameters
     parent_chunk_min_tokens: int = 1000
     parent_chunk_max_tokens: int = 2500
