@@ -1,4 +1,4 @@
-"""Query classifier implementing Step 1 of retrieval & RLM routing."""
+"""Query classifier implementing Step 1 of retrieval and routing."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from deep_context.core.types import QueryShape
 
 
 class QueryClassifier:
-    """Classifies incoming queries into QueryShape (shared by RAG & RLM router)."""
+    """Classifies incoming queries into QueryShape (shared by RAG & agentic router)."""
 
     @classmethod
     async def classify(cls, query: str) -> QueryShape:

@@ -13,24 +13,18 @@ import numpy as np
 from deep_context.core.config import settings
 from deep_context.core.logging import logger
 from deep_context.core.types import (
-    AgentMessage,
-    Budgets,
-    ChildStatus,
     Chunk,
     ChunkLevel,
     Document,
-    DocumentTreeNode,
     ExistingMemory,
     RetrievalFilters,
     RetrievalMode,
-    SessionHandle,
-    SessionStatus,
 )
 from deep_context.storage.base import StorageInterface
 
 
 class SQLiteStore(StorageInterface):
-    """Zero-configuration local storage implementing docs/DATA_MODEL.sql with SQLite & FTS5."""
+    """Zero-configuration local storage implementing hybrid RAG with SQLite & FTS5."""
 
     def __init__(self, db_path: str | None = None):
         self.db_path = db_path or settings.sqlite_db_path
@@ -38,15 +32,13 @@ class SQLiteStore(StorageInterface):
 
     async def initialize(self) -> None:
         """Initialize database connection and schema."""
-        self._conn = await aiosqlite.connect(self.db_path, timeout=30.0)
+        self._conn = await aiosqlite.connect(self.db_path)
         self._conn.row_factory = aiosqlite.Row
 
-        await self._conn.execute("PRAGMA busy_timeout = 30000;")
-        await self._conn.execute("PRAGMA journal_mode = WAL;")
-        await self._conn.execute("PRAGMA synchronous = NORMAL;")
-        await self._conn.execute("PRAGMA foreign_keys = ON;")
+        # Enable WAL mode for concurrent read/write performance
+        await self._conn.execute("PRAGMA journal_mode=WAL;")
+        await self._conn.execute("PRAGMA foreign_keys=ON;")
 
-        # Schema creation
         await self._conn.executescript("""
             CREATE TABLE IF NOT EXISTS documents (
                 id TEXT PRIMARY KEY,
@@ -54,7 +46,7 @@ class SQLiteStore(StorageInterface):
                 title TEXT NOT NULL,
                 source_uri TEXT,
                 doc_type TEXT NOT NULL,
-                permission_scope TEXT NOT NULL DEFAULT '["default"]',
+                permission_scope TEXT NOT NULL DEFAULT 'public',
                 retrieval_mode TEXT NOT NULL DEFAULT 'hybrid',
                 metadata TEXT NOT NULL DEFAULT '{}',
                 ingested_at TEXT NOT NULL,
@@ -70,10 +62,11 @@ class SQLiteStore(StorageInterface):
                 token_count INTEGER NOT NULL,
                 section_path TEXT,
                 page_number INTEGER,
-                embedding TEXT, -- JSON array of floats
+                chunk_index INTEGER NOT NULL DEFAULT 0,
+                embedding TEXT,
                 summary_text TEXT,
                 summary_tokens INTEGER,
-                summary_model TEXT DEFAULT 'qwen3-0.6b',
+                summary_model TEXT,
                 generated_at TEXT,
                 created_at TEXT NOT NULL
             );
@@ -84,16 +77,6 @@ class SQLiteStore(StorageInterface):
                 content,
                 section_path,
                 summary_text
-            );
-
-            CREATE TABLE IF NOT EXISTS document_tree_nodes (
-                id TEXT PRIMARY KEY,
-                document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
-                parent_node_id TEXT REFERENCES document_tree_nodes(id) ON DELETE CASCADE,
-                title TEXT NOT NULL,
-                summary TEXT,
-                chunk_id TEXT REFERENCES chunks(id),
-                node_order INTEGER NOT NULL DEFAULT 0
             );
 
             CREATE TABLE IF NOT EXISTS memory_policy (
@@ -145,53 +128,6 @@ class SQLiteStore(StorageInterface):
                 summary TEXT NOT NULL,
                 outcome TEXT,
                 embedding TEXT,
-                created_at TEXT NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS agents (
-                id TEXT PRIMARY KEY,
-                owner TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'idle',
-                budgets TEXT NOT NULL DEFAULT '{"max_turns": 50, "max_tokens": 2000000, "max_wall_clock_seconds": 3600}',
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS sessions (
-                id TEXT PRIMARY KEY,
-                agent_id TEXT,
-                parent_session_id TEXT REFERENCES sessions(id),
-                user_id TEXT NOT NULL,
-                project_root TEXT,
-                kernel_ref TEXT,
-                state_snapshot TEXT NOT NULL DEFAULT '{}',
-                budgets TEXT NOT NULL DEFAULT '{}',
-                depth INTEGER NOT NULL DEFAULT 0,
-                status TEXT NOT NULL DEFAULT 'active',
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS rlm_children (
-                id TEXT PRIMARY KEY,
-                parent_session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-                child_session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-                name TEXT NOT NULL,
-                model TEXT NOT NULL,
-                depth INTEGER NOT NULL DEFAULT 1,
-                status TEXT NOT NULL DEFAULT 'admitted',
-                admitted_at TEXT NOT NULL,
-                completed_at TEXT,
-                UNIQUE (parent_session_id, name)
-            );
-
-            CREATE TABLE IF NOT EXISTS agent_messages (
-                id TEXT PRIMARY KEY,
-                session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-                target_session_id TEXT NOT NULL,
-                receiver_role TEXT NOT NULL,
-                receiver_name TEXT,
-                content TEXT NOT NULL,
                 created_at TEXT NOT NULL
             );
 
@@ -346,7 +282,6 @@ class SQLiteStore(StorageInterface):
 
     async def delete_document(self, document_id: str) -> bool:
         conn = self._get_conn()
-        await conn.execute("DELETE FROM document_tree_nodes WHERE document_id = ?", (document_id,))
         await conn.execute("DELETE FROM chunks_fts WHERE document_id = ?", (document_id,))
         await conn.execute(
             "DELETE FROM chunks WHERE document_id = ? AND level = 'child'",
@@ -359,7 +294,6 @@ class SQLiteStore(StorageInterface):
 
     async def delete_all_documents(self) -> bool:
         conn = self._get_conn()
-        await conn.execute("DELETE FROM document_tree_nodes")
         await conn.execute("DELETE FROM chunks_fts")
         await conn.execute("DELETE FROM chunks WHERE level = 'child'")
         await conn.execute("DELETE FROM chunks")
@@ -699,80 +633,6 @@ class SQLiteStore(StorageInterface):
 
         candidates.sort(key=lambda x: x[0], reverse=True)
         return [c[1] for c in candidates[:limit]]
-
-    async def insert_tree_nodes(self, nodes: list[DocumentTreeNode]) -> list[str]:
-        if not nodes:
-            return []
-        conn = self._get_conn()
-        node_params = [
-            (
-                n.id,
-                n.document_id,
-                n.parent_node_id,
-                n.title,
-                n.summary,
-                n.chunk_id,
-                n.node_order,
-            )
-            for n in nodes
-        ]
-        await conn.executemany(
-            """
-            INSERT OR REPLACE INTO document_tree_nodes (
-                id, document_id, parent_node_id, title, summary, chunk_id, node_order
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
-            """,
-            node_params,
-        )
-        await conn.commit()
-        return [n.id for n in nodes]
-
-    async def get_tree_nodes_for_document(self, document_id: str) -> list[DocumentTreeNode]:
-        conn = self._get_conn()
-        async with conn.execute(
-            "SELECT * FROM document_tree_nodes WHERE document_id = ? ORDER BY node_order",
-            (document_id,),
-        ) as cursor:
-            rows = await cursor.fetchall()
-            return [
-                DocumentTreeNode(
-                    id=r["id"],
-                    document_id=r["document_id"],
-                    parent_node_id=r["parent_node_id"],
-                    title=r["title"],
-                    summary=r["summary"],
-                    chunk_id=r["chunk_id"],
-                    node_order=r["node_order"],
-                )
-                for r in rows
-            ]
-
-    async def get_child_tree_nodes(
-        self, document_id: str, parent_node_id: str | None
-    ) -> list[DocumentTreeNode]:
-        conn = self._get_conn()
-        params: tuple[Any, ...]
-        if parent_node_id is None:
-            query = "SELECT * FROM document_tree_nodes WHERE document_id = ? AND parent_node_id IS NULL ORDER BY node_order"
-            params = (document_id,)
-        else:
-            query = "SELECT * FROM document_tree_nodes WHERE document_id = ? AND parent_node_id = ? ORDER BY node_order"
-            params = (document_id, parent_node_id)
-
-        async with conn.execute(query, params) as cursor:
-            rows = await cursor.fetchall()
-            return [
-                DocumentTreeNode(
-                    id=r["id"],
-                    document_id=r["document_id"],
-                    parent_node_id=r["parent_node_id"],
-                    title=r["title"],
-                    summary=r["summary"],
-                    chunk_id=r["chunk_id"],
-                    node_order=r["node_order"],
-                )
-                for r in rows
-            ]
 
     # -----------------------------------------------------------------------
     # Typed Memory (Policy, Preference, Fact, Episode)
@@ -1122,184 +982,6 @@ class SQLiteStore(StorageInterface):
 
             candidates.sort(key=lambda x: x[0], reverse=True)
             return [c[1] for c in candidates[:limit]]
-
-    # -----------------------------------------------------------------------
-    # Sessions, Agents & RLM Messaging
-    # -----------------------------------------------------------------------
-
-    async def create_session(self, session: SessionHandle, user_id: str = "default") -> None:
-        conn = self._get_conn()
-        now_iso = session.created_at.isoformat()
-        budgets_json = json.dumps(
-            {
-                "max_turns": session.budgets.max_turns,
-                "max_tokens": session.budgets.max_tokens,
-                "max_wall_clock_seconds": session.budgets.max_wall_clock_seconds,
-                "max_recursion_depth": session.budgets.max_recursion_depth,
-            }
-        )
-
-        await conn.execute(
-            """
-            INSERT OR REPLACE INTO sessions (
-                id, parent_session_id, user_id, depth, budgets, status, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                session.id,
-                session.parent_session_id,
-                user_id,
-                session.depth,
-                budgets_json,
-                session.status.value,
-                now_iso,
-                now_iso,
-            ),
-        )
-        await conn.commit()
-
-    async def get_session(self, session_id: str) -> SessionHandle | None:
-        conn = self._get_conn()
-        async with conn.execute("SELECT * FROM sessions WHERE id = ?", (session_id,)) as cursor:
-            row = await cursor.fetchone()
-            if not row:
-                return None
-            b_dict = json.loads(row["budgets"]) if row["budgets"] else {}
-            budgets = Budgets(
-                max_turns=b_dict.get("max_turns", 50),
-                max_tokens=b_dict.get("max_tokens", 2000000),
-                max_wall_clock_seconds=b_dict.get("max_wall_clock_seconds", 3600),
-                max_recursion_depth=b_dict.get("max_recursion_depth", 1),
-            )
-            return SessionHandle(
-                id=row["id"],
-                parent_session_id=row["parent_session_id"],
-                depth=row["depth"],
-                budgets=budgets,
-                status=SessionStatus(row["status"]),
-                created_at=datetime.fromisoformat(row["created_at"]),
-            )
-
-    async def update_session_status(self, session_id: str, status: SessionStatus) -> None:
-        conn = self._get_conn()
-        now_iso = datetime.now(timezone.utc).isoformat()
-        await conn.execute(
-            "UPDATE sessions SET status = ?, updated_at = ? WHERE id = ?",
-            (status.value, now_iso, session_id),
-        )
-        await conn.commit()
-
-    async def insert_rlm_child(
-        self,
-        parent_session_id: str,
-        child_session_id: str,
-        name: str,
-        model: str,
-        depth: int,
-    ) -> str:
-        import uuid
-
-        cid = str(uuid.uuid4())
-        now_iso = datetime.now(timezone.utc).isoformat()
-        conn = self._get_conn()
-        await conn.execute(
-            """
-            INSERT OR REPLACE INTO rlm_children (
-                id, parent_session_id, child_session_id, name, model, depth, status, admitted_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                cid,
-                parent_session_id,
-                child_session_id,
-                name,
-                model,
-                depth,
-                ChildStatus.ADMITTED.value,
-                now_iso,
-            ),
-        )
-        await conn.commit()
-        return cid
-
-    async def update_rlm_child_status(self, child_session_id: str, status: ChildStatus) -> None:
-        conn = self._get_conn()
-        now_iso = datetime.now(timezone.utc).isoformat()
-        completed_at = now_iso if status in (ChildStatus.COMPLETED, ChildStatus.ERROR) else None
-        await conn.execute(
-            "UPDATE rlm_children SET status = ?, completed_at = COALESCE(?, completed_at) WHERE child_session_id = ?",
-            (status.value, completed_at, child_session_id),
-        )
-        await conn.commit()
-
-    async def insert_agent_message(self, message: AgentMessage) -> str:
-        import uuid
-
-        mid = str(uuid.uuid4())
-        now_iso = message.created_at.isoformat()
-        conn = self._get_conn()
-        # Find target session id based on sender and receiver role
-        target_session_id = ""
-        if message.receiver_role == "parent":
-            async with conn.execute(
-                "SELECT parent_session_id FROM sessions WHERE id = ?",
-                (message.session_id,),
-            ) as cursor:
-                row = await cursor.fetchone()
-                target_session_id = row["parent_session_id"] if row else ""
-        else:
-            async with conn.execute(
-                "SELECT child_session_id FROM rlm_children WHERE parent_session_id = ? AND name = ?",
-                (message.session_id, message.receiver_name),
-            ) as cursor:
-                row = await cursor.fetchone()
-                target_session_id = row["child_session_id"] if row else ""
-
-        await conn.execute(
-            """
-            INSERT INTO agent_messages (
-                id, session_id, target_session_id, receiver_role, receiver_name, content, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                mid,
-                message.session_id,
-                target_session_id,
-                message.receiver_role,
-                message.receiver_name,
-                message.content,
-                now_iso,
-            ),
-        )
-        await conn.commit()
-        return mid
-
-    async def pop_agent_messages(self, target_session_id: str) -> list[AgentMessage]:
-        conn = self._get_conn()
-        async with conn.execute(
-            "SELECT * FROM agent_messages WHERE target_session_id = ? ORDER BY created_at ASC",
-            (target_session_id,),
-        ) as cursor:
-            rows = await cursor.fetchall()
-            messages = [
-                AgentMessage(
-                    session_id=r["session_id"],
-                    receiver_role=r["receiver_role"],
-                    receiver_name=r["receiver_name"],
-                    content=r["content"],
-                    created_at=datetime.fromisoformat(r["created_at"]),
-                )
-                for r in rows
-            ]
-
-        if messages:
-            await conn.execute(
-                "DELETE FROM agent_messages WHERE target_session_id = ?",
-                (target_session_id,),
-            )
-            await conn.commit()
-
-        return messages
 
     # -----------------------------------------------------------------------
     # Events Trace Log

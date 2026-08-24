@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Deep Context Platform — Hybrid RAG & RLM Studio</title>
+    <title>Deep Context Platform — Agentic Hybrid RAG Studio</title>
 
     <!-- Fonts: Plus Jakarta Sans & JetBrains Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -1164,10 +1164,10 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
                   class="preset-chip"
                   onclick="
                     setQuery(
-                      'Read the entire document corpus and extract all security risks',
+                      'Compare the hybrid retrieval latency versus cross-encoder reranking overhead across chunks',
                     )
                   "
-                  >RLM Global Aggregation</span
+                  >Multi-Hop Analysis</span
                 >
               </div>
             </div>
@@ -1215,15 +1215,12 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
                   Routing Strategy</label
                 >
                 <select id="routing-mode">
-                  <option value="">Auto Router (Shape & Token Budget)</option>
+                  <option value="">Auto Router (Shape & Complexity)</option>
                   <option value="hybrid_rag">
-                    Hybrid RAG (BM25 + Vector + RRF)
+                    Hybrid RAG (Dual BM25 + Vector + RRF)
                   </option>
                   <option value="agentic_planner">
-                    Agentic Planner (Multi-Hop)
-                  </option>
-                  <option value="rlm_engine">
-                    RLM Engine (Recursive REPL)
+                    Agentic Planner (Multi-Hop Decomposition)
                   </option>
                   <option value="agentic_rag">
                     Agentic RAG (Corrective Grade→Rewrite)
@@ -1533,11 +1530,8 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
                   Retrieval Strategy</label
                 >
                 <select id="upload-mode-select">
-                  <option value="hybrid">
-                    Hybrid RAG (Dense Vector + BM25 Full-Text)
-                  </option>
-                  <option value="vectorless">
-                    Vectorless PageIndex (Hierarchical Tree)
+                  <option value="hybrid" selected>
+                    Hybrid RAG (Dual BM25 Content & Summaries + Dense Vector)
                   </option>
                 </select>
               </div>
@@ -2127,8 +2121,7 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
               <div>
                 <label><i data-lucide="compass" style="width: 12px; height: 12px"></i> Default Retrieval Mode</label>
                 <select id="cfg-retrieval-mode">
-                  <option value="hybrid">Hybrid (Dense Vector + BM25 tsvector)</option>
-                  <option value="vectorless">Vectorless PageIndex (Tree)</option>
+                  <option value="hybrid" selected>Hybrid (Dense Vector + Dual BM25 content & summary)</option>
                 </select>
               </div>
               <div>
@@ -2747,7 +2740,6 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
 
         const formData = new FormData();
         selectedBatchFiles.forEach((f) => formData.append("files", f));
-        formData.append("vectorless", mode === "vectorless" ? "true" : "false");
         formData.append("embedding_model", embModel);
         formData.append("embedding_dim", String(embDim));
         formData.append("generate_summaries", genSummaries ? "true" : "false");

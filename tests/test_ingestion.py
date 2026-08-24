@@ -88,20 +88,3 @@ CORS origins should be explicitly configured in SecurityFilterChain.
     assert res.document_id is not None
     assert res.parent_chunks_count >= 1
     assert res.child_chunks_count >= 1
-
-
-@pytest.mark.asyncio
-async def test_vectorless_tree_indexing() -> None:
-    req = IngestRequest(
-        title="Employment Contract",
-        content="""# Employment Agreement
-Section 1: Scope of Work
-Section 2: Compensation and Benefits
-Section 3: Confidentiality and Non-disclosure
-""",
-        doc_type="markdown",
-        retrieval_mode=RetrievalMode.VECTORLESS,
-    )
-    res = await ingestion_pipeline.ingest(req)
-    assert res.retrieval_mode == RetrievalMode.VECTORLESS
-    assert res.tree_nodes_count >= 2

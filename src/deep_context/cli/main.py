@@ -21,12 +21,11 @@ from deep_context.core.types import (
 )
 from deep_context.ingestion.pipeline import ingestion_pipeline
 from deep_context.retrieval.engine import retrieval_engine
-from deep_context.rlm.orchestrator import RLMOrchestrator
 from deep_context.storage import close_storage, get_storage
 
 app = typer.Typer(
     name="deep-context",
-    help="Deep Context Platform: Hybrid RAG + Typed Memory + RLM Engine CLI",
+    help="Deep Context Platform: Agentic Hybrid RAG + Local Qwen3 Summarization CLI",
     add_completion=False,
 )
 console = Console()
@@ -92,9 +91,6 @@ def ingest_cmd(
     doc_type: str = typer.Option(
         "auto", "--type", help="Format: auto, markdown, code, pdf, html, text"
     ),
-    vectorless: bool = typer.Option(
-        False, "--vectorless", help="Enable vectorless tree navigation mode"
-    ),
     embedding_model: str = typer.Option(
         "",
         "--embedding-model",
@@ -125,7 +121,7 @@ def ingest_cmd(
             content = p.read_text(encoding="utf-8", errors="replace")
 
         doc_title = title or p.stem
-        mode = RetrievalMode.VECTORLESS if vectorless else RetrievalMode.HYBRID
+        mode = RetrievalMode.HYBRID
         target_model = embedding_model or settings.embedding_model
         target_dim = embedding_dim or (
             768 if "gemini" in target_model.lower() else settings.embedding_dim
@@ -154,7 +150,7 @@ def ingest_cmd(
                 f"Type: [magenta]{detected_type.upper()}[/magenta]\n"
                 f"Embedding: [yellow]{res.embedding_model or target_model} ({res.embedding_dim or target_dim}-dim)[/yellow]\n"
                 f"Parent Chunks: {res.parent_chunks_count} | Child Chunks: {res.child_chunks_count}\n"
-                f"Retrieval Mode: {res.retrieval_mode.value} | Tree Nodes: {res.tree_nodes_count}",
+                f"Retrieval Mode: {res.retrieval_mode.value}",
                 title="Ingestion Result",
             )
         )
@@ -169,11 +165,6 @@ def ingest_all_cmd(
     target_path: str = typer.Argument(
         "documents",
         help="Folder or glob path to ingest all files from (defaults to './documents')",
-    ),
-    vectorless: bool = typer.Option(
-        False,
-        "--vectorless",
-        help="Enable vectorless tree navigation mode for all files",
     ),
     embedding_model: str = typer.Option(
         "",
@@ -235,7 +226,7 @@ def ingest_all_cmd(
         table.add_column("Children", style="yellow")
         table.add_column("Status", style="bold white")
 
-        mode = RetrievalMode.VECTORLESS if vectorless else RetrievalMode.HYBRID
+        mode = RetrievalMode.HYBRID
 
         for file_item in files_to_process:
             ext = file_item.suffix.lower()
@@ -518,51 +509,6 @@ def set_preference_cmd(
                 + (f"• Reranker Strategy: [magenta]{reranker}[/magenta]\n" if reranker else "")
                 + (f"• LLM Model: [yellow]{llm_model}[/yellow]\n" if llm_model else ""),
                 title="Preference Saved",
-            )
-        )
-        await close_storage()
-
-    asyncio.run(_run())
-
-
-@app.command("rlm")
-def rlm_cmd(
-    task_spec: str = typer.Argument(..., help="Task specification for RLM engine"),
-    corpus_file: str = typer.Option("", "--corpus", "-c", help="Path to corpus file"),
-) -> None:
-    """Execute an RLM recursive session with sandboxed REPL and subagent messaging."""
-
-    async def _run() -> None:
-        storage = await get_storage()
-        corpus = ""
-        if corpus_file and Path(corpus_file).exists():
-            p = Path(corpus_file)
-            if p.suffix.lower() == ".pdf":
-                from deep_context.ingestion.parser import DocumentParser
-
-                with console.status(f"[bold cyan]Extracting text from {p.name}...[/bold cyan]"):
-                    parser = DocumentParser()
-                    sections = parser.parse(str(p.resolve()), doc_type="pdf")
-                    corpus = "\n\n".join(f"=== {s.title} ===\n{s.content}" for s in sections)
-            else:
-                corpus = p.read_text(encoding="utf-8", errors="ignore")
-        if not corpus:
-            corpus = f"Repository Context and Ingested Material for task: {task_spec}"
-
-        orchestrator = RLMOrchestrator(storage)
-        model_label = settings.llm_model
-        with console.status(
-            f"[bold green]Running RLM Recursive Session with {model_label}...[/bold green]"
-        ):
-            res = await orchestrator.run_session(task_spec=task_spec, corpus=corpus)
-
-        console.print(
-            Panel(
-                f"[bold green]RLM Session Completed![/bold green]\n"
-                f"Session ID: [cyan]{res.session_id}[/cyan]\n"
-                f"Turns Used: {res.turns_used} | Subagents Spawned: {res.children_spawned}\n\n"
-                f"{res.answer}",
-                title="RLM Synthesis Output",
             )
         )
         await close_storage()

@@ -21,12 +21,12 @@ async def test_query_router_decisions() -> None:
     )
     assert d2.path in (RoutingPath.AGENTIC_PLANNER, RoutingPath.HYBRID_RAG)
 
-    # 3. Massive corpus or global aggregation -> RLM_ENGINE
+    # 3. Forced path override
     d3 = await QueryRouter.route(
-        "Read every file in the codebase and check for memory leaks",
-        estimated_corpus_tokens=200_000,
+        "Any query",
+        forced_path=RoutingPath.AGENTIC_PLANNER,
     )
-    assert d3.path == RoutingPath.RLM_ENGINE
+    assert d3.path == RoutingPath.AGENTIC_PLANNER
 
 
 @pytest.mark.asyncio

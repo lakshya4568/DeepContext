@@ -11,7 +11,6 @@ from deep_context.core.types import (
     Citation,
     QueryShape,
     RetrievalFilters,
-    RetrievalMode,
     RetrievalResult,
 )
 from deep_context.retrieval.classifier import QueryClassifier
@@ -19,12 +18,11 @@ from deep_context.retrieval.hybrid import HybridRetriever
 from deep_context.retrieval.quality_gates import hop_coverage, is_anachronism, protect_consensus
 from deep_context.retrieval.reranker import Reranker
 from deep_context.retrieval.rewriter import QueryRewriter
-from deep_context.retrieval.tree_navigator import TreeNavigator
 from deep_context.storage import get_storage
 
 
 class RetrievalEngine:
-    """The central retrieval engine implementing FR1–FR6 of PRD.md."""
+    """The central retrieval engine implementing hybrid RAG with dual BM25 + dense search."""
 
     def __init__(self) -> None:
         self.classifier = QueryClassifier()
@@ -43,14 +41,15 @@ class RetrievalEngine:
     ) -> RetrievalResult:
         """
         Executes the full retrieval pipeline:
-        1. Resolve active embedding model and reranker from user preferences or arguments
-        2. Classify query shape
-        3. Rewrite / decompose into sub-queries
-        4. Parallel BM25 + Vector recall (or tree navigation if vectorless)
-        5. Reciprocal Rank Fusion & deduplication
-        6. Multi-strategy reranking with consensus protection
-        7. Child -> Parent chunk resolution
-        8. Hop-coverage retry and evidence sufficiency check
+        1. Classify query shape (factoid, multi-hop, how-to, etc.)
+        2. Resolve stored user preferences for embedding model / reranker
+        3. Check anachronisms
+        4. Rewrite / decompose into sub-queries
+        5. Dual-stage hybrid retrieval (BM25 content + summary_tsv + Dense Vector HNSW)
+        6. Reciprocal Rank Fusion (RRF k=60)
+        7. Cross-Encoder reranking
+        8. Parent chunk resolution
+        9. Evidence sufficiency gate (with 1 bounded retry)
         """
         t0 = time.time()
         storage = await get_storage()
@@ -58,52 +57,36 @@ class RetrievalEngine:
         target_top_k = top_k or settings.default_top_k
         max_retries = settings.max_retrieval_retries
 
-        active_emb_model = embedding_model
-        active_emb_dim = embedding_dim
-        active_reranker = reranker
-
-        if user_id:
-            try:
-                emb_pref = await storage.get_preference(user_id, "embedding_model")
-                if emb_pref and not active_emb_model:
-                    val = emb_pref.get("preference_value")
-                    if isinstance(val, dict):
-                        active_emb_model = val.get("model")
-                        if not active_emb_dim:
-                            active_emb_dim = val.get("dim")
-                    elif isinstance(val, str):
-                        active_emb_model = val
-
-                rerank_pref = await storage.get_preference(user_id, "reranker")
-                if rerank_pref and not active_reranker:
-                    val_r = rerank_pref.get("preference_value")
-                    if isinstance(val_r, dict):
-                        active_reranker = val_r.get("strategy")
-                    elif isinstance(val_r, str):
-                        active_reranker = val_r
-            except Exception as e:
-                logger.debug("Failed to load user preferences for %s: %s", user_id, e)
-
-        active_emb_model = active_emb_model or settings.embedding_model
-        active_emb_dim = active_emb_dim or (
+        # 0. Check User Preferences from Memory Store if user_id is provided
+        active_emb_model = embedding_model or settings.embedding_model
+        active_emb_dim = embedding_dim or (
             768 if "gemini" in active_emb_model.lower() else settings.embedding_dim
         )
-        active_reranker = active_reranker or settings.reranker_strategy
+        active_reranker = reranker or settings.reranker_strategy
 
+        if user_id:
+            from deep_context.memory.stores import MemoryStoreManager
+
+            mgr = MemoryStoreManager(storage)
+            prefs = await mgr.get_embedding_preferences(user_id)
+            if not embedding_model and "embedding_model" in prefs:
+                active_emb_model = prefs["embedding_model"]
+            if not embedding_dim and "embedding_dim" in prefs:
+                active_emb_dim = prefs["embedding_dim"]
+            if not reranker and "reranker" in prefs:
+                active_reranker = prefs["reranker"]
+
+        # 1. Classify Query
         shape = await self.classifier.classify(query)
         current_query = query
         retry_count = 0
 
+        # Anachronism gate
         if is_anachronism(query):
             latency_ms = int((time.time() - t0) * 1000)
             await storage.insert_event_trace(
                 event_type="retrieval",
-                payload={
-                    "query": query,
-                    "query_shape": shape.value,
-                    "sufficient": False,
-                    "reason": "anachronism",
-                },
+                payload={"query": query, "rejected_reason": "anachronism"},
                 latency_ms=latency_ms,
             )
             return RetrievalResult(
@@ -118,42 +101,14 @@ class RetrievalEngine:
         while True:
             sub_queries = await self.rewriter.rewrite_or_decompose(current_query, shape)
 
-            is_vectorless = False
-            if filters.document_ids and len(filters.document_ids) == 1:
-                doc = await storage.get_document(filters.document_ids[0])
-                if doc and doc.retrieval_mode == RetrievalMode.VECTORLESS:
-                    is_vectorless = True
-
-            candidates: list[dict[str, Any]] = []
-
-            if is_vectorless and filters.document_ids:
-                tree_nav = TreeNavigator(storage)
-                leaf_ids = await tree_nav.navigate(current_query, filters.document_ids[0])
-                leaf_chunks = await storage.get_chunks_by_ids(leaf_ids)
-                doc = await storage.get_document(filters.document_ids[0])
-                for lc in leaf_chunks:
-                    candidates.append(
-                        {
-                            "id": lc.id,
-                            "document_id": lc.document_id,
-                            "parent_chunk_id": lc.parent_chunk_id or lc.id,
-                            "content": lc.content,
-                            "section_path": lc.section_path,
-                            "page_number": lc.page_number,
-                            "document_title": doc.title if doc else "",
-                            "source_uri": doc.source_uri if doc else None,
-                            "score": 1.0,
-                        }
-                    )
-            else:
-                hybrid_retriever = HybridRetriever(storage)
-                candidates = await hybrid_retriever.retrieve_candidates(
-                    sub_queries=sub_queries,
-                    filters=filters,
-                    limit=settings.first_stage_limit,
-                    embedding_model=active_emb_model,
-                    embedding_dim=active_emb_dim,
-                )
+            hybrid_retriever = HybridRetriever(storage)
+            candidates = await hybrid_retriever.retrieve_candidates(
+                sub_queries=sub_queries,
+                filters=filters,
+                limit=settings.first_stage_limit,
+                embedding_model=active_emb_model,
+                embedding_dim=active_emb_dim,
+            )
 
             rerank_pool = min(24, max(target_top_k, len(candidates)))
             reranked_children = await Reranker.rerank(
@@ -170,7 +125,7 @@ class RetrievalEngine:
             parents = parents[:target_top_k]
 
             missing_hops = hop_coverage(sub_queries, parents)
-            if missing_hops and retry_count == 0 and not is_vectorless:
+            if missing_hops and retry_count == 0:
                 extra = await HybridRetriever(storage).retrieve_candidates(
                     sub_queries=missing_hops,
                     filters=filters,
@@ -178,13 +133,20 @@ class RetrievalEngine:
                     embedding_model=active_emb_model,
                     embedding_dim=active_emb_dim,
                 )
-                extra_parents = await self._resolve_parent_chunks(storage, extra)
-                seen = {p.get("chunk_id") for p in parents}
-                for parent in extra_parents:
-                    if parent.get("chunk_id") not in seen:
-                        parents.append(parent)
-                        seen.add(parent.get("chunk_id"))
-                parents = parents[: max(target_top_k, 12)]
+                if extra:
+                    merged = {c["id"]: c for c in candidates}
+                    for c in extra:
+                        merged[c["id"]] = c
+                    reranked_children = await Reranker.rerank(
+                        query=current_query,
+                        candidates=list(merged.values()),
+                        top_k=rerank_pool,
+                        strategy=active_reranker,
+                        embedding_model=active_emb_model,
+                        embedding_dim=active_emb_dim,
+                    )
+                    parents = await self._resolve_parent_chunks(storage, reranked_children)
+                    parents = parents[:target_top_k]
 
             citations = [
                 Citation(

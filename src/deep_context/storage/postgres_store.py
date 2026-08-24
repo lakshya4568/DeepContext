@@ -13,18 +13,12 @@ from pgvector.asyncpg import register_vector
 from deep_context.core.config import settings
 from deep_context.core.logging import logger
 from deep_context.core.types import (
-    AgentMessage,
-    Budgets,
-    ChildStatus,
     Chunk,
     ChunkLevel,
     Document,
-    DocumentTreeNode,
     ExistingMemory,
     RetrievalFilters,
     RetrievalMode,
-    SessionHandle,
-    SessionStatus,
 )
 from deep_context.storage.base import StorageInterface
 
@@ -105,16 +99,6 @@ class PostgresStore(StorageInterface):
                 BEFORE INSERT OR UPDATE ON chunks
                 FOR EACH ROW EXECUTE FUNCTION update_summary_tsv();
 
-                CREATE TABLE IF NOT EXISTS document_tree_nodes (
-                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                    document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
-                    parent_node_id UUID REFERENCES document_tree_nodes(id) ON DELETE CASCADE,
-                    title TEXT NOT NULL,
-                    summary TEXT,
-                    chunk_id UUID REFERENCES chunks(id),
-                    node_order INTEGER NOT NULL DEFAULT 0
-                );
-
                 CREATE TABLE IF NOT EXISTS memory_policy (
                     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                     tenant_id TEXT NOT NULL DEFAULT 'default',
@@ -182,53 +166,6 @@ class PostgresStore(StorageInterface):
                     END;
                 END $$;
 
-                CREATE TABLE IF NOT EXISTS agents (
-                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                    owner TEXT NOT NULL,
-                    status TEXT NOT NULL DEFAULT 'idle',
-                    budgets JSONB NOT NULL DEFAULT '{"max_turns": 50, "max_tokens": 2000000, "max_wall_clock_seconds": 3600}',
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-                    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-                );
-
-                CREATE TABLE IF NOT EXISTS sessions (
-                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                    agent_id UUID,
-                    parent_session_id UUID REFERENCES sessions(id),
-                    user_id TEXT NOT NULL,
-                    project_root TEXT,
-                    kernel_ref TEXT,
-                    state_snapshot JSONB NOT NULL DEFAULT '{}',
-                    budgets JSONB NOT NULL DEFAULT '{}',
-                    depth INTEGER NOT NULL DEFAULT 0,
-                    status TEXT NOT NULL DEFAULT 'active',
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-                    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-                );
-
-                CREATE TABLE IF NOT EXISTS rlm_children (
-                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                    parent_session_id UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-                    child_session_id UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-                    name TEXT NOT NULL,
-                    model TEXT NOT NULL,
-                    depth INTEGER NOT NULL DEFAULT 1,
-                    status TEXT NOT NULL DEFAULT 'admitted',
-                    admitted_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-                    completed_at TIMESTAMPTZ,
-                    UNIQUE (parent_session_id, name)
-                );
-
-                CREATE TABLE IF NOT EXISTS agent_messages (
-                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                    session_id UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-                    target_session_id UUID NOT NULL,
-                    receiver_role TEXT NOT NULL CHECK (receiver_role IN ('parent', 'child')),
-                    receiver_name TEXT,
-                    content TEXT NOT NULL,
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-                );
-
                 CREATE TABLE IF NOT EXISTS events_trace (
                     id BIGSERIAL PRIMARY KEY,
                     session_id UUID,
@@ -260,8 +197,6 @@ class PostgresStore(StorageInterface):
                 CREATE INDEX IF NOT EXISTS idx_chunks_parent ON chunks (parent_chunk_id);
                 CREATE INDEX IF NOT EXISTS idx_chunks_tsv ON chunks USING GIN (tsv);
                 CREATE INDEX IF NOT EXISTS idx_chunks_embedding ON chunks USING hnsw (embedding vector_cosine_ops);
-                CREATE INDEX IF NOT EXISTS idx_tree_nodes_document ON document_tree_nodes (document_id);
-                CREATE INDEX IF NOT EXISTS idx_tree_nodes_parent ON document_tree_nodes (parent_node_id);
                 CREATE INDEX IF NOT EXISTS idx_memory_policy_tenant ON memory_policy (tenant_id);
                 CREATE INDEX IF NOT EXISTS idx_memory_preference_user ON memory_preference (user_id);
                 CREATE INDEX IF NOT EXISTS idx_memory_fact_scope ON memory_fact (tenant_id, user_id);
@@ -269,8 +204,6 @@ class PostgresStore(StorageInterface):
                 CREATE INDEX IF NOT EXISTS idx_memory_fact_embedding ON memory_fact USING hnsw (embedding vector_cosine_ops);
                 CREATE INDEX IF NOT EXISTS idx_memory_episode_user ON memory_episode (user_id);
                 CREATE INDEX IF NOT EXISTS idx_memory_episode_embedding ON memory_episode USING hnsw (embedding vector_cosine_ops);
-                CREATE INDEX IF NOT EXISTS idx_sessions_agent ON sessions (agent_id);
-                CREATE INDEX IF NOT EXISTS idx_sessions_parent ON sessions (parent_session_id);
                 CREATE INDEX IF NOT EXISTS idx_events_trace_session ON events_trace (session_id);
                 """)
         logger.info("Initialized Postgres database with pgvector and HNSW indexes.")
@@ -744,83 +677,6 @@ class PostgresStore(StorageInterface):
                 for r in rows
             ]
 
-    async def insert_tree_nodes(self, nodes: list[DocumentTreeNode]) -> list[str]:
-        if not nodes:
-            return []
-        pool = self._get_pool()
-        async with pool.acquire() as conn:
-            records = [
-                (
-                    n.id,
-                    n.document_id,
-                    n.parent_node_id,
-                    n.title,
-                    n.summary,
-                    n.chunk_id,
-                    n.node_order,
-                )
-                for n in nodes
-            ]
-            await conn.executemany(
-                """
-                INSERT INTO document_tree_nodes (
-                    id, document_id, parent_node_id, title, summary, chunk_id, node_order
-                ) VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6::uuid, $7)
-                ON CONFLICT (id) DO NOTHING;
-                """,
-                records,
-            )
-            return [n.id for n in nodes]
-
-    async def get_tree_nodes_for_document(self, document_id: str) -> list[DocumentTreeNode]:
-        pool = self._get_pool()
-        async with pool.acquire() as conn:
-            rows = await conn.fetch(
-                "SELECT * FROM document_tree_nodes WHERE document_id = $1::uuid ORDER BY node_order",
-                document_id,
-            )
-            return [
-                DocumentTreeNode(
-                    id=str(r["id"]),
-                    document_id=str(r["document_id"]),
-                    parent_node_id=(str(r["parent_node_id"]) if r["parent_node_id"] else None),
-                    title=r["title"],
-                    summary=r["summary"],
-                    chunk_id=str(r["chunk_id"]) if r["chunk_id"] else None,
-                    node_order=r["node_order"],
-                )
-                for r in rows
-            ]
-
-    async def get_child_tree_nodes(
-        self, document_id: str, parent_node_id: str | None
-    ) -> list[DocumentTreeNode]:
-        pool = self._get_pool()
-        async with pool.acquire() as conn:
-            if parent_node_id is None:
-                rows = await conn.fetch(
-                    "SELECT * FROM document_tree_nodes WHERE document_id = $1::uuid AND parent_node_id IS NULL ORDER BY node_order",
-                    document_id,
-                )
-            else:
-                rows = await conn.fetch(
-                    "SELECT * FROM document_tree_nodes WHERE document_id = $1::uuid AND parent_node_id = $2::uuid ORDER BY node_order",
-                    document_id,
-                    parent_node_id,
-                )
-            return [
-                DocumentTreeNode(
-                    id=str(r["id"]),
-                    document_id=str(r["document_id"]),
-                    parent_node_id=(str(r["parent_node_id"]) if r["parent_node_id"] else None),
-                    title=r["title"],
-                    summary=r["summary"],
-                    chunk_id=str(r["chunk_id"]) if r["chunk_id"] else None,
-                    node_order=r["node_order"],
-                )
-                for r in rows
-            ]
-
     async def get_policy(
         self, tenant_id: str, policy_key: str, user_id: str | None = None
     ) -> dict[str, Any] | None:
@@ -1143,168 +999,6 @@ class PostgresStore(StorageInterface):
                     "created_at": r["created_at"].isoformat(),
                     "score": float(r["score"]),
                 }
-                for r in rows
-            ]
-
-    async def create_session(self, session: SessionHandle, user_id: str = "default") -> None:
-        pool = self._get_pool()
-        budgets_json = json.dumps(
-            {
-                "max_turns": session.budgets.max_turns,
-                "max_tokens": session.budgets.max_tokens,
-                "max_wall_clock_seconds": session.budgets.max_wall_clock_seconds,
-                "max_recursion_depth": session.budgets.max_recursion_depth,
-            }
-        )
-        async with pool.acquire() as conn:
-            await conn.execute(
-                """
-                INSERT INTO sessions (id, parent_session_id, user_id, depth, budgets, status, created_at, updated_at)
-                VALUES ($1::uuid, $2::uuid, $3, $4, $5::jsonb, $6, $7, $8)
-                ON CONFLICT (id) DO UPDATE SET
-                    status = EXCLUDED.status,
-                    updated_at = EXCLUDED.updated_at;
-                """,
-                session.id,
-                session.parent_session_id,
-                user_id,
-                session.depth,
-                budgets_json,
-                session.status.value,
-                session.created_at,
-                session.created_at,
-            )
-
-    async def get_session(self, session_id: str) -> SessionHandle | None:
-        pool = self._get_pool()
-        async with pool.acquire() as conn:
-            row = await conn.fetchrow("SELECT * FROM sessions WHERE id = $1::uuid", session_id)
-            if not row:
-                return None
-            b_dict = (
-                json.loads(row["budgets"])
-                if isinstance(row["budgets"], str)
-                else (row["budgets"] or {})
-            )
-            budgets = Budgets(
-                max_turns=b_dict.get("max_turns", 50),
-                max_tokens=b_dict.get("max_tokens", 2000000),
-                max_wall_clock_seconds=b_dict.get("max_wall_clock_seconds", 3600),
-                max_recursion_depth=b_dict.get("max_recursion_depth", 1),
-            )
-            return SessionHandle(
-                id=str(row["id"]),
-                parent_session_id=(
-                    str(row["parent_session_id"]) if row["parent_session_id"] else None
-                ),
-                depth=row["depth"],
-                budgets=budgets,
-                status=SessionStatus(row["status"]),
-                created_at=row["created_at"],
-            )
-
-    async def update_session_status(self, session_id: str, status: SessionStatus) -> None:
-        pool = self._get_pool()
-        async with pool.acquire() as conn:
-            await conn.execute(
-                "UPDATE sessions SET status = $1, updated_at = now() WHERE id = $2::uuid",
-                status.value,
-                session_id,
-            )
-
-    async def insert_rlm_child(
-        self,
-        parent_session_id: str,
-        child_session_id: str,
-        name: str,
-        model: str,
-        depth: int,
-    ) -> str:
-        pool = self._get_pool()
-        async with pool.acquire() as conn:
-            row = await conn.fetchrow(
-                """
-                INSERT INTO rlm_children (parent_session_id, child_session_id, name, model, depth)
-                VALUES ($1::uuid, $2::uuid, $3, $4, $5)
-                RETURNING id;
-                """,
-                parent_session_id,
-                child_session_id,
-                name,
-                model,
-                depth,
-            )
-            return str(row["id"])
-
-    async def update_rlm_child_status(self, child_session_id: str, status: ChildStatus) -> None:
-        pool = self._get_pool()
-        async with pool.acquire() as conn:
-            await conn.execute(
-                """
-                UPDATE rlm_children SET
-                    status = $1,
-                    completed_at = CASE WHEN $1 IN ('completed', 'error') THEN now() ELSE completed_at END
-                WHERE child_session_id = $2::uuid;
-                """,
-                status.value,
-                child_session_id,
-            )
-
-    async def insert_agent_message(self, message: AgentMessage) -> str:
-        pool = self._get_pool()
-        async with pool.acquire() as conn:
-            target_id = None
-            if message.receiver_role == "parent":
-                r = await conn.fetchrow(
-                    "SELECT parent_session_id FROM sessions WHERE id = $1::uuid",
-                    message.session_id,
-                )
-                target_id = r["parent_session_id"] if r else None
-            else:
-                r = await conn.fetchrow(
-                    "SELECT child_session_id FROM rlm_children WHERE parent_session_id = $1::uuid AND name = $2",
-                    message.session_id,
-                    message.receiver_name,
-                )
-                target_id = r["child_session_id"] if r else None
-
-            if not target_id:
-                raise ValueError("Target session for message could not be resolved.")
-
-            row = await conn.fetchrow(
-                """
-                INSERT INTO agent_messages (session_id, target_session_id, receiver_role, receiver_name, content, created_at)
-                VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6)
-                RETURNING id;
-                """,
-                message.session_id,
-                target_id,
-                message.receiver_role,
-                message.receiver_name,
-                message.content,
-                message.created_at,
-            )
-            return str(row["id"])
-
-    async def pop_agent_messages(self, target_session_id: str) -> list[AgentMessage]:
-        pool = self._get_pool()
-        async with pool.acquire() as conn:
-            rows = await conn.fetch(
-                """
-                DELETE FROM agent_messages
-                WHERE target_session_id = $1::uuid
-                RETURNING session_id, receiver_role, receiver_name, content, created_at;
-                """,
-                target_session_id,
-            )
-            return [
-                AgentMessage(
-                    session_id=str(r["session_id"]),
-                    receiver_role=r["receiver_role"],
-                    receiver_name=r["receiver_name"],
-                    content=r["content"],
-                    created_at=r["created_at"],
-                )
                 for r in rows
             ]
 

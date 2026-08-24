@@ -6,7 +6,7 @@ import math
 import re
 from typing import Any, Literal
 
-from nltk.corpus import stopwords
+from nltk.corpus import stopwords  # type: ignore[import-untyped]
 
 from deep_context.core.config import settings
 from deep_context.retrieval.quality_gates import protect_consensus

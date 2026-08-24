@@ -7,14 +7,11 @@ import pytest
 
 from deep_context.core.config import settings
 from deep_context.core.types import (
-    Budgets,
     Chunk,
     ChunkLevel,
     Document,
     RetrievalFilters,
     RetrievalMode,
-    SessionHandle,
-    SessionStatus,
 )
 from deep_context.storage.postgres_store import PostgresStore
 
@@ -249,20 +246,8 @@ async def test_postgres_typed_memory(pg_store: PostgresStore):
 
 
 @pytest.mark.asyncio
-async def test_postgres_sessions_and_traces(pg_store: PostgresStore):
+async def test_postgres_event_traces(pg_store: PostgresStore):
     sess_id = str(uuid.uuid4())
-    session = SessionHandle(
-        id=sess_id,
-        depth=0,
-        budgets=Budgets(max_turns=20, max_tokens=500000),
-        status=SessionStatus.ACTIVE,
-    )
-    await pg_store.create_session(session, user_id="user_alpha")
-
-    s = await pg_store.get_session(sess_id)
-    assert s is not None
-    assert s.budgets.max_turns == 20
-
     # Event trace
     trace_id = await pg_store.insert_event_trace(
         event_type="hybrid_retrieval",

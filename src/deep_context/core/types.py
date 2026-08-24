@@ -25,7 +25,6 @@ class QueryShape(str, Enum):
 
 class RetrievalMode(str, Enum):
     HYBRID = "hybrid"
-    VECTORLESS = "vectorless"
 
 
 class ChunkLevel(str, Enum):
@@ -36,7 +35,6 @@ class ChunkLevel(str, Enum):
 class RoutingPath(str, Enum):
     HYBRID_RAG = "hybrid_rag"
     AGENTIC_PLANNER = "agentic_planner"
-    RLM_ENGINE = "rlm_engine"
 
 
 @dataclass
@@ -98,17 +96,6 @@ class Chunk:
     summary_model: str | None = None
     generated_at: datetime | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-
-
-@dataclass
-class DocumentTreeNode:
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    document_id: str = ""
-    parent_node_id: str | None = None
-    title: str = ""
-    summary: str | None = None
-    chunk_id: str | None = None
-    node_order: int = 0
 
 
 @dataclass
@@ -196,69 +183,6 @@ class SupportCheckResult:
 
 
 # ---------------------------------------------------------------------------
-# RLM Models & Lifecycle
-# ---------------------------------------------------------------------------
-
-
-class SessionStatus(str, Enum):
-    ACTIVE = "active"
-    COMPLETED = "completed"
-    ERROR = "error"
-    DELETED = "deleted"
-
-
-class ChildStatus(str, Enum):
-    ADMITTED = "admitted"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    DELETED = "deleted"
-    ERROR = "error"
-
-
-@dataclass
-class Budgets:
-    max_turns: int = 50
-    max_tokens: int = 2_000_000
-    max_wall_clock_seconds: int = 3600
-    max_recursion_depth: int = 1  # Depth 1 default per verified RLM paper & Prime Agent
-
-
-@dataclass
-class SessionHandle:
-    id: str
-    parent_session_id: str | None = None
-    depth: int = 0
-    budgets: Budgets = field(default_factory=Budgets)
-    status: SessionStatus = SessionStatus.ACTIVE
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-
-
-@dataclass
-class AdmissionHandle:
-    child_id: str
-    name: str
-    session_dir: str
-    model: str
-
-
-@dataclass
-class AgentMessage:
-    session_id: str
-    receiver_role: str  # 'parent' | 'child'
-    receiver_name: str | None
-    content: str
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-
-
-@dataclass
-class StructuredAnswer:
-    content: str = ""
-    ready: bool = False
-    citations: list[dict[str, Any]] = field(default_factory=list)
-    reasoning: str | None = None
-
-
-# ---------------------------------------------------------------------------
 # Router & Plan Models
 # ---------------------------------------------------------------------------
 
@@ -297,7 +221,6 @@ class IngestResponse(BaseModel):
     parent_chunks_count: int
     child_chunks_count: int
     retrieval_mode: RetrievalMode
-    tree_nodes_count: int = 0
     summaries_generated_count: int = 0
     embedding_model: str | None = None
     embedding_dim: int | None = None
@@ -369,26 +292,6 @@ class QueryResponse(BaseModel):
     latency_ms: int = 0
     token_cost: int = 0
     cache_hit: bool = False
-
-
-class RlmSessionRequest(BaseModel):
-    task_spec: str
-    corpus_text: str | None = None
-    corpus_document_ids: list[str] | None = None
-    tenant_id: str = "default"
-    user_id: str = "default"
-    max_turns: int = 20
-    max_recursion_depth: int = 1
-
-
-class RlmSessionResponse(BaseModel):
-    session_id: str
-    answer: str
-    citations: list[dict[str, Any]]
-    reasoning: str | None = None
-    turns_used: int
-    children_spawned: int
-    status: SessionStatus
 
 
 # ---------------------------------------------------------------------------

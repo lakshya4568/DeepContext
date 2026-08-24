@@ -13,7 +13,6 @@ from deep_context.api.routes_health import router as health_router
 from deep_context.api.routes_memory import router as memory_router
 from deep_context.api.routes_ops import router as ops_router
 from deep_context.api.routes_rag import router as rag_router
-from deep_context.api.routes_rlm import router as rlm_router
 from deep_context.core.config import settings
 from deep_context.core.logging import logger
 from deep_context.scheduler import register_default_jobs, scheduler_loop
@@ -39,8 +38,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 def create_app() -> FastAPI:
     app = FastAPI(
         title="Deep Context Platform API",
-        description="Agent backend: Hybrid RAG, Typed Long-Term Memory, and Recursive Language Model (RLM) Engine.",
-        version="0.1.0",
+        description="Agent backend: Agentic Hybrid RAG with Local Qwen3 Summarization and Typed Long-Term Memory.",
+        version="0.2.0",
         lifespan=lifespan,
     )
 
@@ -55,7 +54,6 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(rag_router)
     app.include_router(memory_router)
-    app.include_router(rlm_router)
     app.include_router(ops_router)
 
     return app

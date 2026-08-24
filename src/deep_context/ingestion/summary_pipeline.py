@@ -14,12 +14,10 @@ from deep_context.core.types import (
     Document,
     IngestRequest,
     IngestResponse,
-    RetrievalMode,
 )
 from deep_context.ingestion.chunker import ParentChildChunker
 from deep_context.ingestion.parser import DocumentParser
 from deep_context.ingestion.summarizer import ChunkSummarizer
-from deep_context.ingestion.tree_indexer import DocumentTreeIndexer
 from deep_context.storage import get_storage
 from deep_context.storage.base import StorageInterface
 
@@ -118,12 +116,6 @@ class SummaryIngestionPipeline:
         all_chunks = parent_chunks + child_chunks
         await storage.insert_chunks(all_chunks)
 
-        tree_nodes_count = 0
-        if request.retrieval_mode == RetrievalMode.VECTORLESS:
-            tree_nodes = DocumentTreeIndexer.build_tree_nodes(doc_id, sections, parent_chunks)
-            await storage.insert_tree_nodes(tree_nodes)
-            tree_nodes_count = len(tree_nodes)
-
         latency_ms = int((time.time() - t0) * 1000)
 
         # 7. Trace event logging
@@ -148,7 +140,6 @@ class SummaryIngestionPipeline:
             parent_chunks_count=len(parent_chunks),
             child_chunks_count=len(child_chunks),
             retrieval_mode=request.retrieval_mode,
-            tree_nodes_count=tree_nodes_count,
             summaries_generated_count=summaries_count,
             embedding_model=emb_model,
             embedding_dim=emb_dim,

@@ -127,12 +127,6 @@ class Settings(BaseSettings):
     child_chunk_max_tokens: int = 600
     chunk_overlap_percentage: float = 0.15
 
-    # RLM parameters
-    max_recursion_depth: int = Field(default=1, alias="MAX_RECURSION_DEPTH")
-    max_repl_chars_per_turn: int = Field(default=8192, alias="MAX_REPL_CHARS_PER_TURN")
-    max_rlm_turns: int = Field(default=30, alias="MAX_RLM_TURNS")
-    max_rlm_wall_clock_seconds: int = Field(default=3600, alias="MAX_RLM_WALL_CLOCK_SECONDS")
-
     # Verification parameters
     confidence_threshold: float = 0.75
     min_aggregation_coverage: float = 0.95

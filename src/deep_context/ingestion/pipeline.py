@@ -12,12 +12,10 @@ from deep_context.core.types import (
     Document,
     IngestRequest,
     IngestResponse,
-    RetrievalMode,
 )
 from deep_context.ingestion.chunker import ParentChildChunker
 from deep_context.ingestion.parser import DocumentParser
 from deep_context.ingestion.summarizer import ChunkSummarizer
-from deep_context.ingestion.tree_indexer import DocumentTreeIndexer
 from deep_context.storage import get_storage
 
 
@@ -50,18 +48,14 @@ class IngestionPipeline:
         summaries_count = 0
         if should_summarize and child_chunks:
             logger.info(
-                "Generating Qwen3 semantic summaries for %d child chunks in doc '%s'...",
-                len(child_chunks),
-                request.title,
+                "Generating Qwen3 semantic summaries for %d child chunks...", len(child_chunks)
             )
             await self.summarizer.summarize_chunks(child_chunks)
-            summaries_count = sum(1 for c in child_chunks if c.summary_text)
+            summaries_count = len(child_chunks)
 
-        # 4. Generate dense embeddings for child chunks using Google Gemini or NVIDIA NIM
+        # 4. Generate embeddings for child chunks only
         emb_model = request.embedding_model or settings.embedding_model
-        emb_dim = request.embedding_dim or (
-            768 if "gemini" in emb_model.lower() else settings.embedding_dim
-        )
+        emb_dim = request.embedding_dim or settings.embedding_dim
 
         child_texts = [c.content for c in child_chunks]
         if child_texts:
@@ -75,11 +69,10 @@ class IngestionPipeline:
             for chunk, emb in zip(child_chunks, embeddings):
                 chunk.embedding = emb
 
-        # 5. Create document record
-        doc_metadata = dict(request.metadata)
+        doc_metadata = request.metadata.copy()
         doc_metadata["embedding_model"] = emb_model
         doc_metadata["embedding_dim"] = emb_dim
-        doc_metadata["summary_model"] = settings.summary_model if should_summarize else None
+        doc_metadata["summaries_generated"] = summaries_count > 0
 
         doc = Document(
             id=doc_id,
@@ -92,16 +85,10 @@ class IngestionPipeline:
             metadata=doc_metadata,
         )
 
-        # 5. Persist to storage (in order: document -> chunks -> optional tree nodes)
+        # 5. Persist to storage (document -> chunks)
         await storage.insert_document(doc)
         all_chunks = parent_chunks + child_chunks
         await storage.insert_chunks(all_chunks)
-
-        tree_nodes_count = 0
-        if request.retrieval_mode == RetrievalMode.VECTORLESS:
-            tree_nodes = DocumentTreeIndexer.build_tree_nodes(doc_id, sections, parent_chunks)
-            await storage.insert_tree_nodes(tree_nodes)
-            tree_nodes_count = len(tree_nodes)
 
         latency_ms = int((time.time() - t0) * 1000)
 
@@ -137,7 +124,6 @@ class IngestionPipeline:
             parent_chunks_count=len(parent_chunks),
             child_chunks_count=len(child_chunks),
             retrieval_mode=request.retrieval_mode,
-            tree_nodes_count=tree_nodes_count,
             summaries_generated_count=summaries_count,
             embedding_model=emb_model,
             embedding_dim=emb_dim,

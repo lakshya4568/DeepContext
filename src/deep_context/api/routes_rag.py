@@ -44,7 +44,6 @@ from deep_context.memory.stores import MemoryStoreManager
 from deep_context.retrieval.engine import retrieval_engine
 from deep_context.retrieval.hybrid import HybridRetriever
 from deep_context.retrieval.reranker import Reranker
-from deep_context.rlm.orchestrator import RLMOrchestrator
 from deep_context.storage import get_storage
 from deep_context.verification.checker import EvidenceVerifier
 
@@ -102,7 +101,6 @@ async def upload_file(
     file: UploadFile = File(...),
     title: str = Form(""),
     doc_type: str = Form("auto"),
-    vectorless: bool = Form(False),
     embedding_model: str = Form(""),
     embedding_dim: int = Form(0),
     generate_summaries: bool | None = Form(None),
@@ -124,7 +122,7 @@ async def upload_file(
             detected_type = "text"
 
     doc_title = title.strip() or Path(filename).stem
-    mode = RetrievalMode.VECTORLESS if vectorless else RetrievalMode.HYBRID
+    mode = RetrievalMode.HYBRID
     target_model = embedding_model or settings.embedding_model
     target_dim = embedding_dim or (
         768 if "gemini" in target_model.lower() else settings.embedding_dim
@@ -174,7 +172,6 @@ async def upload_file(
 @router.post("/v1/upload-batch", response_model=list[IngestResponse])
 async def upload_batch_files(
     files: list[UploadFile] = File(...),
-    vectorless: bool = Form(False),
     embedding_model: str = Form(""),
     embedding_dim: int = Form(0),
     generate_summaries: bool | None = Form(None),
@@ -185,7 +182,7 @@ async def upload_batch_files(
     target_dim = embedding_dim or (
         768 if "gemini" in target_model.lower() else settings.embedding_dim
     )
-    mode = RetrievalMode.VECTORLESS if vectorless else RetrievalMode.HYBRID
+    mode = RetrievalMode.HYBRID
 
     for f in files:
         filename = f.filename or "uploaded_doc"
@@ -288,7 +285,6 @@ async def set_user_preferences_api(
 @router.post("/v1/sync-folder", response_model=list[IngestResponse])
 async def sync_local_folder(
     folder_path: str = "documents",
-    vectorless: bool = False,
     embedding_model: str = "",
     embedding_dim: int = 0,
 ) -> list[IngestResponse]:
@@ -316,7 +312,7 @@ async def sync_local_folder(
     ignored = {".venv", ".git", "__pycache__", "dist", "build"}
 
     results: list[IngestResponse] = []
-    mode = RetrievalMode.VECTORLESS if vectorless else RetrievalMode.HYBRID
+    mode = RetrievalMode.HYBRID
     target_model = embedding_model or settings.embedding_model
     target_dim = embedding_dim or (
         768 if "gemini" in target_model.lower() else settings.embedding_dim
@@ -452,28 +448,6 @@ async def query_platform(req: QueryRequest, background_tasks: BackgroundTasks) -
             query=req.query, filters=filters
         )
 
-    elif decision.path == RoutingPath.RLM_ENGINE:
-        orchestrator = RLMOrchestrator(storage)
-        corpus_chunks: list[dict[str, Any]] = []
-        if req.document_ids:
-            for did in req.document_ids:
-                chunks = await storage.get_document_chunks(document_id=did, level="parent")
-                corpus_chunks.extend(chunks)
-        else:
-            corpus_chunks = await storage.get_document_chunks(level="parent")
-
-        corpus = corpus_chunks if corpus_chunks else [{"content": "Default document corpus."}]
-
-        rlm_res = await orchestrator.run_session(
-            task_spec=req.query,
-            corpus=corpus,
-            user_id=req.user_id or "default",
-            model=req.model,
-        )
-        answer_text = rlm_res.answer
-        citations_list = rlm_res.citations
-        reasoning_text = rlm_res.reasoning
-
     latency_ms = int((time.time() - t0) * 1000)
 
     response = QueryResponse(
@@ -491,12 +465,7 @@ async def query_platform(req: QueryRequest, background_tasks: BackgroundTasks) -
 
     # Only cache grounded, support-checked answers to avoid poisoning the
     # cache with failed verifications or empty corpora.
-    if (
-        not req.stream
-        and answer_text
-        and support_passed
-        and decision.path != RoutingPath.RLM_ENGINE
-    ):
+    if not req.stream and answer_text and support_passed:
         await response_cache.set_json("rag:ask", cache_payload, response.model_dump())
 
     if req.user_id and len(req.query) > 10:
@@ -609,34 +578,6 @@ async def query_platform_stream(
                     elif ev_type == "content":
                         accumulated_content.append(ev.get("delta", ""))
                         yield f"data: {json.dumps(ev)}\n\n"
-
-            elif decision.path == RoutingPath.RLM_ENGINE:
-                yield f"data: {json.dumps({'type': 'status', 'stage': 'rlm', 'message': '⚡ Initializing Recursive Language Model sandboxed REPL...'})}\n\n"
-                orchestrator = RLMOrchestrator(storage)
-                corpus_chunks: list[dict[str, Any]] = []
-                if req.document_ids:
-                    for did in req.document_ids:
-                        chunks = await storage.get_document_chunks(document_id=did, level="parent")
-                        corpus_chunks.extend(chunks)
-                else:
-                    corpus_chunks = await storage.get_document_chunks(level="parent")
-
-                corpus = (
-                    corpus_chunks if corpus_chunks else [{"content": "Default document corpus."}]
-                )
-
-                rlm_res = await orchestrator.run_session(
-                    task_spec=req.query,
-                    corpus=corpus,
-                    user_id=req.user_id or "default",
-                    model=req.model,
-                )
-                yield f"data: {json.dumps({'type': 'citations', 'citations': rlm_res.citations})}\n\n"
-                if rlm_res.reasoning:
-                    accumulated_reasoning.append(rlm_res.reasoning)
-                    yield f"data: {json.dumps({'type': 'reasoning', 'delta': rlm_res.reasoning})}\n\n"
-                accumulated_content.append(rlm_res.answer)
-                yield f"data: {json.dumps({'type': 'content', 'delta': rlm_res.answer})}\n\n"
 
             latency_ms = int((time.time() - t0) * 1000)
 

@@ -7,20 +7,15 @@ from datetime import datetime
 from typing import Any
 
 from deep_context.core.types import (
-    AgentMessage,
-    ChildStatus,
     Chunk,
     Document,
-    DocumentTreeNode,
     ExistingMemory,
     RetrievalFilters,
-    SessionHandle,
-    SessionStatus,
 )
 
 
 class StorageInterface(ABC):
-    """Abstract interface defining persistence operations matching docs/DATA_MODEL.sql."""
+    """Abstract interface defining persistence operations for Agentic Hybrid RAG."""
 
     @abstractmethod
     async def initialize(self) -> None:
@@ -116,23 +111,6 @@ class StorageInterface(ABC):
         limit: int = 100,
     ) -> list[dict[str, Any]]:
         """Cosine similarity vector search against child chunks."""
-        pass
-
-    @abstractmethod
-    async def insert_tree_nodes(self, nodes: list[DocumentTreeNode]) -> list[str]:
-        """Insert document tree nodes for hierarchical navigation."""
-        pass
-
-    @abstractmethod
-    async def get_tree_nodes_for_document(self, document_id: str) -> list[DocumentTreeNode]:
-        """Get all tree nodes for a given document."""
-        pass
-
-    @abstractmethod
-    async def get_child_tree_nodes(
-        self, document_id: str, parent_node_id: str | None
-    ) -> list[DocumentTreeNode]:
-        """Get immediate child tree nodes."""
         pass
 
     # -----------------------------------------------------------------------
@@ -243,52 +221,6 @@ class StorageInterface(ABC):
         self, user_id: str, query_embedding: list[float], limit: int = 5
     ) -> list[dict[str, Any]]:
         """Search past episodic memories."""
-        pass
-
-    # -----------------------------------------------------------------------
-    # Sessions, Agents & RLM Messaging
-    # -----------------------------------------------------------------------
-
-    @abstractmethod
-    async def create_session(self, session: SessionHandle, user_id: str = "default") -> None:
-        """Create a new agent session."""
-        pass
-
-    @abstractmethod
-    async def get_session(self, session_id: str) -> SessionHandle | None:
-        """Get session handle."""
-        pass
-
-    @abstractmethod
-    async def update_session_status(self, session_id: str, status: SessionStatus) -> None:
-        """Update session status."""
-        pass
-
-    @abstractmethod
-    async def insert_rlm_child(
-        self,
-        parent_session_id: str,
-        child_session_id: str,
-        name: str,
-        model: str,
-        depth: int,
-    ) -> str:
-        """Record subagent admission handle in rlm_children table."""
-        pass
-
-    @abstractmethod
-    async def update_rlm_child_status(self, child_session_id: str, status: ChildStatus) -> None:
-        """Update child subagent status."""
-        pass
-
-    @abstractmethod
-    async def insert_agent_message(self, message: AgentMessage) -> str:
-        """Insert message into agent_messages table."""
-        pass
-
-    @abstractmethod
-    async def pop_agent_messages(self, target_session_id: str) -> list[AgentMessage]:
-        """Retrieve and clear pending messages for a session."""
         pass
 
     # -----------------------------------------------------------------------
