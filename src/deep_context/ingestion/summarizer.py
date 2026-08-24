@@ -155,35 +155,36 @@ class ChunkSummarizer:
             f"<|im_start|>assistant\n<think>\n</think>\n"
         )
 
-    def _generate_sync(self, prompt: str) -> tuple[str, int]:
-        """Synchronous model generation call with minimal memory overhead."""
+    def _generate_batch_sync(self, prompts: list[str]) -> list[tuple[str, int]]:
+        """Synchronous batch generation executed safely in a single thread on MPS/GPU."""
         import re
 
         import torch
 
-        inputs = self._tokenizer(prompt, return_tensors="pt").to(self._device)
-        input_len = inputs.input_ids.shape[1]
+        results: list[tuple[str, int]] = []
+        for prompt in prompts:
+            try:
+                inputs = self._tokenizer(prompt, return_tensors="pt").to(self._device)
+                input_len = inputs.input_ids.shape[1]
 
-        with torch.inference_mode():
-            outputs = self._model.generate(
-                **inputs,
-                max_new_tokens=self.max_summary_tokens,
-                do_sample=False,
-                pad_token_id=self._tokenizer.eos_token_id or self._tokenizer.pad_token_id,
-            )
+                with torch.inference_mode():
+                    outputs = self._model.generate(
+                        **inputs,
+                        max_new_tokens=self.max_summary_tokens,
+                        do_sample=False,
+                        pad_token_id=self._tokenizer.eos_token_id or self._tokenizer.pad_token_id,
+                    )
 
-        new_tokens = outputs[0][input_len:]
-        raw_text = self._tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
-        summary = re.sub(r"<think>.*?</think>", "", raw_text, flags=re.DOTALL).strip()
-        summary_tokens = len(new_tokens)
+                new_tokens = outputs[0][input_len:]
+                raw_text = self._tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
+                summary = re.sub(r"<think>.*?</think>", "", raw_text, flags=re.DOTALL).strip()
+                summary_tokens = len(new_tokens)
+                results.append((summary, summary_tokens))
+            except Exception as e:
+                logger.warning("Generation error on prompt: %s", e)
+                results.append(("", 0))
 
-        # Clear temporary tensors
-        del inputs
-        del outputs
-        if self._device == "mps" and hasattr(torch, "mps") and hasattr(torch.mps, "empty_cache"):
-            torch.mps.empty_cache()
-
-        return summary, summary_tokens
+        return results
 
     async def summarize_chunk(
         self, chunk_text: str, context_prefix: str | None = None
@@ -194,7 +195,6 @@ class ChunkSummarizer:
 
         loaded = await self._ensure_model_loaded()
         if not loaded or not self._model:
-            # Fallback when model is not available in mock/test mode
             words = chunk_text.strip().split()
             fallback_summary = " ".join(words[:25]) + ("..." if len(words) > 25 else "")
             return fallback_summary, len(fallback_summary.split())
@@ -202,8 +202,9 @@ class ChunkSummarizer:
         prompt = self._build_prompt(chunk_text, context_prefix)
         loop = asyncio.get_running_loop()
         try:
-            summary, summary_tokens = await loop.run_in_executor(None, self._generate_sync, prompt)
-            return summary, summary_tokens
+            async with self._load_lock:
+                res = await loop.run_in_executor(None, self._generate_batch_sync, [prompt])
+            return res[0]
         except Exception as e:
             logger.warning("Chunk summarization failed (%s); using fallback.", e)
             words = chunk_text.strip().split()
@@ -213,22 +214,40 @@ class ChunkSummarizer:
     async def summarize_batch(
         self, chunks: list[Chunk], progress_callback: Callable[[Chunk], None] | None = None
     ) -> list[tuple[str, int]]:
-        """Summarizes a batch of child chunks."""
-        results: list[tuple[str, int]] = []
-        for i in range(0, len(chunks), self.batch_size):
-            batch = chunks[i : i + self.batch_size]
-            tasks = [
-                self.summarize_chunk(
-                    chunk.content,
-                    context_prefix=chunk.section_path,
+        """Summarizes a batch of child chunks sequentially and safely on MPS/GPU."""
+        if not chunks:
+            return []
+
+        loaded = await self._ensure_model_loaded()
+        if not loaded or not self._model:
+            results: list[tuple[str, int]] = []
+            for c in chunks:
+                words = c.content.strip().split()
+                s = " ".join(words[:25]) + ("..." if len(words) > 25 else "")
+                results.append((s, len(s.split())))
+            return results
+
+        prompts = [self._build_prompt(c.content, c.section_path) for c in chunks]
+        results = []
+        loop = asyncio.get_running_loop()
+
+        async with self._load_lock:
+            for i in range(0, len(prompts), self.batch_size):
+                batch_prompts = prompts[i : i + self.batch_size]
+                batch_chunks = chunks[i : i + self.batch_size]
+
+                batch_res = await loop.run_in_executor(
+                    None, self._generate_batch_sync, batch_prompts
                 )
-                for chunk in batch
-            ]
-            batch_results = await asyncio.gather(*tasks)
-            results.extend(batch_results)
-            if progress_callback:
-                for c in batch:
-                    progress_callback(c)
+                for (summary, tokens), chunk in zip(batch_res, batch_chunks):
+                    if not summary:
+                        words = chunk.content.strip().split()
+                        summary = " ".join(words[:25]) + ("..." if len(words) > 25 else "")
+                        tokens = len(summary.split())
+                    results.append((summary, tokens))
+                    if progress_callback:
+                        progress_callback(chunk)
+
         return results
 
     async def summarize_chunks(

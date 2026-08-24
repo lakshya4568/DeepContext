@@ -53,6 +53,26 @@ class Settings(BaseSettings):
             "GOOGLE_API",
         ),
     )
+    gemini_rate_limit_delay_sec: float = Field(
+        default=0.0,
+        alias="GEMINI_RATE_LIMIT_DELAY_SEC",
+        description="Optional sleep duration in seconds between successive Gemini batch calls (e.g. 5.0s for Free Tier)",
+    )
+    gemini_batch_size: int = Field(
+        default=16,
+        alias="GEMINI_BATCH_SIZE",
+        description="Batch size of text chunks per Gemini embed_content API request",
+    )
+    gemini_max_retries: int = Field(
+        default=5,
+        alias="GEMINI_MAX_RETRIES",
+        description="Maximum retry attempts on 429 Resource Exhausted / Rate Limit errors",
+    )
+    gemini_retry_delay_sec: float = Field(
+        default=5.0,
+        alias="GEMINI_RETRY_DELAY_SEC",
+        description="Initial backoff delay in seconds for exponential backoff on 429 errors",
+    )
     # Hugging Face API
     hf_token: str = Field(
         default="",

@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import math
 import re
 import time
-from typing import Any, AsyncIterator, cast
+from typing import Any, AsyncIterator, Callable, cast
 
 import numpy as np
 from google import genai
@@ -150,6 +151,45 @@ class LLMClient:
 
         return self._gemini_client
 
+    async def _call_gemini_with_backoff(
+        self,
+        coro_fn: Callable[[], Any],
+        operation_name: str = "Gemini API",
+    ) -> Any:
+        """Executes a Gemini API coroutine with automatic 429/ResourceExhausted retry backoff."""
+        max_retries = max(1, settings.gemini_max_retries)
+        base_delay = max(1.0, settings.gemini_retry_delay_sec)
+
+        for attempt in range(max_retries):
+            try:
+                return await coro_fn()
+            except Exception as e:
+                err_msg = str(e).lower()
+                is_rate_limit = any(
+                    k in err_msg
+                    for k in (
+                        "429",
+                        "resource_exhausted",
+                        "resourceexhausted",
+                        "quota",
+                        "rate limit",
+                        "rate_limit",
+                        "too many requests",
+                    )
+                )
+                if is_rate_limit and attempt < max_retries - 1:
+                    wait_sec = base_delay * (2**attempt)
+                    logger.warning(
+                        "Google GenAI 429 / Rate Limit on %s. Throttling and backing off for %.1fs (attempt %d/%d)...",
+                        operation_name,
+                        wait_sec,
+                        attempt + 1,
+                        max_retries,
+                    )
+                    await asyncio.sleep(wait_sec)
+                    continue
+                raise
+
     def _refresh_groq_client(self) -> AsyncOpenAI | None:
         """Dynamically check .env and reload Groq API key if changed."""
         import os
@@ -248,7 +288,7 @@ class LLMClient:
             gemini_client = self._refresh_gemini_client()
             if gemini_client:
                 all_embeddings: list[list[float]] = []
-                batch_size = 32
+                batch_size = max(1, settings.gemini_batch_size)
                 try:
                     for i in range(0, len(cleaned_texts), batch_size):
                         batch = cleaned_texts[i : i + batch_size]
@@ -274,13 +314,21 @@ class LLMClient:
                             config = genai_types.EmbedContentConfig(
                                 output_dimensionality=target_dim
                             )
-                            resp = await asyncio.wait_for(
-                                gemini_client.aio.models.embed_content(
-                                    model=target_model,
-                                    contents=formatted_contents,
-                                    config=config,
-                                ),
-                                timeout=15.0,
+
+                            async def _do_embed_v2(
+                                cur_contents=formatted_contents, cur_config=config
+                            ):
+                                return await asyncio.wait_for(
+                                    gemini_client.aio.models.embed_content(
+                                        model=target_model,
+                                        contents=cur_contents,
+                                        config=cur_config,
+                                    ),
+                                    timeout=20.0,
+                                )
+
+                            resp = await self._call_gemini_with_backoff(
+                                _do_embed_v2, f"embed_content ({target_model})"
                             )
                             if resp.embeddings:
                                 for emb in resp.embeddings:
@@ -301,13 +349,21 @@ class LLMClient:
                                 if target_dim in (768, 1536, 3072)
                                 else None,
                             )
-                            resp = await asyncio.wait_for(
-                                gemini_client.aio.models.embed_content(
-                                    model=target_model,
-                                    contents=formatted_contents,
-                                    config=config,
-                                ),
-                                timeout=15.0,
+
+                            async def _do_embed_001(
+                                cur_contents=formatted_contents, cur_config=config
+                            ):
+                                return await asyncio.wait_for(
+                                    gemini_client.aio.models.embed_content(
+                                        model=target_model,
+                                        contents=cur_contents,
+                                        config=cur_config,
+                                    ),
+                                    timeout=20.0,
+                                )
+
+                            resp = await self._call_gemini_with_backoff(
+                                _do_embed_001, f"embed_content ({target_model})"
                             )
                             if resp.embeddings:
                                 for emb in resp.embeddings:
@@ -318,6 +374,12 @@ class LLMClient:
                                         if n > 0:
                                             vals = vals / n
                                     all_embeddings.append(vals.tolist())
+
+                        # Throttle between successive batches if configured (e.g. for free tier safety)
+                        if settings.gemini_rate_limit_delay_sec > 0 and (
+                            i + batch_size < len(cleaned_texts)
+                        ):
+                            await asyncio.sleep(settings.gemini_rate_limit_delay_sec)
 
                     if len(all_embeddings) == len(cleaned_texts):
                         return all_embeddings
@@ -537,18 +599,26 @@ class LLMClient:
                     )
 
                 try:
-                    gemini_resp = await asyncio.wait_for(
-                        gemini_client.aio.models.generate_content(
-                            model=target_model,
-                            contents=gemini_contents,
-                            config=genai_types.GenerateContentConfig(
-                                system_instruction=system_prompt.strip() if system_prompt else None,
-                                temperature=temperature,
-                                top_p=top_p,
-                                max_output_tokens=min(max_tokens, 8192) if max_tokens else 8192,
+
+                    async def _do_gemini_gen():
+                        return await asyncio.wait_for(
+                            gemini_client.aio.models.generate_content(
+                                model=target_model,
+                                contents=gemini_contents,
+                                config=genai_types.GenerateContentConfig(
+                                    system_instruction=system_prompt.strip()
+                                    if system_prompt
+                                    else None,
+                                    temperature=temperature,
+                                    top_p=top_p,
+                                    max_output_tokens=min(max_tokens, 8192) if max_tokens else 8192,
+                                ),
                             ),
-                        ),
-                        timeout=timeout,
+                            timeout=timeout,
+                        )
+
+                    gemini_resp = await self._call_gemini_with_backoff(
+                        _do_gemini_gen, f"generate_content ({target_model})"
                     )
                     raw_content = gemini_resp.text or ""
                     content, reasoning = self._parse_think_tags(raw_content, None)
