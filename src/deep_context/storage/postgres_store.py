@@ -1220,3 +1220,12 @@ class PostgresStore(StorageInterface):
                 )
                 backfilled += 1
             return backfilled
+
+    # -----------------------------------------------------------------------
+    # Convenience Aliases matching standard naming contracts
+    # -----------------------------------------------------------------------
+    save_document = insert_document
+    save_chunks = insert_chunks
+    search_vectors = search_vector
+    search_fulltext = search_bm25
+    get_document_chunk = get_chunk

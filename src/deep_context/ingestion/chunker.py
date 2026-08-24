@@ -180,3 +180,7 @@ class ParentChildChunker:
             children.append(child_chunk)
 
         return children
+
+
+# Convenience Alias matching standard RAG naming conventions
+RecursiveChunker = ParentChildChunker

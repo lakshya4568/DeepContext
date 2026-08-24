@@ -159,3 +159,54 @@ class SummaryIngestionPipeline:
 
         tasks = [_bounded(r) for r in requests]
         return await asyncio.gather(*tasks)
+
+    async def ingest_document(
+        self,
+        file_path_or_content: str,
+        title: str | None = None,
+        doc_type: str = "auto",
+        embedding_model: str | None = None,
+        embedding_dim: int | None = None,
+        generate_summaries: bool | None = None,
+        tenant_id: str = "default",
+        permission_scope: list[str] | None = None,
+    ) -> IngestResponse:
+        """Convenience method to ingest a file from path or raw text content."""
+        from pathlib import Path
+
+        p = Path(file_path_or_content)
+        if p.exists() and p.is_file():
+            doc_title = title or p.stem
+            ext = p.suffix.lower()
+            detected_type = (
+                doc_type
+                if doc_type != "auto"
+                else (
+                    "pdf"
+                    if ext == ".pdf"
+                    else ("markdown" if ext in (".md", ".markdown") else "text")
+                )
+            )
+            if detected_type == "pdf":
+                content = str(p.resolve())
+            else:
+                content = p.read_text(encoding="utf-8", errors="replace")
+            source_uri = str(p.resolve())
+        else:
+            doc_title = title or "Document"
+            detected_type = "markdown" if doc_type == "auto" else doc_type
+            content = file_path_or_content
+            source_uri = None
+
+        req = IngestRequest(
+            title=doc_title,
+            content=content,
+            doc_type=detected_type,
+            source_uri=source_uri,
+            embedding_model=embedding_model or settings.embedding_model,
+            embedding_dim=embedding_dim or settings.embedding_dim,
+            generate_summaries=generate_summaries,
+            tenant_id=tenant_id,
+            permission_scope=permission_scope or ["default"],
+        )
+        return await self.ingest(req)

@@ -95,7 +95,17 @@ class Chunk:
     summary_tokens: int | None = None
     summary_model: str | None = None
     generated_at: datetime | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @property
+    def text(self) -> str:
+        """Alias for content to match standard RAG conventions."""
+        return self.content
+
+    @text.setter
+    def text(self, val: str) -> None:
+        self.content = val
 
 
 @dataclass

@@ -164,3 +164,33 @@ class HybridRetriever:
         fused_ids = sorted(fused_ids, key=lambda cid: fused_score_map.get(cid, 0.0), reverse=True)
         ordered_candidates = [id_to_candidate[cid] for cid in fused_ids if cid in id_to_candidate]
         return deduplicate_candidates(ordered_candidates, max_candidates=limit)
+
+
+async def hybrid_search(
+    storage: StorageInterface,
+    query: str,
+    query_embedding: list[float] | None = None,
+    filters: RetrievalFilters | None = None,
+    k: int = 50,
+) -> list[dict[str, Any]]:
+    """
+    Convenience function to run BM25 + dense vector hybrid search with RRF fusion.
+    """
+    retriever = HybridRetriever(storage)
+    target_filters = filters or RetrievalFilters()
+    if query_embedding is not None:
+        bm25_hits = await storage.search_bm25(query, filters=target_filters, limit=k)
+        vec_hits = await storage.search_vector(query_embedding, filters=target_filters, limit=k)
+        fused = reciprocal_rank_fusion([bm25_hits, vec_hits], k=settings.rrf_k)
+        fused_score_map = {cid: score for cid, score in fused}
+        fused_ids = [cid for cid, _ in fused[:k]]
+        all_hits = {h["id"]: h for h in (bm25_hits + vec_hits)}
+        results = []
+        for cid in fused_ids:
+            if cid in all_hits:
+                item = dict(all_hits[cid])
+                item["score"] = fused_score_map.get(cid, 0.0)
+                results.append(item)
+        return deduplicate_candidates(results, max_candidates=k)
+
+    return await retriever.retrieve_candidates([query], filters=target_filters, limit=k)

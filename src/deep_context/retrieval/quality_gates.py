@@ -100,3 +100,49 @@ def protect_consensus(
             seen.add(cid)
 
     return merged[:top_k]
+
+
+def check_evidence_sufficiency(
+    chunks: list[dict[str, Any]] | list[Any],
+    query: str,
+    threshold: float = 0.25,
+) -> bool:
+    """
+    Evaluates whether retrieved chunks contain sufficient topical evidence to answer the query.
+    Returns True if sufficient evidence exists, False if abstention/correction is warranted.
+    """
+    if not chunks or not query.strip():
+        return False
+    if is_anachronism(query):
+        return False
+    stopwords = {
+        "what",
+        "how",
+        "why",
+        "the",
+        "and",
+        "for",
+        "with",
+        "this",
+        "that",
+        "from",
+        "are",
+        "is",
+        "were",
+        "been",
+    }
+    query_terms = set(re.findall(r"\w+", query.lower())) - stopwords
+    if not query_terms:
+        return True
+
+    blob = " ".join(
+        str(
+            c.get("content", "")
+            if isinstance(c, dict)
+            else (getattr(c, "content", None) or getattr(c, "text", ""))
+        )
+        for c in chunks
+    ).lower()
+
+    matches = sum(1 for term in query_terms if term in blob)
+    return (matches / len(query_terms)) >= threshold
