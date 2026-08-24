@@ -53,9 +53,17 @@ class Settings(BaseSettings):
             "GOOGLE_API",
         ),
     )
-    gemini_base_url: str = Field(
+    # Hugging Face API
+    hf_token: str = Field(
         default="",
-        alias="GEMINI_BASE_URL",
+        validation_alias=AliasChoices(
+            "HF_TOKEN",
+            "HF_TOKE",
+            "hf_token",
+            "HUGGINGFACE_TOKEN",
+            "HUGGINGFACE_API_KEY",
+            "HUGGING_FACE_HUB_TOKEN",
+        ),
     )
 
     # EcoHash API (for hosted BGE reranker)

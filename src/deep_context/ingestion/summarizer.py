@@ -71,8 +71,16 @@ class ChunkSummarizer:
                 loop = asyncio.get_running_loop()
 
                 def _load() -> tuple[Any, Any, str]:
+                    import os
+
+                    token = settings.hf_token or os.environ.get("HF_TOKEN") or None
+                    if token:
+                        os.environ["HF_TOKEN"] = token
+                        os.environ["HUGGING_FACE_HUB_TOKEN"] = token
+
                     tok = AutoTokenizer.from_pretrained(
                         self.model_name,
+                        token=token,
                         trust_remote_code=True,
                     )
                     # FP16 on GPU (MPS/CUDA) cuts RAM/VRAM usage in half (~600MB vs 1.2GB)
@@ -80,8 +88,9 @@ class ChunkSummarizer:
                     target_device = torch.device(device_str)
                     mdl: Any = AutoModelForCausalLM.from_pretrained(
                         self.model_name,
+                        token=token,
                         trust_remote_code=True,
-                        torch_dtype=dtype,
+                        dtype=dtype,
                         low_cpu_mem_usage=True,
                     )
                     mdl = mdl.to(target_device)
