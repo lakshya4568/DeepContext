@@ -350,7 +350,18 @@ class LLMClient:
                         timeout=8.0,
                     )
                     for item in response.data:
-                        all_embeddings.append(item.embedding)
+                        raw_emb = list(item.embedding) if hasattr(item, "embedding") else []
+                        emb_vals: list[float] = [float(x) for x in raw_emb]
+                        if len(emb_vals) != target_dim:
+                            if len(emb_vals) > target_dim:
+                                vals = np.array(emb_vals[:target_dim], dtype=np.float32)
+                                n = np.linalg.norm(vals)
+                                if n > 0:
+                                    vals = vals / n
+                                emb_vals = vals.tolist()
+                            else:
+                                emb_vals = emb_vals + [0.0] * (target_dim - len(emb_vals))
+                        all_embeddings.append(emb_vals)
                 return all_embeddings
             except Exception as e:
                 logger.warning(
@@ -373,7 +384,18 @@ class LLMClient:
                             timeout=8.0,
                         )
                         for item in response.data:
-                            all_embeddings.append(item.embedding)
+                            raw_emb = list(item.embedding) if hasattr(item, "embedding") else []
+                            emb_vals = [float(x) for x in raw_emb]
+                            if len(emb_vals) != target_dim:
+                                if len(emb_vals) > target_dim:
+                                    vals = np.array(emb_vals[:target_dim], dtype=np.float32)
+                                    n = np.linalg.norm(vals)
+                                    if n > 0:
+                                        vals = vals / n
+                                    emb_vals = vals.tolist()
+                                else:
+                                    emb_vals = emb_vals + [0.0] * (target_dim - len(emb_vals))
+                            all_embeddings.append(emb_vals)
                     return all_embeddings
                 except Exception as e2:
                     logger.warning("NVIDIA NIM fallback embedding failed: %s", e2)

@@ -70,7 +70,7 @@ class PostgresStore(StorageInterface):
                     token_count INTEGER NOT NULL,
                     section_path TEXT,
                     page_number INTEGER,
-                    embedding VECTOR,
+                    embedding VECTOR(768),
                     tsv TSVECTOR GENERATED ALWAYS AS (to_tsvector('english', content)) STORED,
                     summary_text TEXT,
                     summary_tokens INTEGER,
@@ -130,7 +130,7 @@ class PostgresStore(StorageInterface):
                     tenant_id TEXT NOT NULL DEFAULT 'default',
                     user_id TEXT,
                     content TEXT NOT NULL,
-                    embedding VECTOR,
+                    embedding VECTOR(768),
                     tsv TSVECTOR GENERATED ALWAYS AS (to_tsvector('english', content)) STORED,
                     source TEXT NOT NULL,
                     confidence REAL NOT NULL CHECK (confidence BETWEEN 0 AND 1),
@@ -146,28 +146,9 @@ class PostgresStore(StorageInterface):
                     task_type TEXT,
                     summary TEXT NOT NULL,
                     outcome TEXT NOT NULL,
-                    embedding VECTOR,
+                    embedding VECTOR(768),
                     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
                 );
-
-                DO $$
-                BEGIN
-                    BEGIN
-                        ALTER TABLE chunks ALTER COLUMN embedding TYPE VECTOR;
-                    EXCEPTION WHEN OTHERS THEN
-                        NULL;
-                    END;
-                    BEGIN
-                        ALTER TABLE memory_fact ALTER COLUMN embedding TYPE VECTOR;
-                    EXCEPTION WHEN OTHERS THEN
-                        NULL;
-                    END;
-                    BEGIN
-                        ALTER TABLE memory_episode ALTER COLUMN embedding TYPE VECTOR;
-                    EXCEPTION WHEN OTHERS THEN
-                        NULL;
-                    END;
-                END $$;
 
                 CREATE TABLE IF NOT EXISTS events_trace (
                     id BIGSERIAL PRIMARY KEY,
@@ -203,15 +184,14 @@ class PostgresStore(StorageInterface):
                 CREATE INDEX IF NOT EXISTS idx_chunks_tsv ON chunks USING GIN (tsv);
                 CREATE INDEX IF NOT EXISTS idx_chunks_search_tsv ON chunks USING GIN (search_tsv);
                 CREATE INDEX IF NOT EXISTS idx_chunks_summary_tsv ON chunks USING GIN (summary_tsv);
-                CREATE INDEX IF NOT EXISTS idx_chunks_embedding ON chunks USING hnsw (embedding vector_cosine_ops);
                 CREATE INDEX IF NOT EXISTS idx_chunks_embedding_hnsw ON chunks USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 200);
                 CREATE INDEX IF NOT EXISTS idx_memory_policy_tenant ON memory_policy (tenant_id);
                 CREATE INDEX IF NOT EXISTS idx_memory_preference_user ON memory_preference (user_id);
                 CREATE INDEX IF NOT EXISTS idx_memory_fact_scope ON memory_fact (tenant_id, user_id);
                 CREATE INDEX IF NOT EXISTS idx_memory_fact_tsv ON memory_fact USING GIN (tsv);
-                CREATE INDEX IF NOT EXISTS idx_memory_fact_embedding ON memory_fact USING hnsw (embedding vector_cosine_ops);
+                CREATE INDEX IF NOT EXISTS idx_memory_fact_embedding ON memory_fact USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 200);
                 CREATE INDEX IF NOT EXISTS idx_memory_episode_user ON memory_episode (user_id);
-                CREATE INDEX IF NOT EXISTS idx_memory_episode_embedding ON memory_episode USING hnsw (embedding vector_cosine_ops);
+                CREATE INDEX IF NOT EXISTS idx_memory_episode_embedding ON memory_episode USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 200);
                 CREATE INDEX IF NOT EXISTS idx_events_trace_session ON events_trace (session_id);
                 """)
         logger.info("Initialized Postgres database with pgvector and HNSW indexes.")

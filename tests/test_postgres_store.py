@@ -88,13 +88,13 @@ async def test_postgres_pgvector_similarity_search(pg_store: PostgresStore):
     child_id_1 = str(uuid.uuid4())
     child_id_2 = str(uuid.uuid4())
 
-    # Build 1024-dim normalized test vectors
-    vec1 = [0.0] * 1024
+    # Build 768-dim normalized test vectors
+    vec1 = [0.0] * 768
     vec1[0] = 1.0
     vec1[1] = 0.5
     vec1 = (np.array(vec1) / np.linalg.norm(vec1)).tolist()
 
-    vec2 = [0.0] * 1024
+    vec2 = [0.0] * 768
     vec2[100] = 1.0
     vec2 = (np.array(vec2) / np.linalg.norm(vec2)).tolist()
 
@@ -126,7 +126,7 @@ async def test_postgres_pgvector_similarity_search(pg_store: PostgresStore):
     assert c_parent == 1
 
     # Query with vector close to vec1
-    query_vec = [0.0] * 1024
+    query_vec = [0.0] * 768
     query_vec[0] = 0.95
     query_vec[1] = 0.45
     query_vec = (np.array(query_vec) / np.linalg.norm(query_vec)).tolist()
@@ -211,7 +211,7 @@ async def test_postgres_typed_memory(pg_store: PostgresStore):
     assert pref["preference_value"]["accent"] == "cyan"
 
     # Semantic Fact with pgvector
-    fact_vec = [0.0] * 1024
+    fact_vec = [0.0] * 768
     fact_vec[5] = 1.0
     fact_id = await pg_store.insert_fact(
         tenant_id=test_tid,
@@ -346,7 +346,7 @@ async def test_postgres_ef_search_runtime_parameter(pg_store: PostgresStore):
     )
 
     child_id = str(uuid.uuid4())
-    vec = [0.0] * 1024
+    vec = [0.0] * 768
     vec[42] = 1.0
     child_chunk = Chunk(
         id=child_id,

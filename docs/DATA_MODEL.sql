@@ -51,7 +51,7 @@ CREATE TABLE chunks (
     token_count     INTEGER NOT NULL,
     section_path    TEXT,                        -- e.g. "3. Retrieval > 3.2 Reranking"
     page_number     INTEGER,
-    embedding       VECTOR(1536),                 -- NULL for parent-only rows if you don't embed parents
+    embedding       VECTOR(768),                 -- 768 for Gemini Embedding 2 MRL
     tsv             TSVECTOR GENERATED ALWAYS AS (to_tsvector('english', content)) STORED,
     summary_text    TEXT,                         -- LLM-generated semantic summary
     summary_tokens  INTEGER,

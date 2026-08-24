@@ -858,10 +858,11 @@ class SQLiteStore(StorageInterface):
                 if q_vec is not None and r["embedding"]:
                     emb = json.loads(r["embedding"])
                     c_vec = np.array(emb, dtype=np.float32)
-                    c_norm = np.linalg.norm(c_vec)
-                    if c_norm > 0:
-                        sim = float(np.dot(q_vec, c_vec / c_norm))
-                        score = 0.5 * score + 0.5 * max(sim, 0.0)
+                    if len(c_vec) == len(q_vec):
+                        c_norm = np.linalg.norm(c_vec)
+                        if c_norm > 0:
+                            sim = float(np.dot(q_vec, c_vec / c_norm))
+                            score = 0.5 * score + 0.5 * max(sim, 0.0)
 
                 facts.append(
                     {
@@ -963,6 +964,8 @@ class SQLiteStore(StorageInterface):
             for r in rows:
                 emb = json.loads(r["embedding"])
                 c_vec = np.array(emb, dtype=np.float32)
+                if len(c_vec) != len(q_vec):
+                    continue
                 c_norm = np.linalg.norm(c_vec)
                 if c_norm == 0:
                     continue

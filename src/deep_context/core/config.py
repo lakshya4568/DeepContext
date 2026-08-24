@@ -78,8 +78,8 @@ class Settings(BaseSettings):
 
     # Models & Embedding Configuration
     embedding_provider: str = Field(
-        default="auto", alias="EMBEDDING_PROVIDER"
-    )  # 'auto' | 'gemini' | 'nvidia' | 'mock'
+        default="gemini", alias="EMBEDDING_PROVIDER"
+    )  # 'gemini' | 'nvidia' | 'auto' | 'mock'
     embedding_model: str = Field(default="gemini-embedding-2", alias="EMBEDDING_MODEL")
     embedding_dim: int = Field(default=768, alias="EMBEDDING_DIM")  # 768 for gemini-embedding-2 MRL
     reranker_strategy: str = Field(

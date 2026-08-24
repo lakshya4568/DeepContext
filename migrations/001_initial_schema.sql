@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS chunks (
     token_count INTEGER NOT NULL,
     section_path TEXT,
     page_number INTEGER,
-    embedding VECTOR(1024),
+    embedding VECTOR(768),
     tsv TSVECTOR GENERATED ALWAYS AS (to_tsvector('english', content)) STORED,
     summary_text TEXT,
     summary_tokens INTEGER,

@@ -1,11 +1,11 @@
 -- Migration: 002_add_optimized_indexes.sql
 -- Optimized PostgreSQL indexes for DeepContext Hybrid Retrieval (BM25 + pgvector)
 
--- 1. Ensure embedding vector column dimension (1024 for BGE-M3 / NVIDIA NIM)
+-- 1. Ensure embedding vector column dimension (768 for Gemini Embedding 2 MRL)
 DO $$
 BEGIN
     BEGIN
-        ALTER TABLE chunks ALTER COLUMN embedding TYPE vector(1024);
+        ALTER TABLE chunks ALTER COLUMN embedding TYPE vector(768);
     EXCEPTION WHEN OTHERS THEN
         NULL;
     END;

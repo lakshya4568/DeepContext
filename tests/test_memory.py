@@ -81,7 +81,7 @@ async def test_prompt_assembler_8_layers() -> None:
         tenant_id="default",
         user_id="user_1",
         content="Project uses Postgres with pgvector.",
-        embedding=[0.1] * 1024,
+        embedding=[0.1] * 768,
         source="user_stated",
         confidence=0.9,
     )
