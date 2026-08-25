@@ -77,6 +77,7 @@ class SummaryIngestionPipeline:
             )
             await self.summarizer.summarize_chunks(child_chunks)
             summaries_count = sum(1 for c in child_chunks if c.summary_text)
+            self.summarizer.unload()
 
         # 4. Generate dense embeddings for child chunks
         emb_model = request.embedding_model or settings.embedding_model
@@ -303,6 +304,7 @@ class SummaryIngestionPipeline:
                         "rate_sec": round(rate, 2),
                         "message": f"Summarized child chunk {done}/{total_children} (ETA: {eta_sec // 60}m {eta_sec % 60}s)...",
                     }
+            self.summarizer.unload()
 
         # 4. Embed
         emb_model = request.embedding_model or settings.embedding_model

@@ -104,6 +104,14 @@ async def delete_all_documents() -> dict[str, Any]:
     }
 
 
+@router.post("/v1/models/unload")
+async def unload_models() -> dict[str, Any]:
+    """Explicitly unload Qwen3 and local neural models to free GPU/RAM memory."""
+    summary_ingestion_pipeline.summarizer.unload()
+    ingestion_pipeline.summarizer.unload()
+    return {"status": "unloaded", "message": "All local neural model weights freed from GPU/RAM."}
+
+
 @router.post("/v1/upload", response_model=IngestResponse)
 async def upload_file(
     file: UploadFile = File(...),

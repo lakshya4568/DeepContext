@@ -52,6 +52,7 @@ class IngestionPipeline:
             )
             await self.summarizer.summarize_chunks(child_chunks)
             summaries_count = len(child_chunks)
+            self.summarizer.unload()
 
         # 4. Generate embeddings for child chunks only
         emb_model = request.embedding_model or settings.embedding_model

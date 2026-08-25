@@ -113,17 +113,23 @@ class ChunkSummarizer:
 
     def unload(self) -> None:
         """Explicitly free model weights and release GPU (MPS) / RAM memory."""
-        if not self._is_loaded:
+        if not self._is_loaded and self._model is None:
             return
 
         try:
+            import gc
+
             import torch
 
-            del self._model
-            del self._tokenizer
+            if self._model is not None:
+                del self._model
+            if self._tokenizer is not None:
+                del self._tokenizer
             self._model = None
             self._tokenizer = None
             self._is_loaded = False
+
+            gc.collect()
             gc.collect()
 
             if hasattr(torch, "mps") and hasattr(torch.mps, "empty_cache"):
@@ -131,7 +137,10 @@ class ChunkSummarizer:
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
 
-            logger.info("Summarization model '%s' unloaded from memory.", self.model_name)
+            logger.info(
+                "Summarization model '%s' successfully unloaded from memory (RAM/GPU freed).",
+                self.model_name,
+            )
         except Exception as e:
             logger.warning("Error during model unload: %s", e)
 
@@ -157,7 +166,6 @@ class ChunkSummarizer:
 
     def _generate_batch_sync(self, prompts: list[str]) -> list[tuple[str, int]]:
         """Synchronous batch generation executed safely in a single thread on MPS/GPU."""
-        import gc
         import re
 
         import torch
