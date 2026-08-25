@@ -261,54 +261,48 @@ class SummaryIngestionPipeline:
             }
             t_sum_start = time.time()
 
-            prompts = [
-                self.summarizer._build_prompt(c.content, c.section_path) for c in child_chunks
-            ]
+            await self.summarizer._ensure_model_loaded()
             loop = asyncio.get_running_loop()
-
             async with self.summarizer._load_lock:
-                await self.summarizer._ensure_model_loaded()
-                for i in range(0, len(prompts), self.summarizer.batch_size):
-                    batch_prompts = prompts[i : i + self.summarizer.batch_size]
-                    batch_chunks = child_chunks[i : i + self.summarizer.batch_size]
-
+                for idx, chunk in enumerate(child_chunks):
+                    prompt = self.summarizer._build_prompt(chunk.content, chunk.section_path)
                     batch_res = await loop.run_in_executor(
-                        None, self.summarizer._generate_batch_sync, batch_prompts
+                        None, self.summarizer._generate_batch_sync, [prompt]
                     )
 
-                    for (summary, tokens), chunk in zip(batch_res, batch_chunks):
-                        if not summary:
-                            words = chunk.content.strip().split()
-                            summary = " ".join(words[:25]) + ("..." if len(words) > 25 else "")
-                            tokens = len(summary.split())
-                        chunk.summary_text = summary
-                        chunk.summary_tokens = tokens
-                        chunk.summary_model = settings.summary_model
-                        chunk.generated_at = datetime.now(timezone.utc)
-                        summaries_count += 1
+                    summary, tokens = batch_res[0] if batch_res else ("", 0)
+                    if not summary:
+                        words = chunk.content.strip().split()
+                        summary = " ".join(words[:25]) + ("..." if len(words) > 25 else "")
+                        tokens = len(summary.split())
+                    chunk.summary_text = summary
+                    chunk.summary_tokens = tokens
+                    chunk.summary_model = settings.summary_model
+                    chunk.generated_at = datetime.now(timezone.utc)
+                    summaries_count += 1
 
-                        done = summaries_count
-                        elapsed = time.time() - t_sum_start
-                        rate = elapsed / max(1, done)
-                        remaining = total_children - done
-                        eta_sec = int(rate * remaining)
-                        pct = 18 + int(62 * (done / total_children))
+                    done = summaries_count
+                    elapsed = time.time() - t_sum_start
+                    rate = elapsed / max(1, done)
+                    remaining = total_children - done
+                    eta_sec = int(rate * remaining)
+                    pct = 18 + int(62 * (done / total_children))
 
-                        sec_label = chunk.section_path or (
-                            f"Page {chunk.page_number}" if chunk.page_number else "Section"
-                        )
-                        yield {
-                            "stage": "summarizing",
-                            "percent": pct,
-                            "current": done,
-                            "total": total_children,
-                            "summary": summary,
-                            "tokens": tokens,
-                            "section": sec_label,
-                            "eta_sec": eta_sec,
-                            "rate_sec": round(rate, 2),
-                            "message": f"Summarized child chunk {done}/{total_children} (ETA: {eta_sec // 60}m {eta_sec % 60}s)...",
-                        }
+                    sec_label = chunk.section_path or (
+                        f"Page {chunk.page_number}" if chunk.page_number else "Section"
+                    )
+                    yield {
+                        "stage": "summarizing",
+                        "percent": pct,
+                        "current": done,
+                        "total": total_children,
+                        "summary": summary,
+                        "tokens": tokens,
+                        "section": sec_label,
+                        "eta_sec": eta_sec,
+                        "rate_sec": round(rate, 2),
+                        "message": f"Summarized child chunk {done}/{total_children} (ETA: {eta_sec // 60}m {eta_sec % 60}s)...",
+                    }
 
         # 4. Embed
         emb_model = request.embedding_model or settings.embedding_model
