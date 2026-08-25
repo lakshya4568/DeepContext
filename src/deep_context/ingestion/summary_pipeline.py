@@ -6,6 +6,8 @@ import asyncio
 import time
 import uuid
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Any, AsyncIterator
 
 from deep_context.core.config import settings
 from deep_context.core.llm_client import llm_client
@@ -210,3 +212,165 @@ class SummaryIngestionPipeline:
             permission_scope=permission_scope or ["default"],
         )
         return await self.ingest(req)
+
+    async def ingest_stream(self, request: IngestRequest) -> AsyncIterator[dict[str, Any]]:
+        """Ingests a document while streaming real-time progress events for UI and CLI."""
+        t0 = time.time()
+        yield {
+            "stage": "parsing",
+            "percent": 5,
+            "message": f"Extracting sections from '{request.title}'...",
+        }
+
+        storage = self.storage or await get_storage()
+        doc_id = str(uuid.uuid4())
+
+        # 1. Parse
+        sections = self.parser.parse(request.content, doc_type=request.doc_type)
+        yield {
+            "stage": "chunking",
+            "percent": 10,
+            "message": f"Extracted {len(sections)} sections. Creating parent & child chunks...",
+        }
+
+        # 2. Chunk
+        parent_chunks, child_chunks = self.chunker.chunk_sections(doc_id, sections)
+        yield {
+            "stage": "chunked",
+            "percent": 15,
+            "parents": len(parent_chunks),
+            "children": len(child_chunks),
+            "message": f"Created {len(parent_chunks)} parent chunks and {len(child_chunks)} child chunks.",
+        }
+
+        # 3. Summarize
+        should_summarize = (
+            request.generate_summaries
+            if request.generate_summaries is not None
+            else settings.summary_enabled
+        )
+
+        summaries_count = 0
+        if should_summarize and child_chunks:
+            total_children = len(child_chunks)
+            yield {
+                "stage": "summarizing_start",
+                "percent": 18,
+                "total": total_children,
+                "message": f"Initializing Qwen3 model on GPU/MPS for {total_children} chunks...",
+            }
+            t_sum_start = time.time()
+
+            prompts = [
+                self.summarizer._build_prompt(c.content, c.section_path) for c in child_chunks
+            ]
+            loop = asyncio.get_running_loop()
+
+            async with self.summarizer._load_lock:
+                await self.summarizer._ensure_model_loaded()
+                for i in range(0, len(prompts), self.summarizer.batch_size):
+                    batch_prompts = prompts[i : i + self.summarizer.batch_size]
+                    batch_chunks = child_chunks[i : i + self.summarizer.batch_size]
+
+                    batch_res = await loop.run_in_executor(
+                        None, self.summarizer._generate_batch_sync, batch_prompts
+                    )
+
+                    for (summary, tokens), chunk in zip(batch_res, batch_chunks):
+                        if not summary:
+                            words = chunk.content.strip().split()
+                            summary = " ".join(words[:25]) + ("..." if len(words) > 25 else "")
+                            tokens = len(summary.split())
+                        chunk.summary_text = summary
+                        chunk.summary_tokens = tokens
+                        chunk.summary_model = settings.summary_model
+                        chunk.generated_at = datetime.now(timezone.utc)
+                        summaries_count += 1
+
+                        done = summaries_count
+                        elapsed = time.time() - t_sum_start
+                        rate = elapsed / max(1, done)
+                        remaining = total_children - done
+                        eta_sec = int(rate * remaining)
+                        pct = 18 + int(62 * (done / total_children))
+
+                        sec_label = chunk.section_path or (
+                            f"Page {chunk.page_number}" if chunk.page_number else "Section"
+                        )
+                        yield {
+                            "stage": "summarizing",
+                            "percent": pct,
+                            "current": done,
+                            "total": total_children,
+                            "summary": summary,
+                            "tokens": tokens,
+                            "section": sec_label,
+                            "eta_sec": eta_sec,
+                            "rate_sec": round(rate, 2),
+                            "message": f"Summarized child chunk {done}/{total_children} (ETA: {eta_sec // 60}m {eta_sec % 60}s)...",
+                        }
+
+        # 4. Embed
+        emb_model = request.embedding_model or settings.embedding_model
+        emb_dim = request.embedding_dim or (
+            768 if "gemini" in emb_model.lower() else settings.embedding_dim
+        )
+        yield {
+            "stage": "embedding",
+            "percent": 82,
+            "message": f"Generating {emb_dim}-dim embeddings via {emb_model}...",
+        }
+
+        child_texts = [c.content for c in child_chunks]
+        if child_texts:
+            embeddings = await llm_client.get_embeddings(
+                child_texts,
+                model=emb_model,
+                dim=emb_dim,
+                title=request.title,
+                is_query=False,
+            )
+            for chunk, emb in zip(child_chunks, embeddings):
+                chunk.embedding = emb
+
+        # 5. Persist
+        yield {
+            "stage": "indexing",
+            "percent": 94,
+            "message": "Saving vectors and building HNSW indexes in PostgreSQL...",
+        }
+
+        doc_metadata = dict(request.metadata)
+        doc_metadata["embedding_model"] = emb_model
+        doc_metadata["embedding_dim"] = emb_dim
+        doc_metadata["summary_model"] = settings.summary_model if should_summarize else None
+
+        doc = Document(
+            id=doc_id,
+            tenant_id=request.tenant_id,
+            title=request.title,
+            source_uri=request.source_uri,
+            doc_type=request.doc_type,
+            permission_scope=request.permission_scope,
+            retrieval_mode=request.retrieval_mode,
+            metadata=doc_metadata,
+        )
+
+        await storage.insert_document(doc)
+        all_chunks = parent_chunks + child_chunks
+        await storage.insert_chunks(all_chunks)
+
+        elapsed_total = round(time.time() - t0, 1)
+        yield {
+            "stage": "complete",
+            "percent": 100,
+            "document_id": doc_id,
+            "title": request.title,
+            "parent_chunks_count": len(parent_chunks),
+            "child_chunks_count": len(child_chunks),
+            "summaries_generated_count": summaries_count,
+            "embedding_model": emb_model,
+            "embedding_dim": emb_dim,
+            "elapsed_sec": elapsed_total,
+            "message": f"Successfully ingested '{request.title}' in {elapsed_total}s!",
+        }

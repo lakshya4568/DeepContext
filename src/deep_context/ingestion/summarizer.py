@@ -157,12 +157,15 @@ class ChunkSummarizer:
 
     def _generate_batch_sync(self, prompts: list[str]) -> list[tuple[str, int]]:
         """Synchronous batch generation executed safely in a single thread on MPS/GPU."""
+        import gc
         import re
 
         import torch
 
         results: list[tuple[str, int]] = []
-        for prompt in prompts:
+        for prompt_idx, prompt in enumerate(prompts):
+            inputs = None
+            outputs = None
             try:
                 inputs = self._tokenizer(prompt, return_tensors="pt").to(self._device)
                 input_len = inputs.input_ids.shape[1]
@@ -183,6 +186,26 @@ class ChunkSummarizer:
             except Exception as e:
                 logger.warning("Generation error on prompt: %s", e)
                 results.append(("", 0))
+            finally:
+                if inputs is not None:
+                    del inputs
+                if outputs is not None:
+                    del outputs
+                # Periodically reclaim cache to prevent memory bloat and swap on 8GB RAM Mac
+                if (prompt_idx + 1) % 5 == 0:
+                    gc.collect()
+                    if (
+                        self._device == "mps"
+                        and hasattr(torch, "mps")
+                        and hasattr(torch.mps, "empty_cache")
+                    ):
+                        torch.mps.empty_cache()
+                    elif self._device == "cuda" and torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+
+        gc.collect()
+        if self._device == "mps" and hasattr(torch, "mps") and hasattr(torch.mps, "empty_cache"):
+            torch.mps.empty_cache()
 
         return results
 

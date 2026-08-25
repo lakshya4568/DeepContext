@@ -53,6 +53,10 @@ class StorageInterface(ABC):
         """List ingested documents with parent/child chunk counts for UI and diagnostics."""
         pass
 
+    async def get_document_chunks_detail(self, document_id: str) -> list[dict[str, Any]]:
+        """Fetch all parent and child chunks with summaries and metadata for inspection."""
+        return []
+
     @abstractmethod
     async def delete_document(self, document_id: str) -> bool:
         """Delete document and cascade to its chunks."""

@@ -149,7 +149,8 @@ def ingest_cmd(
                 f"Title: {res.title}\n"
                 f"Type: [magenta]{detected_type.upper()}[/magenta]\n"
                 f"Embedding: [yellow]{res.embedding_model or target_model} ({res.embedding_dim or target_dim}-dim)[/yellow]\n"
-                f"Parent Chunks: {res.parent_chunks_count} | Child Chunks: {res.child_chunks_count}\n"
+                f"Parent Chunks: [green]{res.parent_chunks_count}[/green] | Child Chunks: [yellow]{res.child_chunks_count}[/yellow]\n"
+                f"LLM Summaries: [cyan]{res.summaries_generated_count} generated (Qwen3)[/cyan]\n"
                 f"Retrieval Mode: {res.retrieval_mode.value}",
                 title="Ingestion Result",
             )
@@ -224,6 +225,7 @@ def ingest_all_cmd(
         table.add_column("Size", style="dim")
         table.add_column("Parents", style="green")
         table.add_column("Children", style="yellow")
+        table.add_column("Summaries (Qwen3)", style="cyan")
         table.add_column("Status", style="bold white")
 
         mode = RetrievalMode.HYBRID
@@ -256,6 +258,7 @@ def ingest_all_cmd(
                     file_size_kb,
                     str(res.parent_chunks_count),
                     str(res.child_chunks_count),
+                    f"{res.summaries_generated_count}/{res.child_chunks_count}",
                     "[green]✓ Ingested[/green]",
                 )
             except Exception as e:
@@ -263,6 +266,7 @@ def ingest_all_cmd(
                     file_item.name,
                     detected_type.upper(),
                     file_size_kb,
+                    "-",
                     "-",
                     "-",
                     f"[red]✗ Error: {e}[/red]",
@@ -511,6 +515,126 @@ def set_preference_cmd(
                 title="Preference Saved",
             )
         )
+        await close_storage()
+
+    asyncio.run(_run())
+
+
+@app.command("docs")
+@app.command("list-docs")
+def docs_cmd(limit: int = typer.Option(50, "--limit", "-l", help="Max documents to list")) -> None:
+    """List all ingested documents with parent/child chunk counts and Qwen3 summary stats."""
+
+    async def _run() -> None:
+        storage = await get_storage()
+        docs = await storage.list_document_summaries(limit=limit)
+
+        if not docs:
+            console.print(
+                "[yellow]No documents found in knowledge base. Ingest a document first via `deep-context ingest <path>`[/yellow]"
+            )
+            await close_storage()
+            return
+
+        table = Table(title=f"Knowledge Base Documents ({len(docs)} total)")
+        table.add_column("Doc ID", style="dim", width=12)
+        table.add_column("Title", style="bold cyan")
+        table.add_column("Type", style="magenta")
+        table.add_column("Mode", style="white")
+        table.add_column("Parents", style="green", justify="right")
+        table.add_column("Children", style="yellow", justify="right")
+        table.add_column("Summaries (Qwen3)", style="bold cyan", justify="right")
+        table.add_column("Ingested At", style="dim")
+
+        for d in docs:
+            summaries_display = (
+                f"[green]{d.get('summaries_count', 0)}/{d.get('child_chunks_count', 0)} ✓[/green]"
+                if d.get("summaries_count", 0) > 0
+                else "[dim]0 (disabled)[/dim]"
+            )
+            table.add_row(
+                d["id"][:8] + "...",
+                d["title"],
+                d["doc_type"].upper(),
+                d["retrieval_mode"],
+                str(d["parent_chunks_count"]),
+                str(d["child_chunks_count"]),
+                summaries_display,
+                str(d.get("created_at", ""))[:19],
+            )
+
+        console.print(table)
+        console.print(
+            "[dim]Tip: Run `deep-context chunks <doc_id>` to inspect individual parent/child chunks and summaries.[/dim]"
+        )
+        await close_storage()
+
+    asyncio.run(_run())
+
+
+@app.command("chunks")
+@app.command("inspect-chunks")
+def chunks_cmd(
+    document_id: str = typer.Argument(..., help="Document ID or Title keyword to inspect"),
+) -> None:
+    """Inspect all parent chunks, child chunks, and Qwen3 semantic summaries for a document."""
+
+    async def _run() -> None:
+        storage = await get_storage()
+        docs = await storage.list_document_summaries(limit=100)
+
+        # Resolve doc ID by prefix or title match
+        target_doc = None
+        for d in docs:
+            if (
+                d["id"] == document_id
+                or d["id"].startswith(document_id)
+                or document_id.lower() in d["title"].lower()
+            ):
+                target_doc = d
+                break
+
+        if not target_doc:
+            console.print(f"[bold red]Document not found:[/bold red] '{document_id}'")
+            await close_storage()
+            return
+
+        doc_id = target_doc["id"]
+        chunks = await storage.get_document_chunks_detail(doc_id)
+
+        console.print(
+            Panel(
+                f"[bold cyan]Document:[/bold cyan] {target_doc['title']} ([dim]{doc_id}[/dim])\n"
+                f"[bold]Parents:[/bold] {target_doc['parent_chunks_count']} | [bold]Children:[/bold] {target_doc['child_chunks_count']} | "
+                f"[bold]Summaries:[/bold] [green]{target_doc.get('summaries_count', 0)} generated[/green]",
+                title="Hierarchical Chunk Structure",
+            )
+        )
+
+        children = [c for c in chunks if c["level"] == "child"]
+
+        table = Table(title=f"Child Chunks & Qwen3 Summaries ({len(children)} total)")
+        table.add_column("Level", style="dim", width=7)
+        table.add_column("Section / Page", style="magenta", width=20)
+        table.add_column("Tokens", style="yellow", justify="right", width=7)
+        table.add_column("Qwen3 Semantic Summary", style="bold cyan", width=45)
+        table.add_column("Content Preview", style="white", width=45)
+
+        for c in children:
+            sec_info = c.get("section_path") or (
+                f"Page {c.get('page_number')}" if c.get("page_number") else "Section"
+            )
+            summary_disp = c.get("summary_text") or "[dim]No summary[/dim]"
+            content_preview = c["content"].strip().replace("\n", " ")[:120] + "..."
+            table.add_row(
+                "CHILD",
+                sec_info[:18],
+                str(c["token_count"]),
+                summary_disp,
+                content_preview,
+            )
+
+        console.print(table)
         await close_storage()
 
     asyncio.run(_run())

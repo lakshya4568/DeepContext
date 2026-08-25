@@ -1554,12 +1554,34 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
               </div>
             </div>
 
-            <div style="display: flex; align-items: center; gap: 10px; margin-top: 12px; margin-bottom: 12px; padding: 10px 14px; background: var(--bg-subtle); border-radius: var(--radius-sm); border: 1px solid var(--border);">
-              <input type="checkbox" id="upload-summary-checkbox" checked style="width: 16px; height: 16px; cursor: pointer;">
-              <label for="upload-summary-checkbox" style="margin: 0; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--text);">
-                <i data-lucide="cpu" style="width: 13px; height: 13px; vertical-align: -2px; margin-right: 4px; color: var(--blue);"></i>
-                Generate Qwen3 Semantic Summaries for Child Chunks (Apple Silicon MPS / Local GPU)
-              </label>
+            <!-- Ingestion Mode Selector -->
+            <div style="margin-top: 14px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px;">
+              <label style="font-size: 11px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Ingestion Strategy</label>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <label id="mode-fast-card" style="border: 2px solid var(--emerald); background: var(--emerald-bg); border-radius: var(--radius-md); padding: 12px; cursor: pointer; display: flex; flex-direction: column; gap: 4px;">
+                  <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <span style="font-weight: 800; font-size: 13px; color: var(--text); display: flex; align-items: center; gap: 6px;">
+                      <i data-lucide="zap" style="width: 14px; height: 14px; color: var(--emerald);"></i> Fast Ingest
+                    </span>
+                    <input type="radio" name="ingest_speed_mode" id="mode-fast-radio" value="fast" onchange="toggleIngestSpeedMode('fast')" checked style="accent-color: var(--emerald); width: 16px; height: 16px;">
+                  </div>
+                  <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4;">
+                    Hierarchical Parent-Child + Gemini 768 MRL + HNSW.<br><strong style="color: var(--emerald);">⚡ ~30 seconds</strong> (Recommended for 8GB Mac)
+                  </div>
+                </label>
+
+                <label id="mode-deep-card" style="border: 1px solid var(--border); background: var(--bg-card); border-radius: var(--radius-md); padding: 12px; cursor: pointer; display: flex; flex-direction: column; gap: 4px;">
+                  <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <span style="font-weight: 800; font-size: 13px; color: var(--text); display: flex; align-items: center; gap: 6px;">
+                      <i data-lucide="sparkles" style="width: 14px; height: 14px; color: var(--purple);"></i> Deep Ingest
+                    </span>
+                    <input type="radio" name="ingest_speed_mode" id="mode-deep-radio" value="deep" onchange="toggleIngestSpeedMode('deep')" style="accent-color: var(--purple); width: 16px; height: 16px;">
+                  </div>
+                  <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4;">
+                    Generates local Qwen3 summaries for every child chunk.<br><strong style="color: var(--amber);">🧠 ~1.6s / chunk</strong> (Real-time live progress)
+                  </div>
+                </label>
+              </div>
             </div>
 
             <div style="display: flex; gap: 10px; margin-top: 10px">
@@ -1580,6 +1602,57 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
                 ></i>
                 Sync ./documents/
               </button>
+            </div>
+
+            <!-- Live Streaming Ingestion Progress Card -->
+            <div id="live-ingest-monitor" style="display: none; margin-top: 16px; background: var(--bg-card); border: 1px solid var(--blue-border); border-radius: var(--radius-md); padding: 16px; box-shadow: var(--shadow-sm);">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span class="pulse-dot" style="background: var(--blue);"></span>
+                  <span id="live-ingest-title" style="font-weight: 800; font-size: 13px; color: var(--text);">Ingesting Document...</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span id="live-ingest-percent" style="font-family: var(--font-mono); font-weight: 800; font-size: 13px; color: var(--blue);">0%</span>
+                  <button class="btn btn-secondary btn-sm" onclick="abortIngestStream()" style="padding: 3px 8px; font-size: 11px; color: var(--rose);">
+                    <i data-lucide="x" style="width: 11px; height: 11px;"></i> Cancel
+                  </button>
+                </div>
+              </div>
+
+              <!-- Animated Progress Bar -->
+              <div style="width: 100%; height: 8px; background: var(--bg-subtle); border-radius: 4px; overflow: hidden; margin-bottom: 10px; border: 1px solid var(--border-subtle);">
+                <div id="live-ingest-progress-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, var(--blue), var(--purple)); transition: width 0.2s ease;"></div>
+              </div>
+
+              <!-- Status Text & Stage -->
+              <div id="live-ingest-message" style="font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 10px;">Initializing ingestion...</div>
+
+              <!-- Metrics Grid -->
+              <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; font-size: 11px;">
+                <div style="background: var(--bg-subtle); padding: 6px 10px; border-radius: var(--radius-sm);">
+                  <div style="color: var(--text-muted);">Chunks Processed</div>
+                  <div id="live-ingest-chunks" style="font-weight: 700; color: var(--text);">0 / 0</div>
+                </div>
+                <div style="background: var(--bg-subtle); padding: 6px 10px; border-radius: var(--radius-sm);">
+                  <div style="color: var(--text-muted);">Estimated Remaining</div>
+                  <div id="live-ingest-eta" style="font-weight: 700; color: var(--emerald);">Calculating...</div>
+                </div>
+                <div style="background: var(--bg-subtle); padding: 6px 10px; border-radius: var(--radius-sm);">
+                  <div style="color: var(--text-muted);">Device Mode</div>
+                  <div style="font-weight: 700; color: var(--purple);">Apple MPS GPU</div>
+                </div>
+              </div>
+
+              <!-- Live Summary Box -->
+              <div id="live-ingest-summary-box" style="display: none; background: var(--emerald-bg); border: 1px solid var(--emerald-border); border-radius: var(--radius-sm); padding: 10px; font-size: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                  <span style="font-weight: 700; color: var(--emerald); display: flex; align-items: center; gap: 4px;">
+                    <i data-lucide="sparkles" style="width: 12px; height: 12px;"></i> Live Qwen3 Summary
+                  </span>
+                  <span id="live-ingest-sec-tag" class="version-tag" style="font-size: 10px;">Section</span>
+                </div>
+                <div id="live-ingest-summary-text" style="color: var(--text); line-height: 1.4;">Waiting for chunk...</div>
+              </div>
             </div>
           </div>
 
@@ -1631,13 +1704,15 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
                     <th>Mode</th>
                     <th>Parents</th>
                     <th>Children</th>
+                    <th>Summaries (Qwen3)</th>
+                    <th>Inspect</th>
                     <th>Action</th>
                   </tr>
                 </thead>
                 <tbody id="doc-library-tbody">
                   <tr>
                     <td
-                      colspan="6"
+                      colspan="8"
                       style="color: var(--text-dim); text-align: center"
                     >
                       No documents in library.
@@ -2721,6 +2796,46 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
         }
       }
 
+      let ingestAbortController = null;
+      let currentIngestMode = "fast";
+
+      function toggleIngestSpeedMode(mode) {
+        currentIngestMode = mode;
+        const fastCard = document.getElementById("mode-fast-card");
+        const deepCard = document.getElementById("mode-deep-card");
+        const fastRadio = document.getElementById("mode-fast-radio");
+        const deepRadio = document.getElementById("mode-deep-radio");
+
+        if (mode === "fast") {
+          fastCard.style.borderColor = "var(--emerald)";
+          fastCard.style.background = "var(--emerald-bg)";
+          deepCard.style.borderColor = "var(--border)";
+          deepCard.style.background = "var(--bg-card)";
+          fastRadio.checked = true;
+        } else {
+          deepCard.style.borderColor = "var(--purple)";
+          deepCard.style.background = "var(--purple-bg)";
+          fastCard.style.borderColor = "var(--border)";
+          fastCard.style.background = "var(--bg-card)";
+          deepRadio.checked = true;
+        }
+      }
+
+      function abortIngestStream() {
+        if (ingestAbortController) {
+          ingestAbortController.abort();
+          ingestAbortController = null;
+          const msgEl = document.getElementById("live-ingest-message");
+          if (msgEl) msgEl.textContent = "Ingestion cancelled by user.";
+          const monitor = document.getElementById("live-ingest-monitor");
+          if (monitor) monitor.style.display = "none";
+          const btn = document.getElementById("upload-action-btn");
+          const spinner = document.getElementById("upload-action-spinner");
+          btn.disabled = false;
+          spinner.classList.add("hidden");
+        }
+      }
+
       async function submitBatchUpload() {
         if (!selectedBatchFiles || selectedBatchFiles.length === 0) {
           alert("Please select one or more files to ingest.");
@@ -2729,40 +2844,127 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
 
         const btn = document.getElementById("upload-action-btn");
         const spinner = document.getElementById("upload-action-spinner");
-        const mode = document.getElementById("upload-mode-select").value;
         const embModel =
           document.getElementById("upload-embedding-select")?.value ||
           "gemini-embedding-2";
         const embDim = embModel.includes("gemini") ? 768 : 1024;
+        const genSummaries = currentIngestMode === "deep";
 
-        const genSummaries =
-          document.getElementById("upload-summary-checkbox")?.checked ?? true;
+        btn.disabled = true;
+        spinner.classList.remove("hidden");
 
-        const formData = new FormData();
-        selectedBatchFiles.forEach((f) => formData.append("files", f));
-        formData.append("embedding_model", embModel);
-        formData.append("embedding_dim", String(embDim));
-        formData.append("generate_summaries", genSummaries ? "true" : "false");
+        const monitor = document.getElementById("live-ingest-monitor");
+        const titleEl = document.getElementById("live-ingest-title");
+        const percentEl = document.getElementById("live-ingest-percent");
+        const progressBar = document.getElementById("live-ingest-progress-bar");
+        const msgEl = document.getElementById("live-ingest-message");
+        const chunksEl = document.getElementById("live-ingest-chunks");
+        const etaEl = document.getElementById("live-ingest-eta");
+        const sumBox = document.getElementById("live-ingest-summary-box");
+        const sumText = document.getElementById("live-ingest-summary-text");
+        const sumTag = document.getElementById("live-ingest-sec-tag");
+
+        monitor.style.display = "block";
+        progressBar.style.width = "5%";
+        percentEl.textContent = "5%";
+        chunksEl.textContent = "0 / 0";
+        etaEl.textContent = genSummaries ? "Estimating..." : "< 30 sec";
+        sumBox.style.display = "none";
+
+        ingestAbortController = new AbortController();
 
         try {
-          const res = await fetch("/v1/upload-batch", {
-            method: "POST",
-            body: formData,
-          });
-          const data = await res.json();
-          alert(
-            `Successfully ingested ${data.length} document(s) using ${embModel} (${embDim}d)!`,
-          );
+          for (let fileIdx = 0; fileIdx < selectedBatchFiles.length; fileIdx++) {
+            const f = selectedBatchFiles[fileIdx];
+            titleEl.textContent = `[${fileIdx + 1}/${selectedBatchFiles.length}] Ingesting: ${f.name}`;
+            msgEl.textContent = `Uploading ${f.name} and extracting hierarchical sections...`;
+
+            const formData = new FormData();
+            formData.append("file", f);
+            formData.append("title", f.name.replace(/\.[^/.]+$/, ""));
+            formData.append("embedding_model", embModel);
+            formData.append("embedding_dim", String(embDim));
+            formData.append("generate_summaries", genSummaries ? "true" : "false");
+
+            const response = await fetch("/v1/upload-stream", {
+              method: "POST",
+              body: formData,
+              signal: ingestAbortController.signal,
+            });
+
+            if (!response.ok) {
+              throw new Error(
+                `Server returned HTTP ${response.status}: ${response.statusText}`,
+              );
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = "";
+
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+
+              buffer += decoder.decode(value, { stream: true });
+              const parts = buffer.split("\n\n");
+              buffer = parts.pop();
+
+              for (const part of parts) {
+                const line = part.trim();
+                if (!line.startsWith("data: ")) continue;
+
+                try {
+                  const event = JSON.parse(line.slice(6));
+                  const pct = event.percent || 0;
+                  progressBar.style.width = `${pct}%`;
+                  percentEl.textContent = `${pct}%`;
+                  if (event.message) msgEl.textContent = event.message;
+
+                  if (event.parents != null && event.children != null) {
+                    chunksEl.textContent = `0 / ${event.children} (Parents: ${event.parents})`;
+                  }
+
+                  if (event.stage === "summarizing") {
+                    chunksEl.textContent = `${event.current} / ${event.total}`;
+                    const etaMin = Math.floor(event.eta_sec / 60);
+                    const etaSec = event.eta_sec % 60;
+                    etaEl.textContent = `${etaMin}m ${etaSec}s (${event.rate_sec}s/chk)`;
+                    sumBox.style.display = "block";
+                    sumText.textContent = event.summary || "";
+                    sumTag.textContent = event.section || "Child Chunk";
+                  } else if (event.stage === "embedding") {
+                    etaEl.textContent = "Finishing embeddings...";
+                  } else if (event.stage === "complete") {
+                    progressBar.style.width = "100%";
+                    percentEl.textContent = "100%";
+                    etaEl.textContent = "Done ✓";
+                    msgEl.innerHTML = `<strong style="color: var(--emerald);">✓ Complete:</strong> Ingested ${event.title} in ${event.elapsed_sec}s (${event.parent_chunks_count} parents, ${event.child_chunks_count} children, ${event.summaries_generated_count} summaries)`;
+                  } else if (event.stage === "error") {
+                    throw new Error(event.message);
+                  }
+                } catch (e) {
+                  console.error("Error parsing stream event:", e);
+                }
+              }
+            }
+          }
+
           selectedBatchFiles = [];
           document.getElementById("file-queue-box").innerHTML = "";
           document.getElementById("drop-zone-text").textContent =
             "Click or Drag & Drop Documents";
-          loadDocuments();
+          await loadDocuments();
         } catch (err) {
-          alert("Ingest failed: " + err.message);
+          if (err.name !== "AbortError") {
+            alert("Ingestion failed: " + err.message);
+            msgEl.textContent = "Error: " + err.message;
+          }
         } finally {
           btn.disabled = false;
           spinner.classList.add("hidden");
+          ingestAbortController = null;
+          refreshIcons();
         }
       }
 
@@ -2815,12 +3017,24 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
 
           docs.forEach((d) => {
             const row = document.createElement("tr");
+            const summariesCount = d.summaries_count || 0;
+            const summariesBadge =
+              summariesCount > 0
+                ? `<span class="pill-tag" style="color: var(--emerald); background: var(--emerald-bg); border-color: var(--emerald-border); font-weight: 700;">${summariesCount}/${d.child_chunks_count} ✓</span>`
+                : `<span class="pill-tag" style="color: var(--text-muted); background: var(--bg-subtle);">Disabled</span>`;
+
             row.innerHTML = `
             <td style="font-weight: 700; color: var(--text);">${d.title}</td>
             <td><span class="version-tag">${d.doc_type.toUpperCase()}</span></td>
             <td><span class="version-tag">${d.retrieval_mode}</span></td>
-            <td style="color: var(--emerald); font-weight: 600;">${d.parent_chunks_count}</td>
-            <td style="color: var(--amber); font-weight: 600;">${d.child_chunks_count}</td>
+            <td style="color: var(--emerald); font-weight: 700;">${d.parent_chunks_count}</td>
+            <td style="color: var(--amber); font-weight: 700;">${d.child_chunks_count}</td>
+            <td>${summariesBadge}</td>
+            <td>
+              <button class="btn btn-secondary btn-sm" onclick="inspectDocumentChunks('${d.id}', '${d.title.replace(/'/g, "\\'")}')" style="display: inline-flex; align-items: center; gap: 4px;">
+                <i data-lucide="layers" style="width: 12px; height: 12px;"></i> Inspect Chunks
+              </button>
+            </td>
             <td>
               <button class="btn btn-danger btn-sm" onclick="deleteDoc('${d.id}')">
                 <i data-lucide="trash" style="width: 12px; height: 12px;"></i>
@@ -3394,6 +3608,85 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
         }
       }
 
+      async function inspectDocumentChunks(docId, docTitle) {
+        const modal = document.getElementById("chunk-inspector-modal");
+        const titleEl = document.getElementById("inspector-modal-title");
+        const subEl = document.getElementById("inspector-modal-subtitle");
+        const bodyEl = document.getElementById("inspector-modal-body");
+
+        modal.style.display = "flex";
+        titleEl.textContent = `Chunks & Summaries: ${docTitle}`;
+        subEl.textContent = "Fetching parent & child chunks from storage...";
+        bodyEl.innerHTML =
+          '<div style="text-align: center; color: var(--text-muted); padding: 40px;"><span class="spinner"></span> Loading chunk hierarchy...</div>';
+        refreshIcons();
+
+        try {
+          const res = await fetch(`/v1/documents/${docId}/chunks`);
+          const chunks = await res.json();
+
+          if (!chunks || chunks.length === 0) {
+            bodyEl.innerHTML =
+              '<div style="color: var(--text-muted); text-align: center; padding: 40px;">No chunks found for this document.</div>';
+            return;
+          }
+
+          const parents = chunks.filter((c) => c.level === "parent");
+          const children = chunks.filter((c) => c.level === "child");
+          const withSummary = children.filter(
+            (c) => c.summary_text && c.summary_text.trim().length > 0,
+          );
+
+          subEl.innerHTML = `<strong>${parents.length}</strong> Parent Chunks &nbsp;|&nbsp; <strong>${children.length}</strong> Child Chunks &nbsp;|&nbsp; <strong style="color: var(--emerald);">${withSummary.length}</strong> Qwen3 Summaries Generated`;
+
+          bodyEl.innerHTML = "";
+
+          children.forEach((c, idx) => {
+            const card = document.createElement("div");
+            card.style.cssText =
+              "background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px; display: flex; flex-direction: column; gap: 10px;";
+
+            const hasSum =
+              c.summary_text && c.summary_text.trim().length > 0;
+            const summaryHtml = hasSum
+              ? `<div style="background: var(--emerald-bg); border: 1px solid var(--emerald-border); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 13px; color: var(--text);">
+                   <div style="font-weight: 700; color: var(--emerald); display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+                     <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i> Qwen3 Semantic Summary (${c.summary_tokens || 0} tokens)
+                   </div>
+                   <div>${c.summary_text}</div>
+                 </div>`
+              : `<div style="color: var(--text-muted); font-size: 12px; font-style: italic;">No LLM summary generated (summary generation was disabled during ingestion).</div>`;
+
+            const secLabel =
+              c.section_path ||
+              (c.page_number ? "Page " + c.page_number : "Section");
+
+            card.innerHTML = `
+              <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px;">
+                <span style="font-weight: 700; color: var(--primary);">CHILD CHUNK #${idx + 1}</span>
+                <span class="version-tag">${secLabel}</span>
+                <span style="font-family: var(--font-mono); color: var(--text-muted);">${c.token_count} tokens ${c.has_embedding ? "• 768-dim Vector ✓" : ""}</span>
+              </div>
+              ${summaryHtml}
+              <details style="margin-top: 4px; font-size: 13px; color: var(--text-secondary);">
+                <summary style="cursor: pointer; font-weight: 600; color: var(--text-muted); outline: none;">View Raw Chunk Content</summary>
+                <div style="background: var(--bg-subtle); padding: 12px; border-radius: var(--radius-sm); margin-top: 6px; font-family: var(--font-mono); font-size: 12px; white-space: pre-wrap; line-height: 1.5;">${c.content}</div>
+              </details>
+            `;
+            bodyEl.appendChild(card);
+          });
+
+          refreshIcons();
+        } catch (e) {
+          bodyEl.innerHTML = `<div style="color: var(--rose); padding: 20px;">Failed to load chunks: ${e.message}</div>`;
+        }
+      }
+
+      function closeChunkInspector() {
+        document.getElementById("chunk-inspector-modal").style.display =
+          "none";
+      }
+
       // Auto-init on page load
       window.addEventListener("DOMContentLoaded", () => {
         loadDocuments();
@@ -3404,5 +3697,80 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
         setInterval(checkQuotaStatus, 30000);
       });
     </script>
+
+    <!-- Chunk Inspector Modal Dialog -->
+    <div
+      id="chunk-inspector-modal"
+      style="
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.6);
+        backdrop-filter: blur(4px);
+        z-index: 9999;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      "
+    >
+      <div
+        style="
+          background: var(--bg-surface);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-lg);
+          width: 100%;
+          max-width: 960px;
+          max-height: 85vh;
+          display: flex;
+          flex-direction: column;
+          box-shadow: var(--shadow-lg);
+          overflow: hidden;
+        "
+      >
+        <div
+          style="
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          "
+        >
+          <div>
+            <div
+              id="inspector-modal-title"
+              style="font-size: 17px; font-weight: 800; color: var(--text)"
+            >
+              Document Chunks & Summaries
+            </div>
+            <div
+              id="inspector-modal-subtitle"
+              style="font-size: 13px; color: var(--text-muted)"
+            >
+              Loading chunk hierarchy...
+            </div>
+          </div>
+          <button
+            class="btn btn-secondary btn-sm"
+            onclick="closeChunkInspector()"
+            style="padding: 6px 10px"
+          >
+            <i data-lucide="x" style="width: 16px; height: 16px"></i> Close
+          </button>
+        </div>
+        <div
+          id="inspector-modal-body"
+          style="
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+          "
+        >
+          <!-- Chunk cards rendered dynamically -->
+        </div>
+      </div>
+    </div>
   </body>
 </html>

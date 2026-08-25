@@ -1,7 +1,6 @@
 """RAG Ingestion, Retrieval, Uploads, Haystack Benchmark, and Query routes."""
 
-from __future__ import annotations
-
+import asyncio
 import json
 import os
 import random
@@ -39,6 +38,7 @@ from deep_context.core.types import (
     UserPreferenceResponse,
 )
 from deep_context.ingestion.pipeline import ingestion_pipeline
+from deep_context.ingestion.summary_pipeline import SummaryIngestionPipeline
 from deep_context.memory.prompt_assembler import PromptAssembler
 from deep_context.memory.stores import MemoryStoreManager
 from deep_context.retrieval.engine import retrieval_engine
@@ -48,6 +48,7 @@ from deep_context.storage import get_storage
 from deep_context.verification.checker import EvidenceVerifier
 
 router = APIRouter(tags=["RAG & Query"])
+summary_ingestion_pipeline = SummaryIngestionPipeline()
 
 # UI HTML path
 UI_HTML_PATH = Path(__file__).parent.parent / "ui" / "index.html"
@@ -67,6 +68,13 @@ async def list_documents(limit: int = 50) -> list[dict[str, Any]]:
     """List ingested documents and chunk stats."""
     storage = await get_storage()
     return await storage.list_document_summaries(limit=limit)
+
+
+@router.get("/v1/documents/{document_id}/chunks")
+async def get_document_chunks(document_id: str) -> list[dict[str, Any]]:
+    """Inspect all parent and child chunks with LLM summaries for a document."""
+    storage = await get_storage()
+    return await storage.get_document_chunks_detail(document_id)
 
 
 @router.delete("/v1/documents/{document_id}")
@@ -167,6 +175,87 @@ async def upload_file(
             metadata={"filename": filename, "file_size": len(file_bytes)},
         )
         return await ingestion_pipeline.ingest(req)
+
+
+@router.post("/v1/upload-stream")
+async def upload_stream(
+    file: UploadFile = File(...),
+    title: str = Form(""),
+    doc_type: str = Form("auto"),
+    embedding_model: str = Form(""),
+    embedding_dim: int = Form(0),
+    generate_summaries: bool | None = Form(None),
+) -> StreamingResponse:
+    """Stream live real-time ingestion progress and Qwen3 summaries (SSE events)."""
+    filename = file.filename or "uploaded_doc"
+    file_bytes = await file.read()
+
+    detected_type = doc_type
+    if detected_type == "auto":
+        ext = Path(filename).suffix.lower()
+        if ext == ".pdf":
+            detected_type = "pdf"
+        elif ext in (".md", ".markdown"):
+            detected_type = "markdown"
+        elif ext in (".py", ".js", ".ts", ".java", ".go", ".cpp", ".c", ".rs"):
+            detected_type = "code"
+        else:
+            detected_type = "text"
+
+    doc_title = title.strip() or Path(filename).stem
+    mode = RetrievalMode.HYBRID
+    target_model = embedding_model or settings.embedding_model
+    target_dim = embedding_dim or (
+        768 if "gemini" in target_model.lower() else settings.embedding_dim
+    )
+
+    async def event_generator() -> AsyncIterator[str]:
+        import tempfile
+
+        tmp_path = None
+        try:
+            if detected_type == "pdf":
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+                    tmp_file.write(file_bytes)
+                    tmp_path = tmp_file.name
+                content = tmp_path
+            else:
+                content = file_bytes.decode("utf-8", errors="replace")
+
+            req = IngestRequest(
+                title=doc_title,
+                content=content,
+                doc_type=detected_type,
+                source_uri=filename,
+                retrieval_mode=mode,
+                embedding_model=target_model,
+                embedding_dim=target_dim,
+                generate_summaries=generate_summaries,
+                metadata={"filename": filename, "file_size": len(file_bytes)},
+            )
+
+            async for event in summary_ingestion_pipeline.ingest_stream(req):
+                yield f"data: {json.dumps(event)}\n\n"
+                await asyncio.sleep(0.01)
+        except Exception as err:
+            logger.exception("Upload streaming error: %s", err)
+            yield f"data: {json.dumps({'stage': 'error', 'message': str(err)})}\n\n"
+        finally:
+            if tmp_path and os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.post("/v1/upload-batch", response_model=list[IngestResponse])

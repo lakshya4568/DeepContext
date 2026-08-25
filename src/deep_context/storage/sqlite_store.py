@@ -266,6 +266,13 @@ class SQLiteStore(StorageInterface):
                     p_row = await p_cur.fetchone()
                     parent_cnt = p_row["cnt"] if p_row else 0
 
+                async with conn.execute(
+                    "SELECT COUNT(*) as cnt FROM chunks WHERE document_id = ? AND summary_text IS NOT NULL AND summary_text != ''",
+                    (r["id"],),
+                ) as s_cur:
+                    s_row = await s_cur.fetchone()
+                    summary_cnt = s_row["cnt"] if s_row else 0
+
                 docs.append(
                     {
                         "id": r["id"],
@@ -275,10 +282,46 @@ class SQLiteStore(StorageInterface):
                         "retrieval_mode": r["retrieval_mode"],
                         "child_chunks_count": child_cnt,
                         "parent_chunks_count": parent_cnt,
+                        "summaries_count": summary_cnt,
                         "created_at": r["ingested_at"],
                     }
                 )
             return docs
+
+    async def get_document_chunks_detail(self, document_id: str) -> list[dict[str, Any]]:
+        """Fetch all parent and child chunks with summaries and metadata for inspection."""
+        conn = self._get_conn()
+        async with conn.execute(
+            """
+            SELECT
+                id, parent_chunk_id, level, content, token_count,
+                section_path, page_number, summary_text, summary_tokens,
+                summary_model, generated_at,
+                (embedding IS NOT NULL) as has_embedding
+            FROM chunks
+            WHERE document_id = ?
+            ORDER BY level DESC, page_number ASC, created_at ASC
+            """,
+            (document_id,),
+        ) as cursor:
+            rows = await cursor.fetchall()
+            return [
+                {
+                    "id": r["id"],
+                    "parent_chunk_id": r["parent_chunk_id"],
+                    "level": r["level"],
+                    "content": r["content"],
+                    "token_count": r["token_count"],
+                    "section_path": r["section_path"],
+                    "page_number": r["page_number"],
+                    "summary_text": r["summary_text"],
+                    "summary_tokens": r["summary_tokens"],
+                    "summary_model": r["summary_model"],
+                    "generated_at": r["generated_at"],
+                    "has_embedding": bool(r["has_embedding"]),
+                }
+                for r in rows
+            ]
 
     async def delete_document(self, document_id: str) -> bool:
         conn = self._get_conn()

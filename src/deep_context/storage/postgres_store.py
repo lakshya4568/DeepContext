@@ -300,7 +300,8 @@ class PostgresStore(StorageInterface):
                 SELECT
                     d.id, d.title, d.source_uri, d.doc_type, d.retrieval_mode, d.ingested_at,
                     COUNT(c.id) FILTER (WHERE c.level = 'child') as child_chunks_count,
-                    COUNT(c.id) FILTER (WHERE c.level = 'parent') as parent_chunks_count
+                    COUNT(c.id) FILTER (WHERE c.level = 'parent') as parent_chunks_count,
+                    COUNT(c.id) FILTER (WHERE c.summary_text IS NOT NULL AND c.summary_text != '') as summaries_count
                 FROM documents d
                 LEFT JOIN chunks c ON c.document_id = d.id
                 GROUP BY d.id, d.title, d.source_uri, d.doc_type, d.retrieval_mode, d.ingested_at
@@ -318,11 +319,53 @@ class PostgresStore(StorageInterface):
                     "retrieval_mode": r["retrieval_mode"],
                     "child_chunks_count": int(r["child_chunks_count"]),
                     "parent_chunks_count": int(r["parent_chunks_count"]),
+                    "summaries_count": int(r["summaries_count"]),
                     "created_at": (
                         r["ingested_at"].isoformat()
                         if hasattr(r["ingested_at"], "isoformat")
                         else str(r["ingested_at"])
                     ),
+                }
+                for r in rows
+            ]
+
+    async def get_document_chunks_detail(self, document_id: str) -> list[dict[str, Any]]:
+        """Fetch all parent and child chunks with summaries and metadata for inspection."""
+        pool = self._get_pool()
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT
+                    c.id, c.parent_chunk_id, c.level, c.content, c.token_count,
+                    c.section_path, c.page_number, c.summary_text, c.summary_tokens,
+                    c.summary_model, c.generated_at,
+                    (c.embedding IS NOT NULL) as has_embedding
+                FROM chunks c
+                WHERE c.document_id = $1::uuid
+                ORDER BY c.level DESC, c.page_number ASC NULLS LAST, c.created_at ASC;
+                """,
+                document_id,
+            )
+            return [
+                {
+                    "id": str(r["id"]),
+                    "parent_chunk_id": str(r["parent_chunk_id"]) if r["parent_chunk_id"] else None,
+                    "level": r["level"],
+                    "content": r["content"],
+                    "token_count": r["token_count"],
+                    "section_path": r["section_path"],
+                    "page_number": r["page_number"],
+                    "summary_text": r["summary_text"],
+                    "summary_tokens": r["summary_tokens"],
+                    "summary_model": r["summary_model"],
+                    "generated_at": (
+                        r["generated_at"].isoformat()
+                        if r["generated_at"] and hasattr(r["generated_at"], "isoformat")
+                        else str(r["generated_at"])
+                        if r["generated_at"]
+                        else None
+                    ),
+                    "has_embedding": r["has_embedding"],
                 }
                 for r in rows
             ]
