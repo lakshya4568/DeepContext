@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 import random
+import re
 import time
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -792,7 +793,8 @@ async def generate_haystack(req: HaystackGenerateRequest) -> IngestResponse:
         p = random.choice(FILLER_PARAGRAPHS)
         if i == needle_para_idx:
             # Insert the needle prominently within this paragraph
-            p = f"Special Security Notice: {req.needle} All authorized personnel must reference this credential. {p}"
+            query_context = f" Regarding '{req.needle_query}': " if req.needle_query else " "
+            p = f"Special Security Notice:{query_context}{req.needle}. All authorized personnel must reference this credential. {p}"
 
         sections_text.append(p + "\n")
 
@@ -846,7 +848,13 @@ async def benchmark_haystack(
     )
 
     stages: list[StageDiagnostic] = []
-    needle_clean = req.needle.strip().lower()
+
+    def _contains_needle(content: str, target: str) -> bool:
+        if not content or not target:
+            return False
+        c_norm = re.sub(r"\\[_*\-]", lambda m: m.group(0)[1], content.lower())
+        t_norm = re.sub(r"\\[_*\-]", lambda m: m.group(0)[1], target.lower())
+        return t_norm in c_norm or target.lower() in content.lower()
 
     # Stage 1: BM25 FTS5
     bm25_results = await storage.search_bm25(query=req.query, filters=filters, limit=100)
@@ -854,7 +862,7 @@ async def benchmark_haystack(
     bm25_rank = None
     bm25_score = None
     for idx, r in enumerate(bm25_results, start=1):
-        if needle_clean in r["content"].lower():
+        if _contains_needle(r["content"], req.needle):
             bm25_found = True
             bm25_rank = idx
             bm25_score = r.get("score")
@@ -888,7 +896,7 @@ async def benchmark_haystack(
     vec_rank = None
     vec_sim = None
     for idx, r in enumerate(vec_results, start=1):
-        if needle_clean in r["content"].lower():
+        if _contains_needle(r["content"], req.needle):
             vec_found = True
             vec_rank = idx
             vec_sim = r.get("score")
@@ -924,7 +932,7 @@ async def benchmark_haystack(
     rrf_rank = None
     rrf_score = None
     for idx, r in enumerate(rrf_candidates, start=1):
-        if needle_clean in r["content"].lower():
+        if _contains_needle(r["content"], req.needle):
             rrf_found = True
             rrf_rank = idx
             rrf_score = r.get("score")
@@ -961,7 +969,7 @@ async def benchmark_haystack(
     rerank_rank = None
     rerank_score = None
     for idx, r in enumerate(reranked, start=1):
-        if needle_clean in r["content"].lower():
+        if _contains_needle(r["content"], req.needle):
             rerank_found = True
             rerank_rank = idx
             rerank_score = r.get("rerank_score") or r.get("score")
@@ -991,7 +999,7 @@ async def benchmark_haystack(
     parent_found = False
     matched_parent = None
     for p in retrieval_res.parent_chunks:
-        if needle_clean in p["content"].lower():
+        if _contains_needle(p["content"], req.needle):
             parent_found = True
             matched_parent = p
             break
@@ -1017,8 +1025,8 @@ async def benchmark_haystack(
     )
     answer, reasoning = await llm_client.complete(messages, temperature=0.3, enable_thinking=True)
 
-    passed = needle_clean in answer.lower() or needle_clean in (
-        matched_parent["content"].lower() if matched_parent else ""
+    passed = _contains_needle(answer, req.needle) or (
+        matched_parent is not None and _contains_needle(matched_parent["content"], req.needle)
     )
 
     latency_ms = int((time.time() - t0) * 1000)

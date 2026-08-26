@@ -50,7 +50,8 @@ async def test_haystack_generate_and_benchmark() -> None:
         # Check needle was found and retrieved
         assert bench_data["passed"] is True
         assert bench_data["retrieved_parent_chunk"] is not None
-        assert "SECRET_PASSCODE_APOLLO_7722" in bench_data["retrieved_parent_chunk"]["content"]
+        parent_content = bench_data["retrieved_parent_chunk"]["content"].replace(r"\_", "_")
+        assert "SECRET_PASSCODE_APOLLO_7722" in parent_content
 
 
 @pytest.mark.asyncio

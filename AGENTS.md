@@ -128,6 +128,15 @@ uv run mypy .
 
 If the project uses different tools, follow its existing commands. Do not disable linting or typing rules to make a change pass without explaining and justifying the exception.
 
+## Cross-Platform Compatibility (Windows, macOS / Apple Silicon M1–M4, Linux)
+
+All changes made by agents in this repository must maintain complete cross-platform parity. Never write code that assumes a single developer environment ("it works on my machine"):
+
+- **Hardware Acceleration Parity**: Auto-detect and support both **Apple Silicon Metal / MPS** (`torch.backends.mps.is_available()`) on macOS (M1/M2/M3/M4) and **NVIDIA CUDA** (`torch.cuda.is_available()`) on Windows and Linux, with clean CPU fallback. Never call MPS-specific or CUDA-specific methods (such as `torch.mps.empty_cache()` or CUDA tensor operations) without verifying backend availability first.
+- **Model & Embedding Integrity**: Never invent, inject, or silently swap in mock, synthetic, or hash-based embeddings when real embedding models (`gemini-embedding-2`, `nvidia/nv-embedqa`, etc.) are configured. If an upstream provider quota or network call fails, raise actionable, clear errors rather than fabricating artificial vector representations.
+- **OS-Agnostic File & Path Handling**: Always use `pathlib.Path` or forward-slash paths in shared Python logic. Never hardcode platform-specific paths (e.g. Windows backslashes `C:\` or Unix `/tmp` roots) in core code.
+- **Database Consistency**: Ensure PostgreSQL (`pgvector` with HNSW indexes) and SQLite persistence layers behave identically regardless of host OS.
+
 ## RAG Architecture Rules
 
 ### Separation of responsibilities

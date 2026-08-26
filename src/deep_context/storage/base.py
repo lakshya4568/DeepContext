@@ -87,6 +87,16 @@ class StorageInterface(ABC):
         """Insert a batch of chunks (parents and children)."""
         pass
 
+    async def update_chunk_summaries_batch(
+        self, updates: list[tuple[str, str, int, str, Any]]
+    ) -> None:
+        """Incrementally update summaries for a batch of chunks."""
+        pass
+
+    async def update_chunk_embeddings_batch(self, updates: list[tuple[str, list[float]]]) -> None:
+        """Incrementally update embeddings for a batch of chunks."""
+        pass
+
     @abstractmethod
     async def get_chunk(self, chunk_id: str) -> Chunk | None:
         """Get chunk by ID."""

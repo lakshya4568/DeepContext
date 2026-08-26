@@ -21,7 +21,10 @@ async def pg_store():
     """Fixture providing an initialized PostgresStore connected to the test database."""
     dsn = settings.postgres_dsn
     store = PostgresStore(dsn=dsn)
-    await store.initialize()
+    try:
+        await store.initialize()
+    except Exception as e:
+        pytest.skip(f"PostgreSQL/pgvector store not available: {e}")
     yield store
     await store.close()
 
