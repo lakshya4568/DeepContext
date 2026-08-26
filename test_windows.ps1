@@ -194,15 +194,16 @@ if ($Fast) {
     $fullTests = & uv run pytest -v 2>&1
 }
 
-$passedTests = ($fullTests | Select-String "PASSED").Count
-$failedTests = ($fullTests | Select-String "FAILED").Count
-$skippedTests = ($fullTests | Select-String "SKIPPED").Count
+$testExitCode = $LASTEXITCODE
+$passedTests = ($fullTests | Select-String -CaseSensitive "PASSED").Count
+$failedTests = ($fullTests | Select-String -CaseSensitive "FAILED").Count
+$skippedTests = ($fullTests | Select-String -CaseSensitive "SKIPPED").Count
 
 $fullTests | ForEach-Object {
-    if ($_ -match "FAILED") { Write-Host "   $_" -ForegroundColor Red }
+    if ($_ -cmatch "FAILED") { Write-Host "   $_" -ForegroundColor Red }
 }
 
-if ($failedTests -eq 0) {
+if ($testExitCode -eq 0) {
     Write-Success "Full test suite passed! ($passedTests passed, $skippedTests skipped)"
     $PassCount++
 } else {

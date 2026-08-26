@@ -1639,7 +1639,7 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
                 </div>
                 <div style="background: var(--bg-subtle); padding: 6px 10px; border-radius: var(--radius-sm);">
                   <div style="color: var(--text-muted);">Device Mode</div>
-                  <div style="font-weight: 700; color: var(--purple);">Apple MPS GPU</div>
+                  <div id="live-ingest-device-badge" style="font-weight: 700; color: var(--purple);">GPU Accelerated</div>
                 </div>
               </div>
 
@@ -1705,6 +1705,7 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
                     <th>Parents</th>
                     <th>Children</th>
                     <th>Summaries (Qwen3)</th>
+                    <th>Embeddings</th>
                     <th>Inspect</th>
                     <th>Action</th>
                   </tr>
@@ -1712,7 +1713,7 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
                 <tbody id="doc-library-tbody">
                   <tr>
                     <td
-                      colspan="8"
+                      colspan="9"
                       style="color: var(--text-dim); text-align: center"
                     >
                       No documents in library.
@@ -2914,37 +2915,46 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
                 const line = part.trim();
                 if (!line.startsWith("data: ")) continue;
 
+                let event = null;
                 try {
-                  const event = JSON.parse(line.slice(6));
-                  const pct = event.percent || 0;
-                  progressBar.style.width = `${pct}%`;
-                  percentEl.textContent = `${pct}%`;
-                  if (event.message) msgEl.textContent = event.message;
-
-                  if (event.parents != null && event.children != null) {
-                    chunksEl.textContent = `0 / ${event.children} (Parents: ${event.parents})`;
-                  }
-
-                  if (event.stage === "summarizing") {
-                    chunksEl.textContent = `${event.current} / ${event.total}`;
-                    const etaMin = Math.floor(event.eta_sec / 60);
-                    const etaSec = event.eta_sec % 60;
-                    etaEl.textContent = `${etaMin}m ${etaSec}s (${event.rate_sec}s/chk)`;
-                    sumBox.style.display = "block";
-                    sumText.textContent = event.summary || "";
-                    sumTag.textContent = event.section || "Child Chunk";
-                  } else if (event.stage === "embedding") {
-                    etaEl.textContent = "Finishing embeddings...";
-                  } else if (event.stage === "complete") {
-                    progressBar.style.width = "100%";
-                    percentEl.textContent = "100%";
-                    etaEl.textContent = "Done ✓";
-                    msgEl.innerHTML = `<strong style="color: var(--emerald);">✓ Complete:</strong> Ingested ${event.title} in ${event.elapsed_sec}s (${event.parent_chunks_count} parents, ${event.child_chunks_count} children, ${event.summaries_generated_count} summaries)`;
-                  } else if (event.stage === "error") {
-                    throw new Error(event.message);
-                  }
+                  event = JSON.parse(line.slice(6));
                 } catch (e) {
                   console.error("Error parsing stream event:", e);
+                  continue;
+                }
+
+                if (!event) continue;
+
+                if (event.stage === "error") {
+                  progressBar.style.background = "var(--rose)";
+                  msgEl.innerHTML = `<strong style="color: var(--rose);">✗ Ingestion Error:</strong> ${event.message}`;
+                  throw new Error(event.message);
+                }
+
+                const pct = event.percent || 0;
+                progressBar.style.width = `${pct}%`;
+                percentEl.textContent = `${pct}%`;
+                if (event.message) msgEl.textContent = event.message;
+
+                if (event.parents != null && event.children != null) {
+                  chunksEl.textContent = `0 / ${event.children} (Parents: ${event.parents})`;
+                }
+
+                if (event.stage === "summarizing") {
+                  chunksEl.textContent = `${event.current} / ${event.total}`;
+                  const etaMin = Math.floor(event.eta_sec / 60);
+                  const etaSec = event.eta_sec % 60;
+                  etaEl.textContent = `${etaMin}m ${etaSec}s (${event.rate_sec}s/chk)`;
+                  sumBox.style.display = "block";
+                  sumText.textContent = event.summary || "";
+                  sumTag.textContent = event.section || "Child Chunk";
+                } else if (event.stage === "embedding") {
+                  etaEl.textContent = "Finishing embeddings...";
+                } else if (event.stage === "complete") {
+                  progressBar.style.width = "100%";
+                  percentEl.textContent = "100%";
+                  etaEl.textContent = "Done ✓";
+                  msgEl.innerHTML = `<strong style="color: var(--emerald);">✓ Complete:</strong> Ingested ${event.title} in ${event.elapsed_sec}s (${event.parent_chunks_count} parents, ${event.child_chunks_count} children, ${event.summaries_generated_count} summaries)`;
                 }
               }
             }
@@ -3011,7 +3021,7 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
 
           if (docs.length === 0) {
             tbody.innerHTML =
-              '<tr><td colspan="6" style="color: var(--text-dim); text-align: center;">No documents in database. Upload a file or sync ./documents/</td></tr>';
+              '<tr><td colspan="9" style="color: var(--text-dim); text-align: center;">No documents in database. Upload a file or sync ./documents/</td></tr>';
             return;
           }
 
@@ -3023,6 +3033,12 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
                 ? `<span class="pill-tag" style="color: var(--emerald); background: var(--emerald-bg); border-color: var(--emerald-border); font-weight: 700;">${summariesCount}/${d.child_chunks_count} ✓</span>`
                 : `<span class="pill-tag" style="color: var(--text-muted); background: var(--bg-subtle);">Disabled</span>`;
 
+            const embCount = d.embeddings_count !== undefined ? d.embeddings_count : (d.child_chunks_count || 0);
+            const isFullEmb = embCount >= d.child_chunks_count && d.child_chunks_count > 0;
+            const embBadge = isFullEmb
+              ? `<span class="pill-tag" style="color: var(--emerald); background: var(--emerald-bg); border-color: var(--emerald-border); font-weight: 700;">${embCount}/${d.child_chunks_count} ✓</span>`
+              : `<span class="pill-tag" style="color: var(--amber); background: var(--amber-bg); border-color: var(--amber-border); font-weight: 700; cursor: pointer;" onclick="resumeDocEmbeddings('${d.id}', '${d.title.replace(/'/g, "\\'")}')" title="Click to generate missing embeddings">⚠️ ${embCount}/${d.child_chunks_count} (Embed)</span>`;
+
             row.innerHTML = `
             <td style="font-weight: 700; color: var(--text);">${d.title}</td>
             <td><span class="version-tag">${d.doc_type.toUpperCase()}</span></td>
@@ -3030,15 +3046,21 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
             <td style="color: var(--emerald); font-weight: 700;">${d.parent_chunks_count}</td>
             <td style="color: var(--amber); font-weight: 700;">${d.child_chunks_count}</td>
             <td>${summariesBadge}</td>
+            <td>${embBadge}</td>
             <td>
               <button class="btn btn-secondary btn-sm" onclick="inspectDocumentChunks('${d.id}', '${d.title.replace(/'/g, "\\'")}')" style="display: inline-flex; align-items: center; gap: 4px;">
-                <i data-lucide="layers" style="width: 12px; height: 12px;"></i> Inspect Chunks
+                <i data-lucide="layers" style="width: 12px; height: 12px;"></i> Inspect
               </button>
             </td>
             <td>
-              <button class="btn btn-danger btn-sm" onclick="deleteDoc('${d.id}')">
-                <i data-lucide="trash" style="width: 12px; height: 12px;"></i>
-              </button>
+              <div style="display: flex; gap: 4px; align-items: center;">
+                <button class="btn btn-secondary btn-sm" onclick="resumeDocEmbeddings('${d.id}', '${d.title.replace(/'/g, "\\'")}')" title="Generate or resume missing embeddings" style="padding: 4px 8px;">
+                  <i data-lucide="zap" style="width: 12px; height: 12px; color: var(--amber);"></i>
+                </button>
+                <button class="btn btn-danger btn-sm" onclick="deleteDoc('${d.id}')" title="Delete document" style="padding: 4px 8px;">
+                  <i data-lucide="trash" style="width: 12px; height: 12px;"></i>
+                </button>
+              </div>
             </td>
           `;
             tbody.appendChild(row);
@@ -3057,6 +3079,61 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
           refreshIcons();
         } catch (e) {
           console.error("Failed to load documents", e);
+        }
+      }
+
+      async function resumeDocEmbeddings(id, title) {
+        const prog = document.getElementById("upload-progress");
+        const bar = document.getElementById("progress-bar");
+        const msg = document.getElementById("progress-msg");
+        const badge = document.getElementById("progress-stage");
+
+        if (prog) prog.style.display = "block";
+        if (badge) {
+          badge.textContent = "EMBEDDING";
+          badge.style.color = "var(--amber)";
+          badge.style.background = "var(--amber-bg)";
+          badge.style.borderColor = "var(--amber-border)";
+        }
+        if (msg) msg.textContent = `Generating missing embeddings for "${title}"...`;
+        if (bar) {
+          bar.style.width = "20%";
+          bar.style.background = "linear-gradient(90deg, #f59e0b, #10b981)";
+        }
+
+        try {
+          const res = await fetch(`/v1/documents/${id}/embed-stream`, { method: "POST" });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
+
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n\n");
+            buffer = lines.pop();
+
+            for (const line of lines) {
+              if (line.startsWith("data: ")) {
+                try {
+                  const ev = JSON.parse(line.substring(6));
+                  if (bar && ev.percent !== undefined) bar.style.width = `${ev.percent}%`;
+                  if (msg && ev.message) msg.textContent = ev.message;
+                  if (badge && ev.stage) badge.textContent = ev.stage.toUpperCase();
+                } catch (_) {}
+              }
+            }
+          }
+
+          loadDocuments();
+          setTimeout(() => {
+            if (prog) prog.style.display = "none";
+          }, 3000);
+        } catch (e) {
+          alert("Embedding generation error: " + e.message);
+          if (prog) prog.style.display = "none";
         }
       }
 

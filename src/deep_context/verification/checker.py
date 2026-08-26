@@ -88,8 +88,19 @@ class EvidenceVerifier:
                 f"Grounding confidence {confidence:.2f} is below threshold {settings.confidence_threshold:.2f}."
             )
 
+        passed = (
+            confidence >= settings.confidence_threshold
+            and (
+                not is_aggregation
+                or (
+                    coverage_ratio is not None
+                    and coverage_ratio >= settings.min_aggregation_coverage
+                )
+            )
+        )
+
         return SupportCheckResult(
-            passed=len(failure_reasons) == 0,
+            passed=passed,
             claims=claims,
             coverage_ratio=coverage_ratio,
             confidence=confidence,
@@ -109,6 +120,21 @@ class EvidenceVerifier:
                 "hypothesize",
                 "presumably",
                 "my interpretation",
+                "missing from",
+                "not mentioned",
+                "not provided",
+                "not in the",
+                "insufficient evidence",
+                "not discussed",
+                "does not contain",
+                "does not mention",
+                "does not include",
+                "not include",
+                "not available",
+                "not specified",
+                "no mention",
+                "no details",
+                "not detailed",
             )
         ):
             return Claim(text=claim_text, support=ClaimSupport.INFERENCE)
@@ -124,14 +150,21 @@ class EvidenceVerifier:
             return Claim(text=claim_text, support=ClaimSupport.UNSUPPORTED)
 
         for item in evidence:
-            content = item.get("content", "").lower()
+            content = (
+                item.get("content", "") if isinstance(item, dict) else getattr(item, "content", "")
+            ).lower()
             overlap_count = sum(1 for w in words if w in content)
             overlap_ratio = overlap_count / len(words)
             if overlap_ratio >= 0.50 or overlap_count >= 4:
+                item_id = (
+                    (item.get("chunk_id") or item.get("id"))
+                    if isinstance(item, dict)
+                    else getattr(item, "id", None)
+                )
                 return Claim(
                     text=claim_text,
                     support=ClaimSupport.RETRIEVED,
-                    evidence_id=item.get("chunk_id") or item.get("id"),
+                    evidence_id=item_id,
                 )
 
         return Claim(text=claim_text, support=ClaimSupport.UNSUPPORTED)

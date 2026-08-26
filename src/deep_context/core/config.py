@@ -189,7 +189,7 @@ class Settings(BaseSettings):
     # Summarization parameters (Qwen3 0.6B/0.8B local model)
     summary_enabled: bool = Field(default=False, alias="SUMMARY_ENABLED")
     summary_model: str = Field(default="Qwen/Qwen3-0.6B", alias="SUMMARY_MODEL")
-    summary_max_tokens: int = Field(default=80, alias="SUMMARY_MAX_TOKENS")
+    summary_max_tokens: int = Field(default=180, alias="SUMMARY_MAX_TOKENS")
     summary_batch_size: int = Field(default=8, alias="SUMMARY_BATCH_SIZE")
     summary_device: str = Field(
         default="auto", alias="SUMMARY_DEVICE"

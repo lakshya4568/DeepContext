@@ -36,6 +36,12 @@ class StorageInterface(ABC):
         """Insert a document and return its ID."""
         pass
 
+    async def insert_document_and_chunks(self, document: Document, chunks: list[Chunk]) -> str:
+        """Atomically insert a document and all its chunks in a single transaction."""
+        doc_id = await self.insert_document(document)
+        await self.insert_chunks(chunks)
+        return doc_id
+
     @abstractmethod
     async def get_document(self, document_id: str) -> Document | None:
         """Fetch document by ID."""
@@ -55,6 +61,10 @@ class StorageInterface(ABC):
 
     async def get_document_chunks_detail(self, document_id: str) -> list[dict[str, Any]]:
         """Fetch all parent and child chunks with summaries and metadata for inspection."""
+        return []
+
+    async def get_unembedded_chunks(self, document_id: str) -> list[Chunk]:
+        """Fetch all child chunks for a document that do not yet have embeddings."""
         return []
 
     @abstractmethod

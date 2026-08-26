@@ -45,7 +45,7 @@ CREATE INDEX idx_documents_metadata_gin ON documents USING GIN (metadata);
 CREATE TABLE chunks (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     document_id     UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
-    parent_chunk_id UUID REFERENCES chunks(id) ON DELETE CASCADE, -- NULL if this IS a parent
+    parent_chunk_id UUID,                       -- NULL if this IS a parent
     level           TEXT NOT NULL CHECK (level IN ('parent', 'child')),
     content         TEXT NOT NULL,
     token_count     INTEGER NOT NULL,

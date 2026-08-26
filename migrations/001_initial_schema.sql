@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS documents (
 CREATE TABLE IF NOT EXISTS chunks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
-    parent_chunk_id UUID REFERENCES chunks(id) ON DELETE CASCADE,
+    parent_chunk_id UUID,
     level TEXT NOT NULL CHECK (level IN ('parent', 'child')),
     content TEXT NOT NULL,
     token_count INTEGER NOT NULL,

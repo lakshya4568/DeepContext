@@ -528,16 +528,26 @@ class LLMClient:
 
     @staticmethod
     def _parse_think_tags(text: str, reasoning: str | None = None) -> tuple[str, str | None]:
-        """Extract <think>...</think> reasoning blocks from model content."""
-        if reasoning:
-            return text, reasoning
+        """Extract <think>...</think> reasoning blocks and thinking headers from model content."""
+        if not text:
+            return "", reasoning
         if "<think>" in text:
             if "</think>" in text:
                 parts = text.split("</think>", 1)
                 think_part = parts[0].replace("<think>", "").strip()
                 ans_part = parts[1].strip()
-                return ans_part, think_part
-            return text.replace("<think>", "").strip(), None
+                return ans_part, reasoning or think_part
+            return text.replace("<think>", "").strip(), reasoning
+
+        # Strip standard conversational thinking prefixes
+        pattern = r"^(?:Here'?s a thinking process:?|Thinking Process:?|Thought:?)\s*(.+?)(?=\n\n(?=[A-Z\"#*0-9]))"
+        match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
+        if match:
+            think_part = match.group(1).strip()
+            ans_part = text[match.end() :].strip()
+            if ans_part:
+                return ans_part, reasoning or think_part
+
         return text, reasoning
 
     async def complete(

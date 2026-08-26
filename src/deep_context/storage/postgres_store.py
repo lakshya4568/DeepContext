@@ -64,7 +64,7 @@ class PostgresStore(StorageInterface):
                 CREATE TABLE IF NOT EXISTS chunks (
                     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                     document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
-                    parent_chunk_id UUID REFERENCES chunks(id) ON DELETE CASCADE,
+                    parent_chunk_id UUID REFERENCES chunks(id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
                     level TEXT NOT NULL CHECK (level IN ('parent', 'child')),
                     content TEXT NOT NULL,
                     token_count INTEGER NOT NULL,
@@ -80,6 +80,8 @@ class PostgresStore(StorageInterface):
                     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
                 );
 
+                ALTER TABLE chunks DROP CONSTRAINT IF EXISTS chunks_parent_chunk_id_fkey;
+                CREATE INDEX IF NOT EXISTS idx_chunks_parent_id ON chunks (parent_chunk_id);
                 ALTER TABLE chunks ADD COLUMN IF NOT EXISTS search_tsv TSVECTOR;
                 ALTER TABLE chunks ADD COLUMN IF NOT EXISTS summary_text TEXT;
                 ALTER TABLE chunks ADD COLUMN IF NOT EXISTS summary_tokens INTEGER;
@@ -238,6 +240,92 @@ class PostgresStore(StorageInterface):
             )
             return str(row["id"])
 
+    async def insert_document_and_chunks(self, document: Document, chunks: list[Chunk]) -> str:
+        """Atomically inserts document and all its chunks in a single transaction."""
+        pool = self._get_pool()
+        async with pool.acquire() as conn:
+            async with conn.transaction():
+                mode_val = (
+                    document.retrieval_mode.value
+                    if hasattr(document.retrieval_mode, "value")
+                    else str(document.retrieval_mode)
+                )
+                await conn.execute(
+                    """
+                    INSERT INTO documents (
+                        id, tenant_id, title, source_uri, doc_type, permission_scope,
+                        retrieval_mode, metadata, ingested_at, updated_at
+                    ) VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10)
+                    ON CONFLICT (id) DO UPDATE SET
+                        title = EXCLUDED.title,
+                        source_uri = EXCLUDED.source_uri,
+                        doc_type = EXCLUDED.doc_type,
+                        permission_scope = EXCLUDED.permission_scope,
+                        retrieval_mode = EXCLUDED.retrieval_mode,
+                        metadata = EXCLUDED.metadata,
+                        updated_at = EXCLUDED.updated_at;
+                    """,
+                    document.id,
+                    document.tenant_id,
+                    document.title,
+                    document.source_uri,
+                    document.doc_type,
+                    document.permission_scope,
+                    mode_val,
+                    json.dumps(document.metadata),
+                    document.ingested_at,
+                    document.updated_at,
+                )
+
+                if chunks:
+                    insert_sql = """
+                    INSERT INTO chunks (
+                        id, document_id, parent_chunk_id, level, content,
+                        token_count, section_path, page_number, embedding,
+                        summary_text, summary_tokens, summary_model, generated_at,
+                        created_at
+                    ) VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                    ON CONFLICT (id) DO UPDATE SET
+                        content = EXCLUDED.content,
+                        token_count = EXCLUDED.token_count,
+                        section_path = EXCLUDED.section_path,
+                        page_number = EXCLUDED.page_number,
+                        embedding = EXCLUDED.embedding,
+                        summary_text = EXCLUDED.summary_text,
+                        summary_tokens = EXCLUDED.summary_tokens,
+                        summary_model = EXCLUDED.summary_model,
+                        generated_at = EXCLUDED.generated_at;
+                    """
+
+                    def _to_rec(c: Chunk) -> tuple:
+                        level_str = c.level.value if hasattr(c.level, "value") else str(c.level)
+                        emb_val = (
+                            np.array(c.embedding, dtype=np.float32)
+                            if c.embedding is not None
+                            else None
+                        )
+                        return (
+                            c.id,
+                            c.document_id,
+                            c.parent_chunk_id,
+                            level_str,
+                            c.content,
+                            c.token_count,
+                            c.section_path,
+                            c.page_number,
+                            emb_val,
+                            c.summary_text,
+                            c.summary_tokens,
+                            c.summary_model,
+                            c.generated_at,
+                            c.created_at,
+                        )
+
+                    records = [_to_rec(c) for c in chunks]
+                    await conn.executemany(insert_sql, records)
+
+                return str(document.id)
+
     async def get_document(self, document_id: str) -> Document | None:
         pool = self._get_pool()
         async with pool.acquire() as conn:
@@ -301,7 +389,8 @@ class PostgresStore(StorageInterface):
                     d.id, d.title, d.source_uri, d.doc_type, d.retrieval_mode, d.ingested_at,
                     COUNT(c.id) FILTER (WHERE c.level = 'child') as child_chunks_count,
                     COUNT(c.id) FILTER (WHERE c.level = 'parent') as parent_chunks_count,
-                    COUNT(c.id) FILTER (WHERE c.summary_text IS NOT NULL AND c.summary_text != '') as summaries_count
+                    COUNT(c.id) FILTER (WHERE c.summary_text IS NOT NULL AND c.summary_text != '') as summaries_count,
+                    COUNT(c.id) FILTER (WHERE c.embedding IS NOT NULL AND c.level = 'child') as embeddings_count
                 FROM documents d
                 LEFT JOIN chunks c ON c.document_id = d.id
                 GROUP BY d.id, d.title, d.source_uri, d.doc_type, d.retrieval_mode, d.ingested_at
@@ -320,12 +409,43 @@ class PostgresStore(StorageInterface):
                     "child_chunks_count": int(r["child_chunks_count"]),
                     "parent_chunks_count": int(r["parent_chunks_count"]),
                     "summaries_count": int(r["summaries_count"]),
+                    "embeddings_count": int(r["embeddings_count"]),
                     "created_at": (
                         r["ingested_at"].isoformat()
                         if hasattr(r["ingested_at"], "isoformat")
                         else str(r["ingested_at"])
                     ),
                 }
+                for r in rows
+            ]
+
+    async def get_unembedded_chunks(self, document_id: str) -> list[Chunk]:
+        """Fetch all child chunks for a document that do not yet have embeddings."""
+        pool = self._get_pool()
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT * FROM chunks
+                WHERE document_id = $1::uuid AND level = 'child' AND embedding IS NULL
+                ORDER BY page_number ASC NULLS LAST, created_at ASC;
+                """,
+                document_id,
+            )
+            return [
+                Chunk(
+                    id=str(r["id"]),
+                    document_id=str(r["document_id"]),
+                    parent_chunk_id=str(r["parent_chunk_id"]) if r["parent_chunk_id"] else None,
+                    level=ChunkLevel(r["level"]),
+                    content=r["content"],
+                    token_count=r["token_count"],
+                    section_path=r["section_path"],
+                    page_number=r["page_number"],
+                    summary_text=r["summary_text"],
+                    summary_tokens=r["summary_tokens"],
+                    summary_model=r["summary_model"],
+                    generated_at=r["generated_at"],
+                )
                 for r in rows
             ]
 

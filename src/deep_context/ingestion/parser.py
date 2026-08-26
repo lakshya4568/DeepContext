@@ -49,24 +49,23 @@ class DocumentParser:
             )
             return cls.parse_code(text, doc_type_lower)
 
-        # 2. IBM Docling Primary Parsing for PDF, Markdown, DOCX, and HTML
+        # 2. PDF Fast & Resilient Structure Extraction
+        if doc_type_lower == "pdf" or doc_type_lower.endswith(".pdf"):
+            return cls.parse_pdf(content)
+
+        # 3. IBM Docling Primary Parsing for Markdown, DOCX, and HTML
         if doc_type_lower in (
-            "pdf",
             "docx",
             "html",
             "htm",
             "markdown",
             "md",
-        ) or doc_type_lower.endswith((".pdf", ".docx", ".html", ".htm", ".md", ".markdown")):
-            suffix = ".pdf"
+        ) or doc_type_lower.endswith((".docx", ".html", ".htm", ".md", ".markdown")):
+            suffix = ".md"
             if doc_type_lower in ("docx",) or doc_type_lower.endswith(".docx"):
                 suffix = ".docx"
             elif doc_type_lower in ("html", "htm") or doc_type_lower.endswith((".html", ".htm")):
                 suffix = ".html"
-            elif doc_type_lower in ("markdown", "md") or doc_type_lower.endswith(
-                (".md", ".markdown")
-            ):
-                suffix = ".md"
 
             try:
                 sections = cls._parse_with_docling(content, suffix=suffix)
@@ -81,10 +80,7 @@ class DocumentParser:
                     e,
                 )
 
-        # 3. Native Fallbacks
-        if doc_type_lower == "pdf" or doc_type_lower.endswith(".pdf"):
-            return cls._parse_pdf_pypdf(content)
-
+        # 4. Native Fallbacks
         text = content.decode("utf-8", errors="replace") if isinstance(content, bytes) else content
         if doc_type_lower in ("markdown", "md") or doc_type_lower.endswith((".md", ".markdown")):
             return cls.parse_markdown(text)
@@ -96,9 +92,18 @@ class DocumentParser:
     @classmethod
     def parse_pdf(cls, content: str | bytes, use_docling: bool = True) -> list[ParsedSection]:
         """
-        Structure-aware PDF parser using IBM Docling for high-fidelity layout and table
-        extraction, with streaming pypdf fallback for offline or lightweight processing.
+        Structure-aware PDF parser with fast digital extraction for text PDFs (100x faster),
+        and high-fidelity Docling OCR extraction for scanned or image-heavy documents.
         """
+        # 1. Attempt fast streaming text extraction via pypdf first
+        try:
+            sections = cls._parse_pdf_pypdf(content)
+            if sections and sum(len(s.content) for s in sections) > 100:
+                return sections
+        except Exception:
+            pass
+
+        # 2. Fall back to IBM Docling for scanned image / OCR PDFs
         if use_docling:
             try:
                 sections = cls._parse_with_docling(content, suffix=".pdf")
@@ -117,8 +122,13 @@ class DocumentParser:
     @classmethod
     def _parse_with_docling(cls, content: str | bytes, suffix: str = ".pdf") -> list[ParsedSection]:
         """Parses documents via IBM Docling into high-fidelity structured markdown with tables, headers, and metadata."""
+        import logging
         import os
         import tempfile
+
+        # Silence noisy OCR detection logs on text-native documents
+        for name in ("RapidOCR", "rapidocr", "docling", "onnxruntime"):
+            logging.getLogger(name).setLevel(logging.ERROR)
 
         from docling.document_converter import DocumentConverter
 

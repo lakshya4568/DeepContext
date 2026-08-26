@@ -26,40 +26,53 @@ class GroundedAnswer:
 
 
 def _parse_extract_payload(text: str) -> dict[str, Any]:
-    clean = text.strip().strip("```json").strip("```").strip()
+    if not text:
+        return {}
+    clean, _ = llm_client._parse_think_tags(text)
+    clean = clean.strip()
+
+    # 1. Check if enclosed in markdown json fence
+    fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", clean)
+    if fence_match:
+        try:
+            data = json.loads(fence_match.group(1).strip())
+            if isinstance(data, dict) and "supported" in data:
+                return data
+        except Exception:
+            pass
+
+    # 2. Direct JSON load
     try:
         data = json.loads(clean)
-        if isinstance(data, dict):
+        if isinstance(data, dict) and "supported" in data:
             return data
     except Exception:
         pass
-    match = re.search(r"\{.*\}", text, re.DOTALL)
-    if match:
+
+    # 3. Targeted JSON search containing "supported"
+    json_match = re.search(r"\{[\s\S]*?\"supported\"[\s\S]*?\}", clean)
+    if json_match:
         try:
-            data = json.loads(match.group(0))
+            data = json.loads(json_match.group(0).strip())
             if isinstance(data, dict):
                 return data
         except Exception:
             pass
-    # Fallback: parse bullet points if model returned text
-    lines = [
-        line.strip().lstrip("*-0123456789.) ").strip() for line in text.split("\n") if line.strip()
-    ]
-    facts = [
-        line
-        for line in lines
-        if len(line) > 10 and not line.startswith("{") and not line.startswith("}")
-    ]
-    if facts:
-        return {"supported": facts, "unanswerable": False}
+
     return {}
 
 
-def _strip_unsupported(answer: str, evidence: list[dict[str, Any]]) -> str:
+def _get_chunk_content(c: Any) -> str:
+    if isinstance(c, dict):
+        return str(c.get("content", ""))
+    return str(getattr(c, "content", ""))
+
+
+def _strip_unsupported(answer: str, evidence: list[Any]) -> str:
     sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", answer) if s.strip()]
     if not sentences:
         return answer
-    blob = " ".join(c.get("content", "") for c in evidence).lower()
+    blob = " ".join(_get_chunk_content(c) for c in evidence).lower()
     kept: list[str] = []
     for sentence in sentences:
         words = [w for w in re.findall(r"\w+", sentence.lower()) if len(w) > 3]
@@ -77,7 +90,7 @@ def _strip_unsupported(answer: str, evidence: list[dict[str, Any]]) -> str:
 
 async def generate_grounded_answer(
     query: str,
-    retrieved_chunks: list[dict[str, Any]],
+    retrieved_chunks: list[Any],
     *,
     model: str | None = None,
     timeout: float = 8.0,
@@ -97,11 +110,9 @@ async def generate_grounded_answer(
         )
 
     evidence_text = "\n\n".join(
-        f"[{idx}] {chunk.get('content', '')}" for idx, chunk in enumerate(retrieved_chunks, start=1)
+        f"[{idx}] {_get_chunk_content(chunk)}" for idx, chunk in enumerate(retrieved_chunks, start=1)
     )
-    target_model = model or (
-        "meta/llama-3.1-8b-instruct" if settings.has_nvidia_key else settings.llm_model
-    )
+    target_model = model or settings.llm_model
 
     extract_messages = [
         {
@@ -189,9 +200,10 @@ async def generate_grounded_answer(
         {
             "role": "system",
             "content": (
-                "Write the final answer using ONLY the supported facts. "
-                "Cover every supported fact. If some requested details are missing, say so. "
-                "Do not add names, numbers, or events that are not in the supported list."
+                "/no_think\n"
+                "Write the final answer directly using ONLY the supported facts, without preambles, meta-commentary, or thinking headers. "
+                "Cover every supported fact clearly. If some requested details are missing, state that they are not mentioned. "
+                "Do not add claims, names, or numbers that are not in the supported list."
             ),
         },
         {
@@ -222,6 +234,20 @@ async def generate_grounded_answer(
     if not check.passed:
         answer = _strip_unsupported(answer, retrieved_chunks)
         check = await EvidenceVerifier.check_support(answer, retrieved_chunks)
+        if not check.passed and supported:
+            # Fallback to direct supported facts extracted in Pass 1
+            fallback_answer = " ".join(supported)
+            fallback_check = await EvidenceVerifier.check_support(fallback_answer, retrieved_chunks)
+            if fallback_check.passed:
+                return GroundedAnswer(
+                    answer=fallback_answer,
+                    supported_facts=supported,
+                    missing_facts=missing,
+                    refused=False,
+                    support_passed=True,
+                    support_confidence=fallback_check.confidence,
+                )
+
         if not check.passed:
             return GroundedAnswer(
                 answer=REFUSAL_TEMPLATE,

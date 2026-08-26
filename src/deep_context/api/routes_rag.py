@@ -78,6 +78,42 @@ async def get_document_chunks(document_id: str) -> list[dict[str, Any]]:
     return await storage.get_document_chunks_detail(document_id)
 
 
+@router.post("/v1/documents/{document_id}/embed")
+async def resume_document_embeddings_api(
+    document_id: str,
+    embedding_model: str = "",
+    embedding_dim: int = 0,
+) -> dict[str, Any]:
+    """Generate or resume missing dense embeddings for a document in progressive batches."""
+    last_event = {}
+    async for event in summary_ingestion_pipeline.resume_document_embeddings(
+        document_id,
+        embedding_model=embedding_model or None,
+        embedding_dim=embedding_dim or None,
+    ):
+        last_event = event
+    return last_event
+
+
+@router.post("/v1/documents/{document_id}/embed-stream")
+async def resume_document_embeddings_stream(
+    document_id: str,
+    embedding_model: str = "",
+    embedding_dim: int = 0,
+) -> StreamingResponse:
+    """Stream live progress when generating or resuming embeddings for a document."""
+    async def event_gen() -> AsyncIterator[str]:
+        async for event in summary_ingestion_pipeline.resume_document_embeddings(
+            document_id,
+            embedding_model=embedding_model or None,
+            embedding_dim=embedding_dim or None,
+        ):
+            yield f"data: {json.dumps(event)}\n\n"
+            await asyncio.sleep(0.01)
+
+    return StreamingResponse(event_gen(), media_type="text/event-stream")
+
+
 @router.delete("/v1/documents/{document_id}")
 async def delete_single_document(document_id: str) -> dict[str, Any]:
     """Delete a single document and all associated chunks and tree nodes."""

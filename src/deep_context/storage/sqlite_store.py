@@ -273,6 +273,13 @@ class SQLiteStore(StorageInterface):
                     s_row = await s_cur.fetchone()
                     summary_cnt = s_row["cnt"] if s_row else 0
 
+                async with conn.execute(
+                    "SELECT COUNT(*) as cnt FROM chunks WHERE document_id = ? AND level = 'child' AND embedding IS NOT NULL",
+                    (r["id"],),
+                ) as e_cur:
+                    e_row = await e_cur.fetchone()
+                    emb_cnt = e_row["cnt"] if e_row else 0
+
                 docs.append(
                     {
                         "id": r["id"],
@@ -283,10 +290,41 @@ class SQLiteStore(StorageInterface):
                         "child_chunks_count": child_cnt,
                         "parent_chunks_count": parent_cnt,
                         "summaries_count": summary_cnt,
+                        "embeddings_count": emb_cnt,
                         "created_at": r["ingested_at"],
                     }
                 )
             return docs
+
+    async def get_unembedded_chunks(self, document_id: str) -> list[Chunk]:
+        """Fetch all child chunks for a document that do not yet have embeddings."""
+        conn = self._get_conn()
+        async with conn.execute(
+            """
+            SELECT * FROM chunks
+            WHERE document_id = ? AND level = 'child' AND embedding IS NULL
+            ORDER BY page_number ASC, created_at ASC;
+            """,
+            (document_id,),
+        ) as cursor:
+            rows = await cursor.fetchall()
+            return [
+                Chunk(
+                    id=r["id"],
+                    document_id=r["document_id"],
+                    parent_chunk_id=r["parent_chunk_id"],
+                    level=ChunkLevel(r["level"]),
+                    content=r["content"],
+                    token_count=r["token_count"],
+                    section_path=r["section_path"],
+                    page_number=r["page_number"],
+                    summary_text=r["summary_text"],
+                    summary_tokens=r["summary_tokens"],
+                    summary_model=r["summary_model"],
+                    generated_at=datetime.fromisoformat(r["generated_at"]) if r["generated_at"] else None,
+                )
+                for r in rows
+            ]
 
     async def get_document_chunks_detail(self, document_id: str) -> list[dict[str, Any]]:
         """Fetch all parent and child chunks with summaries and metadata for inspection."""

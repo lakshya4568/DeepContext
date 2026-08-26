@@ -167,13 +167,14 @@ class ChunkSummarizer:
         system_msg = (
             "/no_think\n"
             "You are a factual context generator for a search retrieval system. "
-            "Write a short, succinct 1-2 sentence context (under 50 words) that situates this specific chunk "
+            "Write a clear, complete 1-3 sentence context that situates this specific chunk "
             "within the overall document and enclosing section. "
-            "Explicitly resolve any ambiguous pronouns (like 'it', 'they', 'the company', 'the algorithm') "
-            "using the document title and enclosing parent section context. "
+            "Explicitly resolve any ambiguous pronouns (like 'it', 'they', 'the algorithm', 'the author') "
+            "by naming the exact document title, section topic, and enclosing context. "
             "Rules:\n"
+            "- Write complete grammatical sentences that finish with proper terminal punctuation.\n"
             "- Do NOT think or reason. Do NOT output <think> tags.\n"
-            "- Do NOT include preambles like 'This text discusses' or 'Here is the summary'.\n"
+            "- Do NOT include conversational filler like 'Here is the summary'.\n"
             "- Output ONLY the situating context directly."
         )
 
@@ -201,10 +202,31 @@ class ChunkSummarizer:
             f"<|im_start|>assistant\n<think>\n</think>\n"
         )
 
-    def _generate_batch_sync(self, prompts: list[str]) -> list[tuple[str, int]]:
-        """Synchronous batch generation executed efficiently in vectorized batches on GPU."""
+    @staticmethod
+    def _clean_and_complete_summary(raw_text: str) -> str:
+        """Cleans think tags, conversational preambles, and ensures complete terminal sentences."""
         import re
 
+        summary = re.sub(r"<think>.*?</think>", "", raw_text, flags=re.DOTALL).strip()
+        summary = re.sub(
+            r"^(?:Here is the summary:?|Summary:?|Context:?|This chunk discusses:?)\s*",
+            "",
+            summary,
+            flags=re.IGNORECASE,
+        ).strip()
+        if not summary:
+            return ""
+        # Ensure summary doesn't abruptly end mid-sentence: trim to last complete punctuation if truncated
+        if summary and summary[-1] not in (".", "!", "?", '"', "'"):
+            last_punct = max(summary.rfind("."), summary.rfind("!"), summary.rfind("?"))
+            if last_punct > 30:
+                summary = summary[: last_punct + 1].strip()
+            else:
+                summary = summary.rstrip(",;:- ") + "."
+        return summary
+
+    def _generate_batch_sync(self, prompts: list[str]) -> list[tuple[str, int]]:
+        """Synchronous batch generation executed efficiently in vectorized batches on GPU."""
         import torch
 
         if not prompts:
@@ -238,7 +260,7 @@ class ChunkSummarizer:
             for idx in range(len(prompts)):
                 new_tokens = outputs[idx][input_seq_len:]
                 raw_text = self._tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
-                summary = re.sub(r"<think>.*?</think>", "", raw_text, flags=re.DOTALL).strip()
+                summary = self._clean_and_complete_summary(raw_text)
                 results.append((summary, len(new_tokens)))
 
         except Exception as e:
@@ -258,8 +280,11 @@ class ChunkSummarizer:
                         )
                     new_tokens = outputs[0][in_len:]
                     raw_text = self._tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
-                    summary = re.sub(r"<think>.*?</think>", "", raw_text, flags=re.DOTALL).strip()
+                    summary = self._clean_and_complete_summary(raw_text)
                     results.append((summary, len(new_tokens)))
+                except Exception as inner_e:
+                    logger.warning("Generation error on prompt fallback: %s", inner_e)
+                    results.append(("", 0))
                 except Exception as inner_e:
                     logger.warning("Generation error on prompt fallback: %s", inner_e)
                     results.append(("", 0))
