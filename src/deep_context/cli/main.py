@@ -103,6 +103,16 @@ def ingest_cmd(
         "-d",
         help="Embedding output dimensionality (e.g. 768, 1536, 3072, 1024)",
     ),
+    summaries: bool | None = typer.Option(
+        None,
+        "--summaries/--no-summaries",
+        help="Explicitly enable or disable local Qwen3 contextual summaries",
+    ),
+    fast: bool = typer.Option(
+        False,
+        "--fast",
+        help="Fast mode: skip Qwen3 summarization and directly embed parent-child chunks",
+    ),
 ) -> None:
     """Ingest any single PDF, TXT, MD, or Code file into the knowledge base."""
 
@@ -126,6 +136,7 @@ def ingest_cmd(
         target_dim = embedding_dim or (
             768 if "gemini" in target_model.lower() else settings.embedding_dim
         )
+        gen_sum = False if fast else summaries
 
         req = IngestRequest(
             title=doc_title,
@@ -135,6 +146,7 @@ def ingest_cmd(
             retrieval_mode=mode,
             embedding_model=target_model,
             embedding_dim=target_dim,
+            generate_summaries=gen_sum,
         )
 
         with console.status(
@@ -179,6 +191,16 @@ def ingest_all_cmd(
         "-d",
         help="Embedding output dimensionality (e.g. 768, 1536, 3072, 1024)",
     ),
+    summaries: bool | None = typer.Option(
+        None,
+        "--summaries/--no-summaries",
+        help="Explicitly enable or disable local Qwen3 contextual summaries",
+    ),
+    fast: bool = typer.Option(
+        False,
+        "--fast",
+        help="Fast mode: skip Qwen3 summarization and directly embed parent-child chunks",
+    ),
 ) -> None:
     """Batch ingest all PDFs, TXT, MD, and Code files in a folder without manual setup."""
 
@@ -214,6 +236,7 @@ def ingest_all_cmd(
         target_dim = embedding_dim or (
             768 if "gemini" in target_model.lower() else settings.embedding_dim
         )
+        gen_sum = False if fast else summaries
 
         console.print(
             f"[bold green]Found {len(files_to_process)} document(s) to process using {target_model} ({target_dim}-dim)[/bold green]"
@@ -248,6 +271,7 @@ def ingest_all_cmd(
                 retrieval_mode=mode,
                 embedding_model=target_model,
                 embedding_dim=target_dim,
+                generate_summaries=gen_sum,
             )
 
             try:
