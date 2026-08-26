@@ -83,6 +83,9 @@ class ChunkSummarizer:
                         token=token,
                         trust_remote_code=True,
                     )
+                    tok.padding_side = "left"
+                    if tok.pad_token is None:
+                        tok.pad_token = tok.eos_token or "<|extra_0|>"
                     # FP16 on GPU (MPS/CUDA) cuts RAM/VRAM usage in half (~600MB vs 1.2GB)
                     dtype = torch.float16 if device_str in ("cuda", "mps") else torch.float32
                     target_device = torch.device(device_str)
@@ -132,7 +135,7 @@ class ChunkSummarizer:
             gc.collect()
             gc.collect()
 
-            if hasattr(torch, "mps") and hasattr(torch.mps, "empty_cache"):
+            if hasattr(torch.backends, "mps") and torch.backends.mps.is_available() and hasattr(torch, "mps") and hasattr(torch.mps, "empty_cache"):
                 torch.mps.empty_cache()
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
@@ -165,55 +168,71 @@ class ChunkSummarizer:
         )
 
     def _generate_batch_sync(self, prompts: list[str]) -> list[tuple[str, int]]:
-        """Synchronous batch generation executed safely in a single thread on MPS/GPU."""
+        """Synchronous batch generation executed efficiently in vectorized batches on GPU."""
+        import gc
         import re
-
         import torch
 
+        if not prompts:
+            return []
+
         results: list[tuple[str, int]] = []
-        for prompt_idx, prompt in enumerate(prompts):
-            inputs = None
-            outputs = None
-            try:
-                inputs = self._tokenizer(prompt, return_tensors="pt").to(self._device)
-                input_len = inputs.input_ids.shape[1]
+        try:
+            pad_id = (
+                self._tokenizer.pad_token_id
+                if self._tokenizer.pad_token_id is not None
+                else self._tokenizer.eos_token_id
+            )
+            inputs = self._tokenizer(
+                prompts,
+                return_tensors="pt",
+                padding=True,
+                truncation=True,
+                max_length=2048,
+            ).to(self._device)
 
-                with torch.inference_mode():
-                    outputs = self._model.generate(
-                        **inputs,
-                        max_new_tokens=self.max_summary_tokens,
-                        do_sample=False,
-                        pad_token_id=self._tokenizer.eos_token_id or self._tokenizer.pad_token_id,
-                    )
+            input_seq_len = inputs.input_ids.shape[1]
 
-                new_tokens = outputs[0][input_len:]
+            with torch.inference_mode():
+                outputs = self._model.generate(
+                    **inputs,
+                    max_new_tokens=self.max_summary_tokens,
+                    do_sample=False,
+                    pad_token_id=pad_id,
+                )
+
+            for idx in range(len(prompts)):
+                new_tokens = outputs[idx][input_seq_len:]
                 raw_text = self._tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
                 summary = re.sub(r"<think>.*?</think>", "", raw_text, flags=re.DOTALL).strip()
-                summary_tokens = len(new_tokens)
-                results.append((summary, summary_tokens))
-            except Exception as e:
-                logger.warning("Generation error on prompt: %s", e)
-                results.append(("", 0))
-            finally:
-                if inputs is not None:
-                    del inputs
-                if outputs is not None:
-                    del outputs
-                # Periodically reclaim cache to prevent memory bloat and swap on 8GB RAM Mac
-                if (prompt_idx + 1) % 5 == 0:
-                    gc.collect()
-                    if (
-                        self._device == "mps"
-                        and hasattr(torch, "mps")
-                        and hasattr(torch.mps, "empty_cache")
-                    ):
-                        torch.mps.empty_cache()
-                    elif self._device == "cuda" and torch.cuda.is_available():
-                        torch.cuda.empty_cache()
+                results.append((summary, len(new_tokens)))
 
-        gc.collect()
-        if self._device == "mps" and hasattr(torch, "mps") and hasattr(torch.mps, "empty_cache"):
-            torch.mps.empty_cache()
+        except Exception as e:
+            logger.warning("Vectorized batch generation notice (%s). Falling back to sequential: %s", e, e)
+            for prompt in prompts:
+                try:
+                    inputs = self._tokenizer(prompt, return_tensors="pt").to(self._device)
+                    in_len = inputs.input_ids.shape[1]
+                    with torch.inference_mode():
+                        outputs = self._model.generate(
+                            **inputs,
+                            max_new_tokens=self.max_summary_tokens,
+                            do_sample=False,
+                            pad_token_id=self._tokenizer.eos_token_id,
+                        )
+                    new_tokens = outputs[0][in_len:]
+                    raw_text = self._tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
+                    summary = re.sub(r"<think>.*?</think>", "", raw_text, flags=re.DOTALL).strip()
+                    results.append((summary, len(new_tokens)))
+                except Exception as inner_e:
+                    logger.warning("Generation error on prompt fallback: %s", inner_e)
+                    results.append(("", 0))
+        finally:
+            if self._device == "cuda" and torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available() and hasattr(torch, "mps") and hasattr(torch.mps, "empty_cache"):
+                torch.mps.empty_cache()
+            gc.collect()
 
         return results
 

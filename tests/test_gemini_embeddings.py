@@ -10,6 +10,8 @@ from deep_context.core.llm_client import LLMClient
 @pytest.mark.asyncio
 async def test_gemini_mock_embeddings_mrl_dimensions() -> None:
     client = LLMClient()
+    setattr(client, "_refresh_gemini_client", lambda: None)
+    client._gemini_client = None
 
     # Test 768-dim (Recommended MRL)
     emb_768 = await client.get_embeddings(

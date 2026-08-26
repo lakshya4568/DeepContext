@@ -100,10 +100,22 @@ async def test_api_batch_upload_and_folder_sync() -> None:
         assert data[1]["document_id"] is not None
 
         # Test sync folder
-        sync_resp = await ac.post("/v1/sync-folder", params={"folder_path": "documents"})
-        assert sync_resp.status_code == 200
-        sync_data = sync_resp.json()
-        assert isinstance(sync_data, list)
+        import os
+        import tempfile
+        temp_sync_dir = tempfile.mkdtemp()
+        test_file = os.path.join(temp_sync_dir, "sync_test.md")
+        with open(test_file, "w", encoding="utf-8") as f:
+            f.write("# Sync Test\nSmall markdown content.\n")
+
+        try:
+            sync_resp = await ac.post("/v1/sync-folder", params={"folder_path": temp_sync_dir})
+            assert sync_resp.status_code == 200
+            sync_data = sync_resp.json()
+            assert isinstance(sync_data, list)
+        finally:
+            if os.path.exists(test_file):
+                os.remove(test_file)
+            os.rmdir(temp_sync_dir)
 
 
 @pytest.mark.asyncio

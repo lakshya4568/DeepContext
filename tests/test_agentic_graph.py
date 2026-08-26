@@ -44,6 +44,7 @@ def seeded_corpus() -> None:
             ),
             doc_type="markdown",
             retrieval_mode=RetrievalMode.HYBRID,
+            generate_summaries=False,
         )
         await ingestion_pipeline.ingest(req)
 

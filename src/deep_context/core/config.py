@@ -59,7 +59,7 @@ class Settings(BaseSettings):
         description="Optional sleep duration in seconds between successive Gemini batch calls (e.g. 5.0s for Free Tier)",
     )
     gemini_batch_size: int = Field(
-        default=16,
+        default=50,
         alias="GEMINI_BATCH_SIZE",
         description="Batch size of text chunks per Gemini embed_content API request",
     )

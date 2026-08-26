@@ -475,6 +475,63 @@ class SQLiteStore(StorageInterface):
         await conn.commit()
         return chunk_ids
 
+    async def update_chunk_summaries_batch(
+        self, updates: list[tuple[str, str, int, str, Any]]
+    ) -> None:
+        """Incrementally update summaries for a batch of chunks in SQLite."""
+        if not updates:
+            return
+        conn = self._get_conn()
+        params = [
+            (
+                s_text,
+                s_tokens,
+                s_model,
+                gen_at.isoformat() if hasattr(gen_at, "isoformat") else str(gen_at),
+                c_id,
+            )
+            for c_id, s_text, s_tokens, s_model, gen_at in updates
+        ]
+        await conn.executemany(
+            """
+            UPDATE chunks SET
+                summary_text = ?,
+                summary_tokens = ?,
+                summary_model = ?,
+                generated_at = ?
+            WHERE id = ?;
+            """,
+            params,
+        )
+        # Also update FTS summary_text
+        fts_params = [(s_text or "", c_id) for c_id, s_text, _, _, _ in updates]
+        await conn.executemany(
+            """
+            UPDATE chunks_fts SET summary_text = ? WHERE id = ?;
+            """,
+            fts_params,
+        )
+        await conn.commit()
+
+    async def update_chunk_embeddings_batch(
+        self, updates: list[tuple[str, list[float]]]
+    ) -> None:
+        """Incrementally update embeddings for a batch of chunks in SQLite."""
+        if not updates:
+            return
+        conn = self._get_conn()
+        params = [
+            (json.dumps(emb) if emb is not None else None, c_id)
+            for c_id, emb in updates
+        ]
+        await conn.executemany(
+            """
+            UPDATE chunks SET embedding = ? WHERE id = ?;
+            """,
+            params,
+        )
+        await conn.commit()
+
     async def get_chunk(self, chunk_id: str) -> Chunk | None:
         conn = self._get_conn()
         async with conn.execute("SELECT * FROM chunks WHERE id = ?", (chunk_id,)) as cursor:

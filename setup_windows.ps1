@@ -111,12 +111,34 @@ if ($nvidiaSmi) {
 }
 
 # -------------------------------------------------------------
-# 3. Setup Python Virtual Environment & Dependencies
+# 3. Setup Python 3.12 Virtual Environment & Dependencies
 # -------------------------------------------------------------
 Write-Header "Step 3: Setting Up Python 3.12 Virtual Environment with uv"
 
-Write-Info "Syncing Python dependencies from pyproject.toml..."
-& uv sync --extra dev
+# Clean up mixed or mismatched virtual environments if not 3.12
+if (Test-Path ".venv") {
+    $pyVenvCfg = Join-Path ".venv" "pyvenv.cfg"
+    if (Test-Path $pyVenvCfg) {
+        $cfgText = Get-Content $pyVenvCfg -Raw
+        if ($cfgText -notmatch "3\.12") {
+            Write-Info "Recreating virtual environment cleanly for Python 3.12..."
+            try {
+                Remove-Item -Recurse -Force ".venv" -ErrorAction SilentlyContinue
+            } catch {
+                Write-Warn "Could not remove .venv directly (in use). uv will overwrite it."
+            }
+        }
+    }
+}
+
+Write-Info "Creating/Verifying Python 3.12 virtual environment..."
+& uv venv --python 3.12 .venv --allow-existing
+if ($LASTEXITCODE -ne 0) {
+    Write-Warn "Python 3.12 specific venv creation had non-zero code. Syncing default environment..."
+}
+
+Write-Info "Syncing Python dependencies and dev tools from pyproject.toml..."
+& uv sync --extra dev --python .venv
 if ($LASTEXITCODE -ne 0) {
     Write-Fail "Failed to sync dependencies using uv."
     exit 1
@@ -124,104 +146,32 @@ if ($LASTEXITCODE -ne 0) {
 Write-Success "Base dependencies synchronized successfully."
 
 # -------------------------------------------------------------
-# 4. Install CUDA-enabled PyTorch for NVIDIA GPU
+# 4. Configuring CUDA PyTorch & Hardware Acceleration
 # -------------------------------------------------------------
 Write-Header "Step 4: Configuring CUDA PyTorch & Local Models"
-
-Write-Info "Installing CUDA-enabled PyTorch (CUDA 12.4 index) into virtual environment..."
-& uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
-if ($LASTEXITCODE -ne 0) {
-    Write-Warn "CUDA 12.4 PyTorch wheel install returned non-zero code. Trying default wheel..."
-}
 
 # Download NLTK data for BM25 / reranker stopwords
 Write-Info "Downloading NLTK stopwords..."
 & uv run python -c "import nltk; nltk.download('stopwords', quiet=True)"
 
-# Verify GPU detection inside PyTorch
-Write-Info "Verifying PyTorch GPU / CUDA access..."
-$cudaCheckScript = @"
-import torch
-cuda_avail = torch.cuda.is_available()
-device_name = torch.cuda.get_device_name(0) if cuda_avail else 'CPU'
-print(f'CUDA_AVAILABLE={cuda_avail}')
-print(f'DEVICE_NAME={device_name}')
-"@
-
-$cudaOutput = & uv run python -c $cudaCheckScript
+# Verify GPU detection inside PyTorch via check_cuda script
+Write-Info "Verifying PyTorch GPU / CUDA access on NVIDIA GPU..."
+$cudaOutput = & uv run python scripts/check_cuda.py
 $cudaOutput | ForEach-Object { Write-Host "   $_" -ForegroundColor Cyan }
 
 if ($cudaOutput -match "CUDA_AVAILABLE=True") {
-    Write-Success "CUDA is fully operational! Local Qwen3 summarizer will run on GPU."
+    Write-Success "CUDA is fully operational! Local Qwen3 summarizer will run on your NVIDIA RTX 3060 GPU."
 } else {
     Write-Warn "PyTorch did not detect CUDA. CPU will be used as fallback."
 }
 
 # -------------------------------------------------------------
-# 5. Configure PostgreSQL & Database (Pure Python - No psql required)
+# 5. Configure Database (PostgreSQL / SQLite via Pure Python)
 # -------------------------------------------------------------
-Write-Header "Step 5: PostgreSQL Database & pgvector Setup (pgAdmin / Local Server)"
+Write-Header "Step 5: Database Setup (PostgreSQL / SQLite)"
 
-$PostgresConfigured = $false
-$PostgresPassword = ""
-
-if (-not $env:PGPASSWORD) {
-    $secPass = Read-Host -Prompt "Enter password for PostgreSQL user '$PostgresUser' (default is 'postgres')" -AsSecureString
-    $BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secPass)
-    $PostgresPassword = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
-    [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($BSTR)
-    if (-not $PostgresPassword) {
-        $PostgresPassword = "postgres"
-    }
-} else {
-    $PostgresPassword = $env:PGPASSWORD
-}
-
-$dbInitScript = @"
-import asyncio
-import sys
-import asyncpg
-
-async def init_db():
-    user = '$PostgresUser'
-    password = '$PostgresPassword'
-    host = '$PostgresHost'
-    port = $PostgresPort
-    target_db = '$DatabaseName'
-
-    try:
-        # 1. Connect to default 'postgres' database
-        conn = await asyncpg.connect(user=user, password=password, host=host, port=port, database='postgres')
-        exists = await conn.fetchval('SELECT 1 FROM pg_database WHERE datname = $1', target_db)
-        if not exists:
-            print(f'[*] Creating database \"{target_db}\"...')
-            await conn.execute(f'CREATE DATABASE \"{target_db}\"')
-            print(f'[+] Database \"{target_db}\" created successfully.')
-        else:
-            print(f'[+] Database \"{target_db}\" already exists.')
-        await conn.close()
-
-        # 2. Connect to the newly created/existing target database
-        conn_target = await asyncpg.connect(user=user, password=password, host=host, port=port, database=target_db)
-        try:
-            await conn_target.execute('CREATE EXTENSION IF NOT EXISTS vector;')
-            print('[+] Extension \"vector\" (pgvector) enabled successfully.')
-        except Exception as e_vec:
-            print(f'[!] Note on pgvector: {e_vec}')
-            print('[!] If pgvector is not installed in Postgres yet, you can also use pgAdmin or SQLite mode.')
-
-        await conn_target.execute('CREATE EXTENSION IF NOT EXISTS pgcrypto;')
-        print('[+] Extension \"pgcrypto\" enabled.')
-        await conn_target.close()
-        print('DB_SETUP_SUCCESS=True')
-    except Exception as e:
-        print(f'DB_SETUP_ERROR={e}')
-
-asyncio.run(init_db())
-"@
-
-Write-Info "Connecting to PostgreSQL server at $PostgresHost`:$PostgresPort via Python..."
-$dbInitOutput = & uv run python -c $dbInitScript
+Write-Info "Running database initialization script (scripts/init_db.py)..."
+$dbInitOutput = & uv run python scripts/init_db.py
 $dbInitOutput | ForEach-Object { 
     if ($_ -match "\[\+\]") { Write-Host "   $_" -ForegroundColor Green }
     elseif ($_ -match "\[\*\]") { Write-Host "   $_" -ForegroundColor Cyan }
@@ -230,13 +180,9 @@ $dbInitOutput | ForEach-Object {
 }
 
 if ($dbInitOutput -match "DB_SETUP_SUCCESS=True") {
-    Write-Success "PostgreSQL database '$DatabaseName' is initialized and ready!"
-    $PostgresConfigured = $true
+    Write-Success "Database configuration and initialization complete!"
 } else {
-    Write-Warn "Could not connect to PostgreSQL automatically."
-    Write-Info "If your PostgreSQL service is running, you can create the database in pgAdmin GUI:"
-    Write-Info "  1. Open pgAdmin -> Right click 'Databases' -> Create -> Database: '$DatabaseName'"
-    Write-Info "  2. Right click '$DatabaseName' -> Query Tool -> Run: CREATE EXTENSION IF NOT EXISTS vector;"
+    Write-Warn "Database initialization reported a notice. DeepContext will still support SQLite or manual pgAdmin configuration."
 }
 
 # -------------------------------------------------------------

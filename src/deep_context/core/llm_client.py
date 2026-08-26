@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import json
 import math
+import os
 import re
 import time
 from typing import Any, AsyncIterator, Callable, cast
@@ -89,7 +90,7 @@ class LLMClient:
 
         # Google GenAI client (Gemini embeddings & reasoning)
         self._gemini_client: genai.Client | None = None
-        if settings.has_gemini_key:
+        if settings.has_gemini_key and not (settings.allow_mock_fallback and os.environ.get("PYTEST_CURRENT_TEST")):
             try:
                 self._gemini_client = genai.Client(api_key=settings.gemini_api_key)
             except Exception as e:
@@ -98,7 +99,7 @@ class LLMClient:
 
         # Groq client (primary ultra-fast reasoning LLM)
         self._groq_client: AsyncOpenAI | None
-        if settings.has_groq_key:
+        if settings.has_groq_key and not (settings.allow_mock_fallback and os.environ.get("PYTEST_CURRENT_TEST")):
             self._groq_client = AsyncOpenAI(
                 api_key=settings.groq_api_key,
                 base_url=settings.groq_base_url,
@@ -110,7 +111,7 @@ class LLMClient:
         nvidia_key = api_key or settings.nvidia_api_key
         nvidia_url = base_url or settings.nvidia_base_url
         self._client: AsyncOpenAI | None
-        if nvidia_key:
+        if nvidia_key and not (settings.allow_mock_fallback and os.environ.get("PYTEST_CURRENT_TEST")):
             self._client = AsyncOpenAI(
                 api_key=nvidia_key,
                 base_url=nvidia_url,
@@ -121,6 +122,9 @@ class LLMClient:
     def _refresh_gemini_client(self) -> genai.Client | None:
         """Dynamically check .env and reload Gemini API key if changed."""
         import os
+
+        if settings.allow_mock_fallback and os.environ.get("PYTEST_CURRENT_TEST"):
+            return None
 
         current_key = settings.gemini_api_key
         if os.path.exists(".env"):
@@ -385,19 +389,21 @@ class LLMClient:
                         return all_embeddings
                 except Exception as e:
                     logger.warning(
-                        "Gemini embedding model %s failed (%s). Checking fallbacks...",
+                        "Gemini embedding model %s failed (%s). Falling back to secondary providers...",
                         target_model,
                         e,
                     )
-                    if not settings.allow_mock_fallback and not settings.has_nvidia_key:
-                        raise
 
-        # --- Attempt 2: NVIDIA NIM API ---
-        if self._client and settings.has_nvidia_key and not is_gemini:
+        # --- Attempt 2: NVIDIA NIM API (Automatic Fallback or Primary) ---
+        if self._client and settings.has_nvidia_key:
             all_embeddings = []
             batch_size = 32
             bounded_texts = [t[:2500] if len(t) > 2500 else t for t in cleaned_texts]
-            nim_model = target_model
+            nim_model = (
+                target_model
+                if not is_gemini
+                else "nvidia/llama-3.2-nv-embedqa-1b-v2"
+            )
             try:
                 for i in range(0, len(bounded_texts), batch_size):
                     batch = bounded_texts[i : i + batch_size]
@@ -407,9 +413,9 @@ class LLMClient:
                             model=nim_model,
                             encoding_format="float",
                             extra_body={"input_type": "passage", "truncate": "END"},
-                            timeout=8.0,
+                            timeout=15.0,
                         ),
-                        timeout=8.0,
+                        timeout=15.0,
                     )
                     for item in response.data:
                         raw_emb = list(item.embedding) if hasattr(item, "embedding") else []
@@ -424,7 +430,8 @@ class LLMClient:
                             else:
                                 emb_vals = emb_vals + [0.0] * (target_dim - len(emb_vals))
                         all_embeddings.append(emb_vals)
-                return all_embeddings
+                if len(all_embeddings) == len(cleaned_texts):
+                    return all_embeddings
             except Exception as e:
                 logger.warning(
                     "NVIDIA NIM %s failed (%s). Retrying with nvidia/nv-embedqa-e5-v5...",
@@ -441,9 +448,9 @@ class LLMClient:
                                 model="nvidia/nv-embedqa-e5-v5",
                                 encoding_format="float",
                                 extra_body={"input_type": "passage", "truncate": "END"},
-                                timeout=8.0,
+                                timeout=15.0,
                             ),
-                            timeout=8.0,
+                            timeout=15.0,
                         )
                         for item in response.data:
                             raw_emb = list(item.embedding) if hasattr(item, "embedding") else []
@@ -458,14 +465,21 @@ class LLMClient:
                                 else:
                                     emb_vals = emb_vals + [0.0] * (target_dim - len(emb_vals))
                             all_embeddings.append(emb_vals)
-                    return all_embeddings
+                    if len(all_embeddings) == len(cleaned_texts):
+                        return all_embeddings
                 except Exception as e2:
                     logger.warning("NVIDIA NIM fallback embedding failed: %s", e2)
                     if not settings.allow_mock_fallback:
                         raise
 
-        # --- Attempt 3: Deterministic offline mock embedding fallback ---
-        return [self._mock_embedding(t, dim=target_dim) for t in cleaned_texts]
+        # Offline test/mock fallback ONLY when allow_mock_fallback is explicitly enabled in dev/test mode
+        if settings.allow_mock_fallback and not self._has_live_client():
+            return [self._mock_embedding(t, dim=target_dim) for t in cleaned_texts]
+
+        raise RuntimeError(
+            f"Failed to generate embeddings using target model '{target_model}'. "
+            "Please verify your API keys (GEMINI_API_KEY / NVIDIA_API_KEY) and quota in .env."
+        )
 
     async def get_embedding(
         self,

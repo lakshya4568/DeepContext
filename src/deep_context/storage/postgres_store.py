@@ -456,27 +456,18 @@ class PostgresStore(StorageInterface):
             return []
         pool = self._get_pool()
         async with pool.acquire() as conn:
-            records = [
-                (
-                    c.id,
-                    c.document_id,
-                    c.parent_chunk_id,
-                    c.level.value,
-                    c.content,
-                    c.token_count,
-                    c.section_path,
-                    c.page_number,
-                    (np.array(c.embedding, dtype=np.float32) if c.embedding is not None else None),
-                    c.summary_text,
-                    c.summary_tokens,
-                    c.summary_model,
-                    c.generated_at,
-                    c.created_at,
-                )
-                for c in chunks
-            ]
-            await conn.executemany(
-                """
+            async with conn.transaction():
+                # Separate parent chunks (parent_chunk_id is None) from child chunks
+                parents = [
+                    c
+                    for c in chunks
+                    if c.parent_chunk_id is None
+                    or (hasattr(c.level, "value") and c.level.value == "parent")
+                    or str(c.level) == "parent"
+                ]
+                children = [c for c in chunks if c not in parents]
+
+                insert_sql = """
                 INSERT INTO chunks (
                     id, document_id, parent_chunk_id, level, content,
                     token_count, section_path, page_number, embedding,
@@ -493,10 +484,82 @@ class PostgresStore(StorageInterface):
                     summary_tokens = EXCLUDED.summary_tokens,
                     summary_model = EXCLUDED.summary_model,
                     generated_at = EXCLUDED.generated_at;
+                """
+
+                def _to_record(c: Chunk) -> tuple:
+                    level_str = c.level.value if hasattr(c.level, "value") else str(c.level)
+                    emb_val = (
+                        np.array(c.embedding, dtype=np.float32) if c.embedding is not None else None
+                    )
+                    return (
+                        c.id,
+                        c.document_id,
+                        c.parent_chunk_id,
+                        level_str,
+                        c.content,
+                        c.token_count,
+                        c.section_path,
+                        c.page_number,
+                        emb_val,
+                        c.summary_text,
+                        c.summary_tokens,
+                        c.summary_model,
+                        c.generated_at,
+                        c.created_at,
+                    )
+
+                # 1. Insert parents first so foreign key constraints on parent_chunk_id are always satisfied
+                if parents:
+                    parent_records = [_to_record(c) for c in parents]
+                    await conn.executemany(insert_sql, parent_records)
+
+                # 2. Insert children second
+                if children:
+                    child_records = [_to_record(c) for c in children]
+                    await conn.executemany(insert_sql, child_records)
+
+                return [c.id for c in chunks]
+
+    async def update_chunk_summaries_batch(
+        self, updates: list[tuple[str, str, int, str, Any]]
+    ) -> None:
+        """Incrementally update summaries for a batch of chunks (chunk_id, summary_text, tokens, model, gen_time)."""
+        if not updates:
+            return
+        pool = self._get_pool()
+        async with pool.acquire() as conn:
+            await conn.executemany(
+                """
+                UPDATE chunks SET
+                    summary_text = $2,
+                    summary_tokens = $3,
+                    summary_model = $4,
+                    generated_at = $5
+                WHERE id = $1::uuid;
+                """,
+                updates,
+            )
+
+    async def update_chunk_embeddings_batch(
+        self, updates: list[tuple[str, list[float]]]
+    ) -> None:
+        """Incrementally update embeddings for a batch of chunks (chunk_id, embedding_vector)."""
+        if not updates:
+            return
+        pool = self._get_pool()
+        records = [
+            (chunk_id, np.array(emb, dtype=np.float32) if emb is not None else None)
+            for chunk_id, emb in updates
+        ]
+        async with pool.acquire() as conn:
+            await conn.executemany(
+                """
+                UPDATE chunks SET
+                    embedding = $2
+                WHERE id = $1::uuid;
                 """,
                 records,
             )
-            return [c.id for c in chunks]
 
     async def get_chunk(self, chunk_id: str) -> Chunk | None:
         pool = self._get_pool()
