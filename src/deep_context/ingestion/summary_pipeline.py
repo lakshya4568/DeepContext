@@ -69,26 +69,34 @@ class SummaryIngestionPipeline:
         )
 
         summaries_count = 0
+        parent_map = {p.id: p for p in parent_chunks}
         if should_summarize and child_chunks:
             logger.info(
-                "Generating Qwen3 semantic summaries for %d child chunks in doc '%s'...",
+                "Generating Qwen3 contextual summaries for %d child chunks in doc '%s'...",
                 len(child_chunks),
                 request.title,
             )
-            await self.summarizer.summarize_chunks(child_chunks)
+            await self.summarizer.summarize_chunks(
+                child_chunks,
+                parent_chunk_map=parent_map,
+                document_title=request.title,
+            )
             summaries_count = sum(1 for c in child_chunks if c.summary_text)
             self.summarizer.unload()
 
-        # 4. Generate dense embeddings for child chunks
+        # 4. Generate contextual dense embeddings for child chunks (Anthropic/Unstructured Standard)
         emb_model = request.embedding_model or settings.embedding_model
         emb_dim = request.embedding_dim or (
             768 if "gemini" in emb_model.lower() else settings.embedding_dim
         )
 
-        child_texts = [c.content for c in child_chunks]
-        if child_texts:
+        child_contextual_texts = [
+            f"{c.summary_text}\n\n{c.content}" if c.summary_text else c.content
+            for c in child_chunks
+        ]
+        if child_contextual_texts:
             embeddings = await llm_client.get_embeddings(
-                child_texts,
+                child_contextual_texts,
                 model=emb_model,
                 dim=emb_dim,
                 title=request.title,
@@ -252,6 +260,7 @@ class SummaryIngestionPipeline:
         )
 
         summaries_count = 0
+        parent_map = {p.id: p for p in parent_chunks}
         if should_summarize and child_chunks:
             total_children = len(child_chunks)
             yield {
@@ -266,7 +275,16 @@ class SummaryIngestionPipeline:
             loop = asyncio.get_running_loop()
             async with self.summarizer._load_lock:
                 for idx, chunk in enumerate(child_chunks):
-                    prompt = self.summarizer._build_prompt(chunk.content, chunk.section_path)
+                    p_chunk = (
+                        parent_map.get(chunk.parent_chunk_id) if chunk.parent_chunk_id else None
+                    )
+                    parent_text = p_chunk.content if p_chunk else None
+                    prompt = self.summarizer._build_prompt(
+                        chunk.content,
+                        section_path=chunk.section_path,
+                        document_title=request.title,
+                        parent_context=parent_text,
+                    )
                     batch_res = await loop.run_in_executor(
                         None, self.summarizer._generate_batch_sync, [prompt]
                     )
@@ -314,13 +332,16 @@ class SummaryIngestionPipeline:
         yield {
             "stage": "embedding",
             "percent": 82,
-            "message": f"Generating {emb_dim}-dim embeddings via {emb_model}...",
+            "message": f"Generating {emb_dim}-dim contextual embeddings via {emb_model}...",
         }
 
-        child_texts = [c.content for c in child_chunks]
-        if child_texts:
+        child_contextual_texts = [
+            f"{c.summary_text}\n\n{c.content}" if c.summary_text else c.content
+            for c in child_chunks
+        ]
+        if child_contextual_texts:
             embeddings = await llm_client.get_embeddings(
-                child_texts,
+                child_contextual_texts,
                 model=emb_model,
                 dim=emb_dim,
                 title=request.title,

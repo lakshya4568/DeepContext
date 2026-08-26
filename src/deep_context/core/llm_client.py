@@ -604,7 +604,7 @@ class LLMClient:
                         return await asyncio.wait_for(
                             gemini_client.aio.models.generate_content(
                                 model=target_model,
-                                contents=gemini_contents,
+                                contents=gemini_contents,  # type: ignore[arg-type]
                                 config=genai_types.GenerateContentConfig(
                                     system_instruction=system_prompt.strip()
                                     if system_prompt
@@ -809,7 +809,7 @@ class LLMClient:
                 try:
                     gemini_stream = await gemini_client.aio.models.generate_content_stream(
                         model=target_model,
-                        contents=gemini_contents,
+                        contents=gemini_contents,  # type: ignore[arg-type]
                         config=genai_types.GenerateContentConfig(
                             system_instruction=system_prompt.strip() if system_prompt else None,
                             temperature=temperature,

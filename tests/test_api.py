@@ -1,4 +1,4 @@
-"""Tests for FastAPI endpoints."""
+from typing import Any
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -84,7 +84,7 @@ async def test_api_memory_observe() -> None:
 
 
 @pytest.mark.asyncio
-async def test_api_batch_upload_and_folder_sync() -> None:
+async def test_api_batch_upload_and_folder_sync(tmp_path: Any) -> None:
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         # Test batch upload with multiple files (markdown + text)
@@ -99,8 +99,11 @@ async def test_api_batch_upload_and_folder_sync() -> None:
         assert data[0]["document_id"] is not None
         assert data[1]["document_id"] is not None
 
-        # Test sync folder
-        sync_resp = await ac.post("/v1/sync-folder", params={"folder_path": "documents"})
+        # Test sync folder with dedicated temporary test documents
+        test_doc = tmp_path / "sync_sample.md"
+        test_doc.write_text("# Sync Sample\nContent to synchronize.\n", encoding="utf-8")
+
+        sync_resp = await ac.post("/v1/sync-folder", params={"folder_path": str(tmp_path)})
         assert sync_resp.status_code == 200
         sync_data = sync_resp.json()
         assert isinstance(sync_data, list)

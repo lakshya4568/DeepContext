@@ -38,7 +38,7 @@ class IngestionPipeline:
         # 2. Parent-child chunking
         parent_chunks, child_chunks = self.chunker.chunk_sections(doc_id, sections)
 
-        # 3. Generate Qwen3 summaries for child chunks if enabled
+        # 3. Generate Qwen3 contextual summaries for child chunks if enabled
         should_summarize = (
             request.generate_summaries
             if request.generate_summaries is not None
@@ -46,22 +46,30 @@ class IngestionPipeline:
         )
 
         summaries_count = 0
+        parent_map = {p.id: p for p in parent_chunks}
         if should_summarize and child_chunks:
             logger.info(
-                "Generating Qwen3 semantic summaries for %d child chunks...", len(child_chunks)
+                "Generating Qwen3 contextual summaries for %d child chunks...", len(child_chunks)
             )
-            await self.summarizer.summarize_chunks(child_chunks)
+            await self.summarizer.summarize_chunks(
+                child_chunks,
+                parent_chunk_map=parent_map,
+                document_title=request.title,
+            )
             summaries_count = len(child_chunks)
             self.summarizer.unload()
 
-        # 4. Generate embeddings for child chunks only
+        # 4. Generate contextual dense embeddings for child chunks (Anthropic/Unstructured Standard)
         emb_model = request.embedding_model or settings.embedding_model
         emb_dim = request.embedding_dim or settings.embedding_dim
 
-        child_texts = [c.content for c in child_chunks]
-        if child_texts:
+        child_contextual_texts = [
+            f"{c.summary_text}\n\n{c.content}" if c.summary_text else c.content
+            for c in child_chunks
+        ]
+        if child_contextual_texts:
             embeddings = await llm_client.get_embeddings(
-                child_texts,
+                child_contextual_texts,
                 model=emb_model,
                 dim=emb_dim,
                 title=request.title,

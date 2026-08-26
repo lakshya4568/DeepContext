@@ -34,38 +34,148 @@ class DocumentParser:
         content: str | bytes,
         doc_type: str = "markdown",
     ) -> list[ParsedSection]:
-        doc_type = doc_type.lower()
-        if doc_type == "pdf" or doc_type.endswith(".pdf"):
-            return cls.parse_pdf(content)
-        elif isinstance(content, bytes):
-            text = content.decode("utf-8", errors="replace")
-        else:
-            text = content
+        """
+        Structure-aware parser using IBM Docling as the primary engine for PDF,
+        Markdown, DOCX, and HTML, with resilient native fallbacks.
+        """
+        doc_type_lower = doc_type.lower()
 
-        if doc_type == "markdown" or doc_type.endswith(".md"):
-            return cls.parse_markdown(text)
-        elif doc_type in ("python", "code", "py") or doc_type.endswith(
+        # 1. Code AST parsing
+        if doc_type_lower in ("python", "code", "py") or doc_type_lower.endswith(
             (".py", ".js", ".ts", ".java", ".go")
         ):
-            return cls.parse_code(text, doc_type)
+            text = (
+                content.decode("utf-8", errors="replace") if isinstance(content, bytes) else content
+            )
+            return cls.parse_code(text, doc_type_lower)
+
+        # 2. IBM Docling Primary Parsing for PDF, Markdown, DOCX, and HTML
+        if doc_type_lower in (
+            "pdf",
+            "docx",
+            "html",
+            "htm",
+            "markdown",
+            "md",
+        ) or doc_type_lower.endswith((".pdf", ".docx", ".html", ".htm", ".md", ".markdown")):
+            suffix = ".pdf"
+            if doc_type_lower in ("docx",) or doc_type_lower.endswith(".docx"):
+                suffix = ".docx"
+            elif doc_type_lower in ("html", "htm") or doc_type_lower.endswith((".html", ".htm")):
+                suffix = ".html"
+            elif doc_type_lower in ("markdown", "md") or doc_type_lower.endswith(
+                (".md", ".markdown")
+            ):
+                suffix = ".md"
+
+            try:
+                sections = cls._parse_with_docling(content, suffix=suffix)
+                if sections:
+                    return sections
+            except Exception as e:
+                import logging
+
+                logging.getLogger("deep_context").warning(
+                    "Docling parsing for %s encountered an issue (%s); utilizing native fallback.",
+                    doc_type,
+                    e,
+                )
+
+        # 3. Native Fallbacks
+        if doc_type_lower == "pdf" or doc_type_lower.endswith(".pdf"):
+            return cls._parse_pdf_pypdf(content)
+
+        text = content.decode("utf-8", errors="replace") if isinstance(content, bytes) else content
+        if doc_type_lower in ("markdown", "md") or doc_type_lower.endswith((".md", ".markdown")):
+            return cls.parse_markdown(text)
+        elif doc_type_lower in ("html", "htm") or doc_type_lower.endswith((".html", ".htm")):
+            return cls.parse_html_fallback(text)
         else:
             return cls.parse_text(text)
 
     @classmethod
-    def parse_pdf(cls, content: str | bytes) -> list[ParsedSection]:
+    def parse_pdf(cls, content: str | bytes, use_docling: bool = True) -> list[ParsedSection]:
         """
-        Streaming page-by-page PDF parser supporting massive documents (e.g. 1000+ pages)
-        using pypdf with page boundary preservation and token bounding.
+        Structure-aware PDF parser using IBM Docling for high-fidelity layout and table
+        extraction, with streaming pypdf fallback for offline or lightweight processing.
         """
+        if use_docling:
+            try:
+                sections = cls._parse_with_docling(content, suffix=".pdf")
+                if sections:
+                    return sections
+            except Exception as e:
+                import logging
+
+                logging.getLogger("deep_context").warning(
+                    "Docling PDF parsing encountered an issue (%s), falling back to pypdf parser.",
+                    e,
+                )
+
+        return cls._parse_pdf_pypdf(content)
+
+    @classmethod
+    def _parse_with_docling(cls, content: str | bytes, suffix: str = ".pdf") -> list[ParsedSection]:
+        """Parses documents via IBM Docling into high-fidelity structured markdown with tables, headers, and metadata."""
+        import os
+        import tempfile
+
+        from docling.document_converter import DocumentConverter
+
+        tmp_path = None
         try:
-            import pypdf
-        except ImportError:
-            raise ImportError("pypdf is required for PDF parsing. Install it with: uv add pypdf")
+            if isinstance(content, str) and os.path.exists(content):
+                file_to_convert = content
+            else:
+                raw_bytes = (
+                    content
+                    if isinstance(content, bytes)
+                    else content.encode("utf-8", errors="replace")
+                )
+                with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                    tmp.write(raw_bytes)
+                    tmp_path = tmp.name
+                file_to_convert = tmp_path
+
+            converter = DocumentConverter()
+            result = converter.convert(file_to_convert)
+            markdown_content = result.document.export_to_markdown()
+
+            if markdown_content and markdown_content.strip():
+                sections = cls.parse_markdown(markdown_content)
+                # Tag sections with docling parser metadata
+                for sec in sections:
+                    sec.metadata["parser"] = "ibm_docling"
+                    sec.metadata["format"] = suffix.lstrip(".")
+                return sections
+            return []
+        finally:
+            if tmp_path and os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
+
+    @classmethod
+    def parse_html_fallback(cls, content: str) -> list[ParsedSection]:
+        """Fallback HTML parser converting HTML structure into clean Markdown sections."""
+        clean_text = re.sub(r"<(script|style)[^>]*>.*?</\1>", "", content, flags=re.DOTALL)
+        clean_text = re.sub(
+            r"<h([1-6])[^>]*>(.*?)</h\1>", r"\n# \2\n", clean_text, flags=re.IGNORECASE
+        )
+        clean_text = re.sub(r"<p[^>]*>(.*?)</p>", r"\n\1\n", clean_text, flags=re.IGNORECASE)
+        clean_text = re.sub(r"<[^>]+>", " ", clean_text)
+        clean_text = re.sub(r"\s+", " ", clean_text).strip()
+        return cls.parse_markdown(clean_text)
+
+    @classmethod
+    def _parse_pdf_pypdf(cls, content: str | bytes) -> list[ParsedSection]:
+        """Streaming page-by-page PDF parser using pypdf."""
+        import os
+
+        import pypdf
 
         if isinstance(content, str):
-            # Check if content is a file path or raw text
-            import os
-
             if os.path.exists(content):
                 stream: io.BufferedReader | io.BytesIO = open(content, "rb")
             else:

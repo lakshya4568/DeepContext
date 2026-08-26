@@ -17,15 +17,19 @@ def test_summarizer_lazy_initialization() -> None:
 
 
 def test_summarizer_prompt_construction() -> None:
-    """Verify instruct prompt formatting for Qwen."""
+    """Verify instruct prompt formatting for Qwen with document title and parent context."""
     summarizer = ChunkSummarizer()
     prompt = summarizer._build_prompt(
         chunk_text="FastAPI is a modern, fast web framework for building APIs with Python.",
-        context_prefix="Architecture > Presentation Layer",
+        section_path="Architecture > Presentation Layer",
+        document_title="Deep Context Architecture Guide",
+        parent_context="The system uses FastAPI for all REST API endpoints and SSE streaming.",
     )
     assert "<|im_start|>system" in prompt
     assert "<|im_start|>user" in prompt
-    assert "Topic / Path: Architecture > Presentation Layer" in prompt
+    assert "Document: Deep Context Architecture Guide" in prompt
+    assert "Section / Topic: Architecture > Presentation Layer" in prompt
+    assert "Enclosing Section Context:\nThe system uses FastAPI" in prompt
     assert "FastAPI is a modern" in prompt
     assert "<|im_start|>assistant\n<think>\n</think>" in prompt
 
@@ -45,7 +49,12 @@ async def test_summarize_chunk_execution() -> None:
         "PostgreSQL with the pgvector extension provides transactional storage for both structured metadata "
         "and dense vector embeddings. It uses an HNSW index to achieve sub-millisecond nearest neighbor search."
     )
-    summary, tokens = await summarizer.summarize_chunk(text, context_prefix="Database Architecture")
+    summary, tokens = await summarizer.summarize_chunk(
+        text,
+        section_path="Database Architecture",
+        document_title="Storage Specifications",
+        parent_context="PostgreSQL 16 serves as the primary relational and vector persistence store.",
+    )
     assert len(summary) > 0
     assert tokens > 0
     # Lazy load flag should now be True
@@ -56,10 +65,20 @@ async def test_summarize_chunk_execution() -> None:
 @pytest.mark.asyncio
 async def test_summarize_chunks_in_place() -> None:
     summarizer = ChunkSummarizer()
+    parent_chunk = Chunk(
+        id="p1",
+        document_id="doc1",
+        level=ChunkLevel.PARENT,
+        content="Retrieval layer uses Reciprocal Rank Fusion and cross-encoder reranking.",
+        section_path="Retrieval",
+    )
+    parent_map = {"p1": parent_chunk}
+
     chunks = [
         Chunk(
             id="c1",
             document_id="doc1",
+            parent_chunk_id="p1",
             level=ChunkLevel.CHILD,
             content="Reciprocal Rank Fusion fuses ranked lists from BM25 and vector search with score 1 / (60 + rank).",
             section_path="Retrieval > Hybrid Fusion",
@@ -67,13 +86,16 @@ async def test_summarize_chunks_in_place() -> None:
         Chunk(
             id="c2",
             document_id="doc1",
+            parent_chunk_id="p1",
             level=ChunkLevel.CHILD,
             content="Cross-encoder rerankers evaluate the full cross-attention between query and candidate documents.",
             section_path="Retrieval > Reranking",
         ),
     ]
 
-    updated = await summarizer.summarize_chunks(chunks)
+    updated = await summarizer.summarize_chunks(
+        chunks, parent_chunk_map=parent_map, document_title="Platform Architecture"
+    )
     assert len(updated) == 2
     for c in updated:
         assert c.summary_text is not None and len(c.summary_text) > 0
