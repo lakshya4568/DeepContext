@@ -165,6 +165,7 @@ class ChunkSummarizer:
         explicitly resolving pronouns and ambiguous entities (Anthropic/Unstructured standard).
         """
         system_msg = (
+            "/no_think\n"
             "You are a factual context generator for a search retrieval system. "
             "Write a short, succinct 1-2 sentence context (under 50 words) that situates this specific chunk "
             "within the overall document and enclosing section. "
