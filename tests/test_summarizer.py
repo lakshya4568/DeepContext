@@ -104,3 +104,15 @@ async def test_summarize_chunks_in_place() -> None:
         assert c.summary_tokens is not None and c.summary_tokens > 0
         assert c.summary_model == summarizer.model_name
         assert c.generated_at is not None
+
+
+def test_clean_and_complete_summary_deduplication() -> None:
+    """Verify that sentence deduplication eliminates repeated sentences in summary output."""
+    raw = (
+        "The document discusses the system architecture and database design. "
+        "The document discusses the system architecture and database design. "
+        "PostgreSQL pgvector is used for dense embeddings."
+    )
+    cleaned = ChunkSummarizer._clean_and_complete_summary(raw)
+    assert cleaned.count("The document discusses the system architecture and database design.") == 1
+    assert "PostgreSQL pgvector is used for dense embeddings." in cleaned

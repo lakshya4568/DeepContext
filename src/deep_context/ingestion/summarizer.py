@@ -166,11 +166,10 @@ class ChunkSummarizer:
         """
         system_msg = (
             "/no_think\n"
-            "You are a factual document annotator. "
-            "Give a short succinct context to situate the given chunk within the overall document for search retrieval. "
-            "Include a one sentence description of the document with identifying info. "
-            "Always output complete grammatical sentences that finish cleanly. "
-            "Do NOT include meta-commentary, and do NOT output <think> tags."
+            "You are an expert document annotator. "
+            "Your task is to provide a brief, succinct context (1 to 2 sentences, 30-60 words maximum) that situates the given text chunk within the broader document for search retrieval. "
+            "Identify the specific topic, key entities or subjects, and section context, and clarify ambiguous references. "
+            "Do NOT output conversational filler, introductory phrases (e.g. 'The document is about'), or repeated sentences. Output only the succinct factual context."
         )
 
         doc_header = f"Document: {document_title}\n" if document_title else ""
@@ -205,12 +204,12 @@ class ChunkSummarizer:
 
     @staticmethod
     def _clean_and_complete_summary(raw_text: str) -> str:
-        """Cleans think tags, conversational preambles, meta-phrasing, and ensures complete terminal sentences."""
+        """Cleans think tags, conversational preambles, meta-phrasing, deduplicates sentences, and ensures complete terminal sentences."""
         import re
 
         summary = re.sub(r"<think>.*?</think>", "", raw_text, flags=re.DOTALL).strip()
         summary = re.sub(
-            r"^(?:Here is the summary:?|Summary:?|Context:?|This chunk discusses:?|The situating context is:?)\s*",
+            r"^(?:Here is the summary:?|Summary:?|Context:?|This chunk discusses:?|The situating context is:?|Document:?)\s*",
             "",
             summary,
             flags=re.IGNORECASE,
@@ -222,13 +221,28 @@ class ChunkSummarizer:
             if rep_idx > 30:
                 summary = summary[:rep_idx].strip()
 
-        # Strip echoed meta-rules if Qwen repeats prompt instructions
+        # Strip echoed meta-rules if model repeats prompt instructions
         summary = re.sub(
             r"(?:It resolves ambiguous pronouns.*?context\.\s*|The context centers around.*?context\.\s*)",
             "",
             summary,
             flags=re.IGNORECASE,
         ).strip()
+
+        # Deduplicate identical or near-identical consecutive sentences
+        if summary:
+            sentences = re.split(r"(?<=[.!?])\s+", summary)
+            unique_sentences: list[str] = []
+            seen_sentences: set[str] = set()
+            for s in sentences:
+                s_clean = s.strip()
+                if not s_clean:
+                    continue
+                s_norm = re.sub(r"\W+", " ", s_clean.lower()).strip()
+                if s_norm and s_norm not in seen_sentences:
+                    seen_sentences.add(s_norm)
+                    unique_sentences.append(s_clean)
+            summary = " ".join(unique_sentences).strip()
 
         if not summary:
             return ""

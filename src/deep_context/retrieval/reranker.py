@@ -106,33 +106,32 @@ def _consensus_boost_for_candidate(
     Retrieval ranks are preferred. The index fallback preserves compatibility
     with older candidate objects that do not expose BM25/vector ranks.
     """
+    has_explicit_rank_keys = "bm25_rank" in candidate or "dense_rank" in candidate
     bm25_rank = candidate.get("bm25_rank")
     dense_rank = candidate.get("dense_rank")
 
-    if bm25_rank is not None and dense_rank is not None:
-        try:
-            bm25_rank = int(bm25_rank)
-            dense_rank = int(dense_rank)
-        except (TypeError, ValueError):
-            bm25_rank = None
-            dense_rank = None
+    if has_explicit_rank_keys:
+        if bm25_rank is not None and dense_rank is not None:
+            try:
+                bm25_rank = int(bm25_rank)
+                dense_rank = int(dense_rank)
+                if bm25_rank <= 10 and dense_rank <= 10:
+                    return min(
+                        0.15,
+                        max(0.0, settings.reranker_consensus_boost_tier1),
+                    )
 
-    if bm25_rank is not None and dense_rank is not None:
-        if bm25_rank <= 10 and dense_rank <= 10:
-            return min(
-                0.15,
-                max(0.0, settings.reranker_consensus_boost_tier1),
-            )
-
-        if bm25_rank <= 20 and dense_rank <= 20:
-            return min(
-                0.10,
-                max(0.0, settings.reranker_consensus_boost_tier2),
-            )
-
+                if bm25_rank <= 20 and dense_rank <= 20:
+                    return min(
+                        0.10,
+                        max(0.0, settings.reranker_consensus_boost_tier2),
+                    )
+            except (TypeError, ValueError):
+                pass
+        # Candidate has explicit rank info but only appeared in one retriever
         return 0.0
 
-    # Compatibility fallback for candidates that only contain RRF ordering.
+    # Compatibility fallback only for legacy candidates that lack rank keys
     if candidate_index < settings.reranker_consensus_top1_count:
         return min(
             0.15,
@@ -153,29 +152,18 @@ def _blend_with_rrf(
     raw_scores: list[float],
     *,
     score_type: RerankerScoreType,
+    blend_rrf_weight: float | None = None,
 ) -> list[tuple[float, dict[str, Any]]]:
-    """Blend a secondary reranker signal with normalized RRF consensus.
-
-    IMPORTANT TUNING NOTE (regression history):
-    A weighting of 0.70 * norm_rrf + 0.30 * norm_raw with a 0.20/0.08 tiered
-    consensus boost was tried and *dropped* full-pipeline Hit@5 on the GoT
-    eval set from 87.1% to 61.3%, and also degraded Direct Factual, Citation,
-    and Multi-Hop Hit@5 by ~25 points each versus the 0.60/0.40 weighting.
-    The higher RRF weight combined with the larger consensus boost caused the
-    blend to over-anchor on first-stage rank order and under-weight the
-    lexical/semantic reranker signal that corrects RRF mistakes.
-
-    Default weights are restored to the values that produced the best
-    validated Hit@5 (87.1%) on the same corpus and eval set. Do not change
-    these defaults without running the full 36-query benchmark before and
-    after, on a frozen scorer version, and confirming Hit@5/nDCG@5 improve
-    together (not just one of them).
-    """
+    """Blend a secondary reranker signal with normalized RRF consensus."""
     if len(candidates) != len(raw_scores):
         raise ValueError(
             "Candidate count must match reranker score count: "
             f"{len(candidates)} != {len(raw_scores)}"
         )
+
+    rrf_weight = (
+        blend_rrf_weight if blend_rrf_weight is not None else settings.reranker_blend_rrf_weight
+    )
 
     rrf_scores = [float(candidate.get("rrf_score", 0.0)) for candidate in candidates]
 
@@ -205,11 +193,7 @@ def _blend_with_rrf(
             idx,
         )
 
-        final_score = (
-            settings.reranker_blend_rrf_weight * norm_rrf
-            + (1.0 - settings.reranker_blend_rrf_weight) * norm_raw
-            + consensus_boost
-        )
+        final_score = rrf_weight * norm_rrf + (1.0 - rrf_weight) * norm_raw + consensus_boost
 
         copy = dict(candidate)
         copy["rerank_score"] = float(final_score)

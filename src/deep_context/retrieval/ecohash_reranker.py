@@ -69,7 +69,12 @@ class EcoHashReranker:
                 if isinstance(idx, int) and 0 <= idx < len(raw_scores):
                     raw_scores[idx] = float(score)
 
-            scored = _blend_with_rrf(candidates, raw_scores, score_type="probability")
+            scored = _blend_with_rrf(
+                candidates,
+                raw_scores,
+                score_type="probability",
+                blend_rrf_weight=0.15,
+            )
             return [item for _, item in scored[:top_k]]
         except Exception as e:
             logger.warning(
