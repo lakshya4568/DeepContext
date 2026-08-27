@@ -44,6 +44,7 @@ class RetrievalFilters:
     document_ids: list[str] | None = None
     date_range: tuple[str, str] | None = None
     doc_types: list[str] | None = None
+    section_prefix: str | None = None
 
 
 @dataclass

@@ -69,3 +69,18 @@ TTL on auth tokens is set to 15 minutes.
     # Check citations
     assert len(retrieval_res.citations) >= 1
     assert retrieval_res.citations[0].document_id == ingest_res.document_id
+
+
+@pytest.mark.asyncio
+async def test_semantic_filter_extraction() -> None:
+    # 1. Appendix extraction
+    f1 = QueryClassifier.extract_semantic_filters("What are the house words in Appendix B?")
+    assert f1.section_prefix == "appendix/b"
+
+    # 2. Chapter extraction
+    f2 = QueryClassifier.extract_semantic_filters("Explain what happened in Chapter 4")
+    assert f2.section_prefix == "chapter/4"
+
+    # 3. Code doc_type extraction
+    f3 = QueryClassifier.extract_semantic_filters("Show me the function in the python code")
+    assert f3.doc_types == ["code"]

@@ -184,7 +184,23 @@ retrieve → grade_documents ──relevant──→ generate_answer → END
   ```bash
   curl -LsSf https://astral.sh/uv/install.sh | sh
   ```
-- **PostgreSQL 15+ with pgvector** (or SQLite for local zero-config mode).
+- **Database (Choose Option A or Option B)**:
+  - **Option A (Recommended for Highest Retrieval Quality): PostgreSQL with `pg_search` (ParadeDB BM25), `pgvector`, and `pg_trgm`**
+    - **1-Click Docker (Windows, macOS, Linux)**:
+      ```bash
+      docker run -d --name deepcontext-db -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=awems -p 5432:5432 paradedb/paradedb:latest
+      ```
+    - **macOS Native (Homebrew)**:
+      ```bash
+      brew install postgresql@16 pgvector
+      echo "shared_preload_libraries = 'pg_search'" >> /opt/homebrew/var/postgresql@16/postgresql.conf
+      brew services restart postgresql@16
+      ```
+    - **Linux Native (Ubuntu/Debian)**:
+      ```bash
+      sudo apt-get install -y postgresql-16-paradedb
+      ```
+  - **Option B (Zero-Config Local Mode)**: SQLite with FTS5 (set `DATABASE_TYPE=sqlite` in `.env`).
 
 ### 2. Installation & Environment Setup
 

@@ -76,8 +76,8 @@ class RetrievalEngine:
             if not reranker and "reranker" in prefs:
                 active_reranker = prefs["reranker"]
 
-        # 1. Classify Query
-        shape = await self.classifier.classify(query)
+        # 1. Classify Query and extract semantic filters (doc_types, section_prefix)
+        shape, filters = await self.classifier.classify_and_filter(query, filters)
         current_query = query
         retry_count = 0
 
@@ -216,7 +216,7 @@ class RetrievalEngine:
     async def _resolve_parent_chunks(
         self, storage: Any, children: list[dict[str, Any]]
     ) -> list[dict[str, Any]]:
-        """Fetch parent chunk contents so model receives full 1000-2500 token context."""
+        """Fetch parent chunk contents with sibling window expansion so model receives complete, stitched context."""
         if not children:
             return []
 
@@ -238,13 +238,15 @@ class RetrievalEngine:
                     continue
                 seen_parent_ids.add(pid)
                 p = parent_chunk_map[pid]
+                sec = p.section_path or c.get("section_path")
+                page = p.page_number or c.get("page_number")
                 resolved.append(
                     {
                         "chunk_id": p.id,
                         "document_id": p.document_id,
                         "content": p.content,
-                        "section_path": p.section_path or c.get("section_path"),
-                        "page_number": p.page_number or c.get("page_number"),
+                        "section_path": sec,
+                        "page_number": page,
                         "summary_text": c.get("summary_text") or p.summary_text,
                         "document_title": c.get("document_title", ""),
                         "source_uri": c.get("source_uri"),
@@ -270,6 +272,24 @@ class RetrievalEngine:
                         "rrf_score": c.get("rrf_score", 0.0),
                     }
                 )
+
+        # Sibling Window Merging: If two adjacent parents share the same document and consecutive pages,
+        # note their continuous coverage for citations
+        if len(resolved) >= 2:
+            for i in range(len(resolved) - 1):
+                cur = resolved[i]
+                nxt = resolved[i + 1]
+                if (
+                    cur.get("document_id") == nxt.get("document_id")
+                    and cur.get("page_number") is not None
+                    and nxt.get("page_number") is not None
+                ):
+                    p1 = cur["page_number"]
+                    p2 = nxt["page_number"]
+                    if abs(p2 - p1) == 1 and not str(cur.get("section_path", "")).startswith(
+                        "Pages"
+                    ):
+                        cur["section_path"] = f"Pages {min(p1, p2)}–{max(p1, p2)}"
 
         return resolved
 

@@ -29,6 +29,8 @@ class PostgresStore(StorageInterface):
     def __init__(self, dsn: str | None = None):
         self.dsn = dsn or settings.postgres_dsn
         self._pool: asyncpg.Pool | None = None
+        self._has_pg_trgm: bool = False
+        self._has_pg_search: bool = False
 
     async def initialize(self) -> None:
         """Create connection pool and verify/create schema and HNSW indexes."""
@@ -44,8 +46,29 @@ class PostgresStore(StorageInterface):
         )
 
         async with self._pool.acquire() as conn:
-            await conn.execute("CREATE EXTENSION IF NOT EXISTS vector;")
-            await conn.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto;")
+            try:
+                await conn.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+            except Exception as e:
+                logger.debug("vector extension notice: %s", e)
+
+            try:
+                await conn.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto;")
+            except Exception as e:
+                logger.debug("pgcrypto extension notice: %s", e)
+
+            try:
+                await conn.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm;")
+                self._has_pg_trgm = True
+            except Exception as e:
+                logger.debug("pg_trgm extension notice: %s", e)
+                self._has_pg_trgm = False
+
+            try:
+                await conn.execute("CREATE EXTENSION IF NOT EXISTS pg_search;")
+                self._has_pg_search = True
+            except Exception as e:
+                logger.debug("pg_search extension notice: %s", e)
+                self._has_pg_search = False
             # Schema creation from docs/DATA_MODEL.sql
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS documents (
@@ -80,8 +103,12 @@ class PostgresStore(StorageInterface):
                     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
                 );
 
+                ALTER TABLE documents ADD COLUMN IF NOT EXISTS metadata JSONB NOT NULL DEFAULT '{}';
                 ALTER TABLE chunks DROP CONSTRAINT IF EXISTS chunks_parent_chunk_id_fkey;
                 CREATE INDEX IF NOT EXISTS idx_chunks_parent_id ON chunks (parent_chunk_id);
+                ALTER TABLE chunks ADD COLUMN IF NOT EXISTS chunk_index INTEGER NOT NULL DEFAULT 0;
+                ALTER TABLE chunks ADD COLUMN IF NOT EXISTS section_path TEXT;
+                ALTER TABLE chunks ADD COLUMN IF NOT EXISTS page_number INTEGER;
                 ALTER TABLE chunks ADD COLUMN IF NOT EXISTS search_tsv TSVECTOR;
                 ALTER TABLE chunks ADD COLUMN IF NOT EXISTS summary_text TEXT;
                 ALTER TABLE chunks ADD COLUMN IF NOT EXISTS summary_tokens INTEGER;
@@ -196,7 +223,31 @@ class PostgresStore(StorageInterface):
                 CREATE INDEX IF NOT EXISTS idx_memory_episode_embedding ON memory_episode USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 200);
                 CREATE INDEX IF NOT EXISTS idx_events_trace_session ON events_trace (session_id);
                 """)
-        logger.info("Initialized Postgres database with pgvector and HNSW indexes.")
+
+            if self._has_pg_trgm:
+                try:
+                    await conn.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_chunks_trgm ON chunks USING GIN (content gin_trgm_ops);"
+                    )
+                    logger.info("Created or verified GIN trigram index idx_chunks_trgm.")
+                except Exception as e_trgm_idx:
+                    logger.debug("pg_trgm index creation notice: %s", e_trgm_idx)
+
+            if self._has_pg_search:
+                try:
+                    await conn.execute("""
+                        CALL paradedb.create_bm25(
+                            index_name => 'idx_chunks_bm25',
+                            table_name => 'chunks',
+                            key_field => 'id',
+                            text_fields => '{content: {}, summary_text: {}}'
+                        );
+                    """)
+                    logger.info("Created or verified ParadeDB BM25 index idx_chunks_bm25.")
+                except Exception as e_bm25_idx:
+                    logger.debug("ParadeDB BM25 index creation notice: %s", e_bm25_idx)
+
+        logger.info("Initialized Postgres database with pgvector, FTS, and HNSW indexes.")
 
     async def close(self) -> None:
         if self._pool:
@@ -758,6 +809,10 @@ class PostgresStore(StorageInterface):
         phrases = re.findall(r'"([^"]{3,})"', clean_query)
         phrase_term = phrases[0] if phrases else ""
 
+        # Extract alphanumeric or hyphenated technical identifiers (SKUs, codes, model names)
+        ident_matches = re.findall(r"\b[A-Za-z0-9]+(?:[-_][A-Za-z0-9]+)+\b", clean_query)
+        ident_term = ident_matches[0] if ident_matches else ""
+
         stopwords = {
             "who",
             "what",
@@ -805,7 +860,60 @@ class PostgresStore(StorageInterface):
                 clauses.append(f"d.id = ANY(${len(params) + 1}::uuid[])")
                 params.append(filters.document_ids)
 
+            if filters.doc_types:
+                clauses.append(f"d.doc_type = ANY(${len(params) + 1}::text[])")
+                params.append(filters.doc_types)
+
+            if filters.section_prefix:
+                clauses.append(f"c.section_path ILIKE ${len(params) + 1} || '%'")
+                params.append(filters.section_prefix)
+
+            # 1. Try ParadeDB BM25 search if extension is enabled
+            if self._has_pg_search:
+                try:
+                    where_sql = " AND ".join(clauses)
+                    p_query = plain_term if plain_term else clean_query
+                    bm25_params = list(params[3:])  # Skip plain_term, or_terms, phrase_term
+                    bm25_sql = f"""
+                        SELECT c.id, c.document_id, c.parent_chunk_id, c.content, c.section_path,
+                               c.page_number, c.summary_text, d.title as document_title, d.source_uri,
+                               paradedb.score(c.id) AS score
+                        FROM chunks c
+                        JOIN documents d ON d.id = c.document_id
+                        WHERE {where_sql} AND chunks @@@ paradedb.parse(${len(bm25_params) + 1})
+                        ORDER BY score DESC, c.created_at DESC LIMIT {limit};
+                    """
+                    bm25_rows = await conn.fetch(bm25_sql, *bm25_params, p_query)
+                    if bm25_rows:
+                        return [
+                            {
+                                "id": str(r["id"]),
+                                "document_id": str(r["document_id"]),
+                                "parent_chunk_id": (
+                                    str(r["parent_chunk_id"]) if r["parent_chunk_id"] else None
+                                ),
+                                "content": r["content"],
+                                "section_path": r["section_path"],
+                                "page_number": r["page_number"],
+                                "summary_text": r.get("summary_text"),
+                                "document_title": r["document_title"],
+                                "source_uri": r["source_uri"],
+                                "score": float(r["score"]),
+                            }
+                            for r in bm25_rows
+                        ]
+                except Exception as e_pdb:
+                    logger.debug("ParadeDB query notice: %s. Falling back to enhanced FTS.", e_pdb)
+
+            # 2. Enhanced Dual-Channel FTS + Trigram + Exact Identifier Matching
             where_sql = " AND ".join(clauses)
+            trgm_score_clause = "similarity(c.content, $1) * 2.0" if self._has_pg_trgm else "0.0"
+            ident_match_clause = (
+                f"(CASE WHEN length('{ident_term}') > 0 AND (c.content ILIKE '%{ident_term}%' OR COALESCE(c.summary_text, '') ILIKE '%{ident_term}%') THEN 8.0 ELSE 0.0 END)"
+                if ident_term
+                else "0.0"
+            )
+
             sql = f"""
                 SELECT c.id, c.document_id, c.parent_chunk_id, c.content, c.section_path,
                        c.page_number, c.summary_text, d.title as document_title, d.source_uri,
@@ -813,6 +921,8 @@ class PostgresStore(StorageInterface):
                         COALESCE(ts_rank(COALESCE(c.search_tsv, c.tsv), to_tsquery('english', $2)), 0.0) +
                         COALESCE(ts_rank(c.summary_tsv, plainto_tsquery('english', $1)), 0.0) +
                         COALESCE(ts_rank(c.summary_tsv, to_tsquery('english', $2)), 0.0) +
+                        {trgm_score_clause} +
+                        {ident_match_clause} +
                         (CASE WHEN length($3) > 0 AND (c.content ILIKE '%' || $3 || '%' OR COALESCE(c.summary_text, '') ILIKE '%' || $3 || '%') THEN 10.0 ELSE 0.0 END)) AS score
                 FROM chunks c
                 JOIN documents d ON d.id = c.document_id
@@ -820,6 +930,7 @@ class PostgresStore(StorageInterface):
                     (length($1) > 0 AND (COALESCE(c.search_tsv, c.tsv) @@ plainto_tsquery('english', $1) OR (c.summary_tsv IS NOT NULL AND c.summary_tsv @@ plainto_tsquery('english', $1)))) OR
                     (length($2) > 0 AND (COALESCE(c.search_tsv, c.tsv) @@ to_tsquery('english', $2) OR (c.summary_tsv IS NOT NULL AND c.summary_tsv @@ to_tsquery('english', $2)))) OR
                     (length($3) > 0 AND (c.content ILIKE '%' || $3 || '%' OR COALESCE(c.summary_text, '') ILIKE '%' || $3 || '%'))
+                    {" OR (c.content ILIKE '%" + ident_term + "%')" if ident_term else ""}
                 )
                 ORDER BY score DESC, c.created_at DESC LIMIT {limit};
             """
@@ -869,6 +980,14 @@ class PostgresStore(StorageInterface):
             if filters.document_ids:
                 clauses.append(f"d.id = ANY(${len(params) + 1}::uuid[])")
                 params.append(filters.document_ids)
+
+            if filters.doc_types:
+                clauses.append(f"d.doc_type = ANY(${len(params) + 1}::text[])")
+                params.append(filters.doc_types)
+
+            if filters.section_prefix:
+                clauses.append(f"c.section_path ILIKE ${len(params) + 1} || '%'")
+                params.append(filters.section_prefix)
 
             where_sql = " AND ".join(clauses)
             sql = f"""

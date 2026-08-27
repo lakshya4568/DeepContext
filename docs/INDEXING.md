@@ -23,8 +23,10 @@ The `chunks` table utilizes four complementary indexes designed to maximize sear
 
 | Index Name | Type / Method | Target Columns | Purpose |
 |---|---|---|---|
+| `idx_chunks_bm25` | **ParadeDB (Tantivy)** | `content`, `summary_text` | True Okapi BM25 index over chunk content and contextual summaries with non-linear term frequency saturation. |
+| `idx_chunks_trgm` | **GIN (`gin_trgm_ops`)** | `content` | Fast substring and trigram similarity search for technical identifiers, product codes, SKUs, and typos. |
 | `idx_chunks_embedding_hnsw` | **HNSW** (`vector_cosine_ops`) | `embedding` (768-dim) | High-speed approximate nearest neighbor search ($\approx 10\times$ faster than IVFFlat). |
-| `idx_chunks_search_tsv` | **GIN** | `search_tsv` (tsvector) | Full-text BM25 search over weighted summary ('A') + raw content ('B'). |
+| `idx_chunks_search_tsv` | **GIN** | `search_tsv` (tsvector) | Full-text FTS search over weighted summary ('A') + raw content ('B'). |
 | `idx_chunks_parent_null` | **B-Tree** (Partial) | `(id, document_id)` WHERE `parent_chunk_id IS NULL` | Sub-millisecond parent chunk resolution without table scans over child chunks. |
 | `idx_chunks_document_id` | **B-Tree** (Composite) | `(document_id, id)` | Fast filtering and chunk counting scoped by document. |
 

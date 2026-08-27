@@ -152,7 +152,36 @@ class SQLiteStore(StorageInterface):
                 last_error TEXT,
                 last_run_at TEXT
             );
+            CREATE INDEX IF NOT EXISTS idx_events_trace_session ON events_trace (session_id);
             """)
+
+        # Dynamic schema auto-migration for existing SQLite databases
+        async with self._conn.execute("PRAGMA table_info(chunks)") as cursor:
+            chunk_cols = {row[1] for row in await cursor.fetchall()}
+            if "chunk_index" not in chunk_cols:
+                await self._conn.execute(
+                    "ALTER TABLE chunks ADD COLUMN chunk_index INTEGER NOT NULL DEFAULT 0;"
+                )
+            if "section_path" not in chunk_cols:
+                await self._conn.execute("ALTER TABLE chunks ADD COLUMN section_path TEXT;")
+            if "page_number" not in chunk_cols:
+                await self._conn.execute("ALTER TABLE chunks ADD COLUMN page_number INTEGER;")
+            if "summary_text" not in chunk_cols:
+                await self._conn.execute("ALTER TABLE chunks ADD COLUMN summary_text TEXT;")
+            if "summary_tokens" not in chunk_cols:
+                await self._conn.execute("ALTER TABLE chunks ADD COLUMN summary_tokens INTEGER;")
+            if "summary_model" not in chunk_cols:
+                await self._conn.execute("ALTER TABLE chunks ADD COLUMN summary_model TEXT;")
+            if "generated_at" not in chunk_cols:
+                await self._conn.execute("ALTER TABLE chunks ADD COLUMN generated_at TEXT;")
+
+        async with self._conn.execute("PRAGMA table_info(documents)") as cursor:
+            doc_cols = {row[1] for row in await cursor.fetchall()}
+            if "metadata" not in doc_cols:
+                await self._conn.execute(
+                    "ALTER TABLE documents ADD COLUMN metadata TEXT NOT NULL DEFAULT '{}';"
+                )
+
         await self._conn.commit()
         logger.info("Initialized SQLite database at %s", self.db_path)
 
@@ -667,6 +696,15 @@ class SQLiteStore(StorageInterface):
             sql += f" AND d.id IN ({ph})"
             params.extend(filters.document_ids)
 
+        if filters.doc_types:
+            ph_dt = ",".join("?" for _ in filters.doc_types)
+            sql += f" AND d.doc_type IN ({ph_dt})"
+            params.extend(filters.doc_types)
+
+        if filters.section_prefix:
+            sql += " AND c.section_path LIKE ?"
+            params.append(f"{filters.section_prefix}%")
+
         sql += f" ORDER BY fts_rank ASC LIMIT {limit}"
 
         results: list[dict[str, Any]] = []
@@ -722,6 +760,15 @@ class SQLiteStore(StorageInterface):
             ph = ",".join("?" for _ in filters.document_ids)
             sql += f" AND d.id IN ({ph})"
             params.extend(filters.document_ids)
+
+        if filters.doc_types:
+            ph_dt = ",".join("?" for _ in filters.doc_types)
+            sql += f" AND d.doc_type IN ({ph_dt})"
+            params.extend(filters.doc_types)
+
+        if filters.section_prefix:
+            sql += " AND c.section_path LIKE ?"
+            params.append(f"{filters.section_prefix}%")
 
         q_vec = np.array(query_embedding, dtype=np.float32)
         q_norm = np.linalg.norm(q_vec)

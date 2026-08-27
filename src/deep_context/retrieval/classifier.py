@@ -6,7 +6,7 @@ import json
 
 from deep_context.core.llm_client import llm_client
 from deep_context.core.logging import logger
-from deep_context.core.types import QueryShape
+from deep_context.core.types import QueryShape, RetrievalFilters
 
 
 class QueryClassifier:
@@ -147,3 +147,42 @@ class QueryClassifier:
             logger.debug("LLM query classification fallback to heuristic: %s", e)
 
         return QueryShape.FACTUAL_LOOKUP
+
+    @classmethod
+    def extract_semantic_filters(
+        cls, query: str, base_filters: RetrievalFilters | None = None
+    ) -> RetrievalFilters:
+        """Extract structured document types and section prefixes directly from query text."""
+        filters = base_filters or RetrievalFilters()
+        q = query.lower()
+
+        # Detect appendix or chapter references
+        if not filters.section_prefix:
+            if "appendix" in q:
+                for letter in ("a", "b", "c", "d", "e", "f", "g"):
+                    if f"appendix {letter}" in q:
+                        filters.section_prefix = f"appendix/{letter}"
+                        break
+            elif "chapter" in q:
+                for ch in range(1, 50):
+                    if f"chapter {ch}" in q:
+                        filters.section_prefix = f"chapter/{ch}"
+                        break
+
+        # Detect document type hints if not already specified
+        if not filters.doc_types:
+            if "appendix" in q and not filters.section_prefix:
+                filters.doc_types = ["appendix"]
+            elif any(k in q for k in ("python code", "source code", "repo code", "in the code")):
+                filters.doc_types = ["code"]
+
+        return filters
+
+    @classmethod
+    async def classify_and_filter(
+        cls, query: str, filters: RetrievalFilters | None = None
+    ) -> tuple[QueryShape, RetrievalFilters]:
+        """Classify query shape and extract structured semantic filters."""
+        shape = await cls.classify(query)
+        enriched_filters = cls.extract_semantic_filters(query, filters)
+        return shape, enriched_filters

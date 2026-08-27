@@ -53,9 +53,19 @@ async def init():
             await target_conn.execute("CREATE EXTENSION IF NOT EXISTS vector;")
             print('[+] Extension "vector" (pgvector) enabled successfully.')
         except Exception as e_vec:
-            print("[!] pgvector is not installed in PostgreSQL 16 on this machine.")
-            print(f"[!] Details: {e_vec}")
-            print("[*] Note: DeepContext can also run seamlessly with DATABASE_TYPE=sqlite in .env")
+            print(f"[!] vector notice: {e_vec}")
+
+        try:
+            await target_conn.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm;")
+            print('[+] Extension "pg_trgm" enabled successfully.')
+        except Exception as e_trgm:
+            print(f"[!] pg_trgm notice: {e_trgm}")
+
+        try:
+            await target_conn.execute("CREATE EXTENSION IF NOT EXISTS pg_search;")
+            print('[+] Extension "pg_search" (ParadeDB BM25) enabled successfully.')
+        except Exception as e_search:
+            print(f"[!] pg_search notice: {e_search}")
 
         await target_conn.close()
         print("DB_SETUP_SUCCESS=True")
