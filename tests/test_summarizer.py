@@ -30,10 +30,13 @@ def test_summarizer_prompt_construction() -> None:
     assert "<document>" in prompt
     assert "Document: Deep Context Architecture Guide" in prompt
     assert "Section: Architecture > Presentation Layer" in prompt
-    assert "Enclosing Section Context:\nThe system uses FastAPI" in prompt
-    assert "<chunk>\nFastAPI is a modern" in prompt
-    assert "Please give a short succinct context to situate this chunk" in prompt
-    assert "<|im_start|>assistant\n<think>\n</think>" in prompt
+    assert "Context: The system uses FastAPI" in prompt
+    assert "<passage>\nFastAPI is a modern" in prompt
+    assert "Complete the factual situating context" in prompt
+    assert (
+        "<|im_start|>assistant\n<think>\n</think>\nIn Deep Context Architecture Guide (Architecture > Presentation Layer), "
+        in prompt
+    )
 
 
 @pytest.mark.asyncio
