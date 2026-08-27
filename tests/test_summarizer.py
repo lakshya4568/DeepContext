@@ -17,7 +17,7 @@ def test_summarizer_lazy_initialization() -> None:
 
 
 def test_summarizer_prompt_construction() -> None:
-    """Verify instruct prompt formatting for Qwen with document title and parent context."""
+    """Verify instruct prompt formatting for Qwen with Anthropic document and chunk context."""
     summarizer = ChunkSummarizer()
     prompt = summarizer._build_prompt(
         chunk_text="FastAPI is a modern, fast web framework for building APIs with Python.",
@@ -27,10 +27,12 @@ def test_summarizer_prompt_construction() -> None:
     )
     assert "<|im_start|>system" in prompt
     assert "<|im_start|>user" in prompt
+    assert "<document>" in prompt
     assert "Document: Deep Context Architecture Guide" in prompt
-    assert "Section / Topic: Architecture > Presentation Layer" in prompt
+    assert "Section: Architecture > Presentation Layer" in prompt
     assert "Enclosing Section Context:\nThe system uses FastAPI" in prompt
-    assert "FastAPI is a modern" in prompt
+    assert "<chunk>\nFastAPI is a modern" in prompt
+    assert "Please give a short succinct context to situate this chunk" in prompt
     assert "<|im_start|>assistant\n<think>\n</think>" in prompt
 
 

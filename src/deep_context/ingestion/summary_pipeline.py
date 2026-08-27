@@ -500,9 +500,7 @@ class SummaryIngestionPipeline:
             return
 
         emb_model = (
-            embedding_model
-            or doc.metadata.get("embedding_model")
-            or settings.embedding_model
+            embedding_model or doc.metadata.get("embedding_model") or settings.embedding_model
         )
         emb_dim = (
             embedding_dim

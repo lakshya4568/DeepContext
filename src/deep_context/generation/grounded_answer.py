@@ -114,7 +114,8 @@ async def generate_grounded_answer(
         )
 
     evidence_text = "\n\n".join(
-        f"[{idx}] {_get_chunk_content(chunk)}" for idx, chunk in enumerate(retrieved_chunks, start=1)
+        f"[{idx}] {_get_chunk_content(chunk)}"
+        for idx, chunk in enumerate(retrieved_chunks, start=1)
     )
     target_model = model or settings.llm_model
 

@@ -102,6 +102,7 @@ async def resume_document_embeddings_stream(
     embedding_dim: int = 0,
 ) -> StreamingResponse:
     """Stream live progress when generating or resuming embeddings for a document."""
+
     async def event_gen() -> AsyncIterator[str]:
         async for event in summary_ingestion_pipeline.resume_document_embeddings(
             document_id,

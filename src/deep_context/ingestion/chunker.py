@@ -12,7 +12,7 @@ from deep_context.ingestion.parser import ParsedSection, count_approx_tokens
 
 
 class ParentChildChunker:
-    """Creates searchable child chunks (300-600 tokens) linked to context parent chunks (1000-2500 tokens)."""
+    """Creates searchable child chunks (150-300 tokens) linked to context parent chunks (1000-2500 tokens)."""
 
     def __init__(
         self,
@@ -110,7 +110,7 @@ class ParentChildChunker:
         sections: list[ParsedSection],
         created_at: datetime,
     ) -> list[Chunk]:
-        """Split parent text into overlapping child chunks (300-600 tokens) with exact page resolution."""
+        """Split parent text into overlapping child chunks (150-300 tokens) with exact page resolution."""
         # Split by paragraphs or sentence boundaries
         units = [p.strip() for p in re.split(r"(?<=\n\n)|(?<=\. )", parent_text) if p.strip()]
         if not units:

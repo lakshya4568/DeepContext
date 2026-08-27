@@ -1,4 +1,4 @@
-"""NVIDIA NIM API Client for BGE-m3 Embeddings and GLM-5.2 LLM Reasoning."""
+"""Unified Client for Google Gemini / Vertex AI, Groq LLMs, and Dense Embeddings."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ from deep_context.core.logging import logger
 def parse_rate_limit_error(
     error: Exception | str, provider: str = "groq", model: str = "qwen/qwen3.6-27b"
 ) -> dict[str, Any]:
-    """Extract structured details (retry_after, limit, used, quota_type) from rate limit errors."""
+    """Parses Groq or provider rate limit / quota errors into structured status."""
     err_str = str(error)
     is_rate_limit = (
         "429" in err_str
@@ -36,17 +36,27 @@ def parse_rate_limit_error(
     if not is_rate_limit:
         return {}
 
-    retry_match = re.search(r"try again in ([\w\.\s]+?)(?:\.|\s*Need|$)", err_str, re.IGNORECASE)
-    retry_after = retry_match.group(1).strip() if retry_match else "a few minutes"
+    # Detect quota type (TPD, TPM, RPM, etc.)
+    quota_desc = "Tokens Per Day (TPD)"
+    limit = None
+    used = None
+    retry_after = "a few minutes"
 
-    limit_match = re.search(r"Limit (\d+),\s*Used (\d+)", err_str)
-    limit = limit_match.group(1) if limit_match else "200000"
-    used = limit_match.group(2) if limit_match else "200000"
+    # Groq-style rate limit format: "Limit 200000, Used 200000, Requested 4867. Please try again in 5m23.12s."
+    m_limit = re.search(r"Limit\s+(\d+)", err_str, re.IGNORECASE)
+    m_used = re.search(r"Used\s+(\d+)", err_str, re.IGNORECASE)
+    m_time = re.search(r"try again in\s+([0-9a-zA-Z\.\s]+)\.", err_str, re.IGNORECASE)
 
-    quota_desc = "tokens per day (TPD)"
-    if "tokens per minute" in err_str.lower() or "tpm" in err_str.lower():
-        quota_desc = "tokens per minute (TPM)"
-    elif "requests per minute" in err_str.lower() or "rpm" in err_str.lower():
+    if m_limit:
+        limit = int(m_limit.group(1))
+    if m_used:
+        used = int(m_used.group(1))
+    if m_time:
+        retry_after = m_time.group(1).strip()
+
+    if "TPM" in err_str or "tokens per minute" in err_str.lower():
+        quota_desc = "Tokens Per Minute (TPM)"
+    elif "RPM" in err_str or "requests per minute" in err_str.lower():
         quota_desc = "requests per minute (RPM)"
 
     friendly_msg = (
@@ -70,7 +80,7 @@ def parse_rate_limit_error(
 
 
 class LLMClient:
-    """Unified client for Google Gemini, Groq, and NVIDIA NIM APIs (fast reasoning LLMs and dense embeddings)."""
+    """Unified client for Google Gemini / Vertex AI, Groq LLMs, and Dense Embeddings."""
 
     # Global rate limit state accessible across threads/requests
     global_rate_limit: dict[str, Any] | None = None
@@ -111,7 +121,7 @@ class LLMClient:
         else:
             self._groq_client = None
 
-        # NVIDIA NIM client (dense embeddings and fallback LLM)
+        # NVIDIA NIM client (dense embeddings)
         nvidia_key = api_key or settings.nvidia_api_key
         nvidia_url = base_url or settings.nvidia_base_url
         self._client: AsyncOpenAI | None
@@ -143,11 +153,15 @@ class LLMClient:
                             if val:
                                 current_key = val
                                 settings.gemini_api_key = val
-                        elif line.startswith("GOOGLE_CLOUD_PROJECT=") or line.startswith("GCP_PROJECT="):
+                        elif line.startswith("GOOGLE_CLOUD_PROJECT=") or line.startswith(
+                            "GCP_PROJECT="
+                        ):
                             val = line.split("=", 1)[1].strip().strip('"').strip("'")
                             if val:
                                 settings.google_cloud_project = val
-                        elif line.startswith("GOOGLE_CLOUD_LOCATION=") or line.startswith("GCP_REGION="):
+                        elif line.startswith("GOOGLE_CLOUD_LOCATION=") or line.startswith(
+                            "GCP_REGION="
+                        ):
                             val = line.split("=", 1)[1].strip().strip('"').strip("'")
                             if val:
                                 settings.google_cloud_location = val
@@ -164,14 +178,23 @@ class LLMClient:
             or os.environ.get("GOOGLE_GENAI_USE_VERTEXAI", "").lower() in ("true", "1")
         )
         if use_vertex:
-            proj = settings.google_cloud_project or os.environ.get("GOOGLE_CLOUD_PROJECT", "agentic-core")
-            loc = settings.google_cloud_location or os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1")
-            creds_path = settings.google_application_credentials or os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+            proj = settings.google_cloud_project or os.environ.get(
+                "GOOGLE_CLOUD_PROJECT", "agentic-core"
+            )
+            loc = settings.google_cloud_location or os.environ.get(
+                "GOOGLE_CLOUD_LOCATION", "us-central1"
+            )
+            creds_path = settings.google_application_credentials or os.environ.get(
+                "GOOGLE_APPLICATION_CREDENTIALS"
+            )
             if creds_path and os.path.exists(creds_path):
                 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = creds_path
 
             client_key = f"vertexai:{proj}:{loc}"
-            if getattr(self, "_current_gemini_key", None) != client_key or self._gemini_client is None:
+            if (
+                getattr(self, "_current_gemini_key", None) != client_key
+                or self._gemini_client is None
+            ):
                 self._current_gemini_key = client_key
                 try:
                     self._gemini_client = genai.Client(
@@ -179,7 +202,11 @@ class LLMClient:
                         project=proj,
                         location=loc,
                     )
-                    logger.info("Initialized Google GenAI client with Vertex AI (Project: %s, Region: %s, ADC)", proj, loc)
+                    logger.info(
+                        "Initialized Google GenAI client with Vertex AI (Project: %s, Region: %s, ADC)",
+                        proj,
+                        loc,
+                    )
                 except Exception as e:
                     logger.warning("Failed to initialize Vertex AI client: %s", e)
                     self._gemini_client = None
@@ -396,6 +423,7 @@ class LLMClient:
                                             elif hasattr(r, "embedding") and r.embedding:
                                                 combined_embeddings.append(r.embedding)
                                         from types import SimpleNamespace
+
                                         return SimpleNamespace(embeddings=combined_embeddings)
                                     raise
 
@@ -623,14 +651,11 @@ class LLMClient:
         timeout: float = 60.0,
         max_retries: int = 2,
     ) -> tuple[str, str | None]:
-        """
-        Generate completion using Groq (qwen/qwen3.6-27b) or NVIDIA NIM fallback.
+        """Generate completion using Google Gemini / Vertex AI or Groq (qwen/qwen3.6-27b).
 
         Args:
             timeout: Per-request timeout in seconds.
             max_retries: Maximum retry attempts on rate-limit errors.
-
-        Returns: (content, reasoning_content)
         """
         import asyncio
 
@@ -640,23 +665,6 @@ class LLMClient:
                 model.startswith("gemini-")
                 or model.startswith("models/gemini")
                 or model.startswith("google/gemini")
-            )
-        )
-
-        is_nim_model = bool(
-            model
-            and not is_gemini_model
-            and any(
-                model.startswith(p)
-                for p in [
-                    "meta/",
-                    "nvidia/",
-                    "z-ai/",
-                    "mistralai/",
-                    "ibm/",
-                    "google/",
-                    "microsoft/",
-                ]
             )
         )
 
@@ -688,7 +696,9 @@ class LLMClient:
 
                 # Configure thinking for Gemini 3.7 Flash
                 thinking_cfg = None
-                if enable_thinking and ("3.7" in target_model or "flash" in target_model or "gemini" in target_model):
+                if enable_thinking and (
+                    "3.7" in target_model or "flash" in target_model or "gemini" in target_model
+                ):
                     try:
                         thinking_cfg = genai_types.ThinkingConfig(
                             thinking_level="MEDIUM",
@@ -747,56 +757,12 @@ class LLMClient:
                 except Exception as e:
                     logger.warning("Gemini model %s complete failed: %s", target_model, e)
 
-        # --- Attempt 1: NVIDIA NIM (When NIM model requested) ---
-        if is_nim_model and self._client and settings.has_nvidia_key:
-            target_model = model or "z-ai/glm-5.2"
-            extra_body: dict[str, Any] = {}
-            if enable_thinking:
-                extra_body["chat_template_kwargs"] = {
-                    "enable_thinking": True,
-                    "clear_thinking": False,
-                }
-
-            nim_models = [target_model]
-            if "meta/llama-3.1-8b-instruct" not in nim_models:
-                nim_models.append("meta/llama-3.1-8b-instruct")
-
-            for m in nim_models:
-                for attempt in range(max_retries):
-                    try:
-                        nim_resp: Any = await asyncio.wait_for(
-                            self._client.chat.completions.create(
-                                model=m,
-                                messages=cast(Any, messages),
-                                temperature=temperature,
-                                top_p=top_p,
-                                max_tokens=min(max_tokens, 8192) if max_tokens else 8192,
-                                extra_body=extra_body if extra_body else None,
-                                timeout=timeout,
-                            ),
-                            timeout=timeout,
-                        )
-                        if nim_resp.choices and len(nim_resp.choices) > 0:
-                            msg = nim_resp.choices[0].message
-                            raw_content = msg.content or ""
-                            reasoning = getattr(msg, "reasoning_content", None)
-                            content, reasoning = self._parse_think_tags(raw_content, reasoning)
-                            if not content and reasoning:
-                                content = reasoning.split("\n\n")[-1].replace("ANSWER:", "").strip()
-                            return content, reasoning
-                    except asyncio.TimeoutError:
-                        logger.warning("NVIDIA NIM model %s timed out after %.0fs.", m, timeout)
-                        break
-                    except Exception as e:
-                        logger.warning("NVIDIA NIM model %s failed: %s", m, e)
-                        break
-
-        # --- Attempt 2: Groq API (Ultra-fast reasoning) ---
+        # --- Attempt 1: Groq API (Ultra-fast reasoning) ---
         groq_client = self._refresh_groq_client()
         if groq_client:
-            m = self.llm_model if (not model or is_gemini_model or is_nim_model) else model
-            if not m or m.startswith("gemini-") or ("meta/" in m and "groq" not in m) or m == "llama-3.3-70b-versatile":
-                m = "qwen/qwen3.8-27b"
+            m = self.llm_model if (not model or is_gemini_model) else model
+            if not m or m.startswith("gemini-"):
+                m = "qwen/qwen3.6-27b"
             try:
                 groq_resp: Any = await asyncio.wait_for(
                     groq_client.chat.completions.create(
@@ -823,44 +789,19 @@ class LLMClient:
                 notice = self.record_rate_limit(e, "groq", m)
                 if notice:
                     logger.warning(
-                        "Groq model %s hit rate limit (%s). Reset in %s. Failing over to NVIDIA NIM...",
+                        "Groq model %s hit rate limit (%s). Reset in %s.",
                         m,
                         notice.get("quota_type"),
                         notice.get("retry_after"),
                     )
                 else:
-                    logger.warning(
-                        "Groq model %s call failed: %s. Failing over to NVIDIA NIM...", m, e
-                    )
-
-        # --- Attempt 3: NVIDIA NIM (General High-Speed Fallback) ---
-        if self._client and settings.has_nvidia_key:
-            target_model = "meta/llama-3.1-8b-instruct"
-            try:
-                fallback_resp: Any = await asyncio.wait_for(
-                    self._client.chat.completions.create(
-                        model=target_model,
-                        messages=cast(Any, messages),
-                        temperature=temperature,
-                        top_p=top_p,
-                        max_tokens=min(max_tokens, 8192) if max_tokens else 8192,
-                        timeout=timeout,
-                    ),
-                    timeout=timeout,
-                )
-                if fallback_resp.choices and len(fallback_resp.choices) > 0:
-                    self.last_rate_limit = None
-                    LLMClient.global_rate_limit = None
-                    msg = fallback_resp.choices[0].message
-                    raw_content = msg.content or ""
-                    reasoning = getattr(msg, "reasoning_content", None)
-                    content, reasoning = self._parse_think_tags(raw_content, reasoning)
-                    return content, reasoning
-            except Exception as e:
-                logger.warning("NVIDIA NIM fallback failed: %s", e)
+                    logger.warning("Groq model %s call failed: %s.", m, e)
 
         # Fallback: Deterministic mock
         return self._mock_completion(messages)
+
+    # Alias for backward compatibility
+    generate_completion = complete
 
     async def stream_complete(
         self,
@@ -871,9 +812,7 @@ class LLMClient:
         max_tokens: int = 8192,
         enable_thinking: bool = True,
     ) -> AsyncIterator[dict[str, Any]]:
-        """
-        Yields chunks of {"type": "reasoning" | "content", "text": "..."}
-        """
+        """Yields chunks with type (reasoning or content) and text."""
 
         is_gemini_model = bool(
             model
@@ -881,23 +820,6 @@ class LLMClient:
                 model.startswith("gemini-")
                 or model.startswith("models/gemini")
                 or model.startswith("google/gemini")
-            )
-        )
-
-        is_nim_model = bool(
-            model
-            and not is_gemini_model
-            and any(
-                model.startswith(p)
-                for p in [
-                    "meta/",
-                    "nvidia/",
-                    "z-ai/",
-                    "mistralai/",
-                    "ibm/",
-                    "google/",
-                    "microsoft/",
-                ]
             )
         )
 
@@ -929,7 +851,9 @@ class LLMClient:
 
                 # Configure thinking for Gemini 3.7 Flash
                 thinking_cfg = None
-                if enable_thinking and ("3.7" in target_model or "flash" in target_model or "gemini" in target_model):
+                if enable_thinking and (
+                    "3.7" in target_model or "flash" in target_model or "gemini" in target_model
+                ):
                     try:
                         thinking_cfg = genai_types.ThinkingConfig(
                             thinking_level="MEDIUM",
@@ -983,44 +907,12 @@ class LLMClient:
                 except Exception as e:
                     logger.warning("Gemini model %s streaming failed: %s", target_model, e)
 
-        # --- Attempt 1: NVIDIA NIM (When NIM model requested) ---
-        if is_nim_model and self._client and settings.has_nvidia_key:
-            nim_models = [model or "meta/llama-3.1-8b-instruct"]
-            if "meta/llama-3.1-8b-instruct" not in nim_models:
-                nim_models.append("meta/llama-3.1-8b-instruct")
-
-            for m in nim_models:
-                try:
-                    nim_stream: Any = await self._client.chat.completions.create(
-                        model=m,
-                        messages=cast(Any, messages),
-                        temperature=temperature,
-                        top_p=top_p,
-                        max_tokens=min(max_tokens, 8192),
-                        stream=True,
-                    )
-                    stream_emitted = False
-                    async for chunk in nim_stream:
-                        if not getattr(chunk, "choices", None) or len(chunk.choices) == 0:
-                            continue
-                        delta = chunk.choices[0].delta
-                        if delta is None:
-                            continue
-                        content = getattr(delta, "content", None)
-                        if content:
-                            stream_emitted = True
-                            self.last_rate_limit = None
-                            LLMClient.global_rate_limit = None
-                            yield {"type": "content", "text": content}
-                    if stream_emitted:
-                        return
-                except Exception as e:
-                    logger.warning("NVIDIA NIM model %s streaming failed: %s", m, e)
-
-        # --- Attempt 2: Groq API ---
+        # --- Attempt 1: Groq API ---
         groq_client = self._refresh_groq_client()
-        if groq_client and not is_nim_model:
+        if groq_client:
             m = model or self.llm_model or "qwen/qwen3.6-27b"
+            if m.startswith("gemini-"):
+                m = "qwen/qwen3.6-27b"
             try:
                 stream_obj: Any = await groq_client.chat.completions.create(
                     model=m,
@@ -1099,68 +991,15 @@ class LLMClient:
                 notice = self.record_rate_limit(e, "groq", m)
                 if notice:
                     logger.warning(
-                        "Groq model %s hit rate limit (%s). Reset in %s. Failing over to NVIDIA NIM...",
+                        "Groq model %s hit rate limit (%s). Reset in %s.",
                         m,
                         notice.get("quota_type"),
                         notice.get("retry_after"),
                     )
                 else:
-                    logger.warning(
-                        "Groq model %s streaming failed: %s. Failing over to NVIDIA NIM...", m, e
-                    )
+                    logger.warning("Groq model %s streaming failed: %s.", m, e)
 
-        # --- Attempt 2: NVIDIA NIM (General Fallback) ---
-        if self._client and settings.has_nvidia_key:
-            target_nim_model = (
-                model
-                if (
-                    model
-                    and any(
-                        model.startswith(p) for p in ["meta/", "nvidia/", "z-ai/", "mistralai/"]
-                    )
-                )
-                else "meta/llama-3.1-8b-instruct"
-            )
-            try:
-                fallback_stream: Any = await self._client.chat.completions.create(
-                    model=target_nim_model,
-                    messages=cast(Any, messages),
-                    temperature=temperature,
-                    top_p=top_p,
-                    max_tokens=min(max_tokens, 8192),
-                    stream=True,
-                )
-                stream_emitted = False
-                async for chunk in fallback_stream:
-                    if not getattr(chunk, "choices", None) or len(chunk.choices) == 0:
-                        continue
-                    delta = chunk.choices[0].delta
-                    if delta is None:
-                        continue
-
-                    reasoning = getattr(delta, "reasoning_content", None)
-                    if reasoning:
-                        stream_emitted = True
-                        self.last_rate_limit = None
-                        LLMClient.global_rate_limit = None
-                        yield {"type": "reasoning", "text": reasoning}
-
-                    content = getattr(delta, "content", None)
-                    if content:
-                        stream_emitted = True
-                        self.last_rate_limit = None
-                        LLMClient.global_rate_limit = None
-                        yield {"type": "content", "text": content}
-
-                if stream_emitted:
-                    return
-
-            except Exception as e:
-                logger.warning("NVIDIA NIM streaming fallback failed: %s. Using mock.", e)
-                if not settings.allow_mock_fallback:
-                    raise
-
-        # --- Attempt 3: Direct Context Extraction Fallback ---
+        # --- Attempt 2: Direct Context Extraction Fallback ---
         active_notice = self.last_rate_limit or LLMClient.global_rate_limit
         if active_notice:
             yield {"type": "rate_limit", "notice": active_notice}
@@ -1171,12 +1010,7 @@ class LLMClient:
         yield {"type": "content", "text": content}
 
     def _mock_completion(self, messages: list[dict[str, Any]]) -> tuple[str, str | None]:
-        """Generate structured synthetic answer for testing purposes.
-
-        When the NVIDIA NIM API is unavailable, this extracts retrieved context
-        from the assembled prompt messages and presents it directly so the user
-        still gets useful information from their documents.
-        """
+        """Generate structured synthetic answer for testing purposes."""
         last_msg = messages[-1]["content"] if messages else ""
         system_msg = (
             messages[0]["content"] if len(messages) > 1 and messages[0]["role"] == "system" else ""
@@ -1184,7 +1018,10 @@ class LLMClient:
 
         active_notice = self.last_rate_limit or LLMClient.global_rate_limit
         if active_notice:
-            reasoning = f"⚠️ **Groq Rate Limit Notice**: {active_notice['message']}\nShowing retrieved document evidence directly."
+            reasoning = (
+                f"⚠️ **Groq Rate Limit Notice**: {active_notice['message']}\n"
+                "Showing retrieved document evidence directly."
+            )
             banner = f"> ⚠️ **Groq Rate Limit Reached**: {active_notice['message']}\n\n"
         else:
             reasoning = (

@@ -427,9 +427,7 @@ async def run_evaluation():
         from deep_context.generation.grounded_answer import generate_grounded_answer
 
         t_gen_0 = time.time()
-        eval_gen_model = (
-            "meta/llama-3.1-8b-instruct" if settings.has_nvidia_key else settings.llm_model
-        )
+        eval_gen_model = settings.llm_model
         grounded_res = await generate_grounded_answer(
             query=question,
             retrieved_chunks=retrieval_res.parent_chunks,

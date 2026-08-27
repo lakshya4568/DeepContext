@@ -679,6 +679,18 @@ class PostgresStore(StorageInterface):
                 records,
             )
 
+    def _to_float_list(self, val: Any) -> list[float] | None:
+        if val is None:
+            return None
+        if hasattr(val, "to_numpy"):
+            return val.to_numpy().tolist()
+        if isinstance(val, np.ndarray):
+            return val.tolist()
+        try:
+            return list(val)
+        except Exception:
+            return [float(x) for x in str(val).strip("[]").split(",") if x.strip()]
+
     async def get_chunk(self, chunk_id: str) -> Chunk | None:
         pool = self._get_pool()
         async with pool.acquire() as conn:
@@ -694,7 +706,7 @@ class PostgresStore(StorageInterface):
                 token_count=row["token_count"],
                 section_path=row["section_path"],
                 page_number=row["page_number"],
-                embedding=(list(row["embedding"]) if row["embedding"] is not None else None),
+                embedding=self._to_float_list(row["embedding"]),
                 summary_text=row.get("summary_text"),
                 summary_tokens=row.get("summary_tokens"),
                 summary_model=row.get("summary_model"),
@@ -718,7 +730,7 @@ class PostgresStore(StorageInterface):
                     token_count=r["token_count"],
                     section_path=r["section_path"],
                     page_number=r["page_number"],
-                    embedding=(list(r["embedding"]) if r["embedding"] is not None else None),
+                    embedding=self._to_float_list(r["embedding"]),
                     summary_text=r.get("summary_text"),
                     summary_tokens=r.get("summary_tokens"),
                     summary_model=r.get("summary_model"),

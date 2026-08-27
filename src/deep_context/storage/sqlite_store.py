@@ -321,7 +321,9 @@ class SQLiteStore(StorageInterface):
                     summary_text=r["summary_text"],
                     summary_tokens=r["summary_tokens"],
                     summary_model=r["summary_model"],
-                    generated_at=datetime.fromisoformat(r["generated_at"]) if r["generated_at"] else None,
+                    generated_at=datetime.fromisoformat(r["generated_at"])
+                    if r["generated_at"]
+                    else None,
                 )
                 for r in rows
             ]

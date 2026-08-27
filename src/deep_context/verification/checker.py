@@ -88,15 +88,9 @@ class EvidenceVerifier:
                 f"Grounding confidence {confidence:.2f} is below threshold {settings.confidence_threshold:.2f}."
             )
 
-        passed = (
-            confidence >= settings.confidence_threshold
-            and (
-                not is_aggregation
-                or (
-                    coverage_ratio is not None
-                    and coverage_ratio >= settings.min_aggregation_coverage
-                )
-            )
+        passed = confidence >= settings.confidence_threshold and (
+            not is_aggregation
+            or (coverage_ratio is not None and coverage_ratio >= settings.min_aggregation_coverage)
         )
 
         return SupportCheckResult(

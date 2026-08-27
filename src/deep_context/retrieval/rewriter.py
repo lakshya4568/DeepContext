@@ -59,9 +59,7 @@ class QueryRewriter:
             if appendix_q not in sub_queries:
                 sub_queries.append(appendix_q)
 
-        target_model = (
-            "meta/llama-3.1-8b-instruct" if settings.has_nvidia_key else settings.llm_model
-        )
+        target_model = settings.llm_model
 
         if (
             shape in (QueryShape.MULTI_HOP, QueryShape.AGGREGATION)
@@ -101,6 +99,17 @@ class QueryRewriter:
                     for p in parts:
                         if p not in sub_queries:
                             sub_queries.append(p)
+
+        # Preserve verbatim quoted phrases to protect BM25 exact-phrase matching and needle retrieval
+        clean_q = query.replace("“", '"').replace("”", '"').replace("‘", "'").replace("’", "'")
+        quoted_phrases = re.findall(r'"([^"]{3,})"', clean_q)
+        if quoted_phrases:
+            for qp in quoted_phrases:
+                qp_stripped = qp.strip()
+                if qp_stripped and qp_stripped not in sub_queries:
+                    sub_queries.append(qp_stripped)
+            # If user passed explicit quoted search terms, preserve exact phrasing without generic paraphrase dilution
+            return sub_queries[:4]
 
         all_words = re.findall(r"\w+", query)
         has_proper_nouns = (
