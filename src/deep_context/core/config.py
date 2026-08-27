@@ -73,6 +73,38 @@ class Settings(BaseSettings):
         alias="GEMINI_RETRY_DELAY_SEC",
         description="Initial backoff delay in seconds for exponential backoff on 429 errors",
     )
+
+    # Google Cloud Vertex AI (Uses Google Cloud Billing & Free Trial Credits via ADC)
+    vertex_ai_enabled: bool = Field(
+        default=False,
+        alias="VERTEX_AI_ENABLED",
+        description="Enable Google Cloud Vertex AI for Gemini embeddings & completions",
+    )
+    google_cloud_project: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "GOOGLE_CLOUD_PROJECT",
+            "GCP_PROJECT",
+            "PROJECT_ID",
+            "google_cloud_project",
+        ),
+        description="Google Cloud Project ID (e.g. 'agentic-core')",
+    )
+    google_cloud_location: str = Field(
+        default="us-central1",
+        validation_alias=AliasChoices(
+            "GOOGLE_CLOUD_LOCATION",
+            "GCP_REGION",
+            "GOOGLE_CLOUD_REGION",
+            "google_cloud_location",
+        ),
+        description="Google Cloud Region for Vertex AI (e.g. 'us-central1')",
+    )
+    google_application_credentials: str = Field(
+        default="",
+        alias="GOOGLE_APPLICATION_CREDENTIALS",
+        description="Path to Google Cloud Service Account JSON key file for ADC authentication",
+    )
     # Hugging Face API
     hf_token: str = Field(
         default="",
@@ -199,7 +231,13 @@ class Settings(BaseSettings):
     allow_mock_fallback: bool = Field(default=True, alias="ALLOW_MOCK_FALLBACK")
 
     @property
+    def has_vertex_ai(self) -> bool:
+        return bool(self.vertex_ai_enabled or self.google_cloud_project)
+
+    @property
     def has_gemini_key(self) -> bool:
+        if self.has_vertex_ai:
+            return True
         k = self.gemini_api_key.strip()
         return bool(k and not k.startswith("AIzaSy-your-key") and len(k) > 10)
 

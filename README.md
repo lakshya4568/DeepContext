@@ -33,9 +33,12 @@ Most modern RAG systems suffer from three critical flaws:
 **Deep Context Platform solves this from first principles:**
 
 - **100% Hand-Crafted Core:** Zero LangChain, zero LlamaIndex, zero LangGraph. Pure, reviewable, high-speed Python 3.12 and raw SQL.
-- **Hierarchical Parent-Child Resolution:** Ingests documents into 1,000–2,500 token parent blocks mapped to 200–600 token child chunks with 15% overlap. Vector search hits precise children; synthesis receives rich parent context.
-- **Multi-Strategy Hybrid Retrieval:** Combines BM25 full-text indexing, `pgvector` HNSW dense vector search, Reciprocal Rank Fusion (RRF $k=60$), and multi-strategy rerankers.
-- **Matryoshka Representation Learning (MRL):** Native support for Google `gemini-embedding-2` and `gemini-embedding-001` with flexible output dimensions (768d, 1536d, 3072d) for up to 75% vector storage savings.
+- **Anthropic Contextual Retrieval Standard:** Ingests documents with local GPU/MPS Qwen3-0.6B contextual summaries prepended to raw text (`summary_text + "\n\n" + raw_content`), cutting retrieval failure rates by up to 67%.
+- **Hierarchical Parent-Child Resolution & Multi-Chunk Synthesis:** Precise 300-token child chunks for dense vector search; automatically expands to 1,500-token parent sections during LLM synthesis across distant chapters.
+- **Decoupled Zero Data-Loss Ingestion Pipeline:** Checkpoint 1 atomic PostgreSQL writes preserve document hierarchy and Qwen3 summaries even on upstream rate limits, with on-demand deferred embedding resumption (`/v1/documents/{id}/embed-stream`).
+- **Google Cloud Vertex AI & ADC Integration:** Native support for Google Cloud Vertex AI with OAuth 2.0 Application Default Credentials (`gcloud auth application-default login`), drawing directly from Google Cloud credits.
+- **Multi-Strategy Hybrid Retrieval:** Combines weighted BM25 full-text indexing (prioritizing summary terms), `pgvector` HNSW dense vector search, Reciprocal Rank Fusion (RRF $k=60$), and neural cross-encoder rerankers.
+- **Matryoshka Representation Learning (MRL):** Native support for `gemini-embedding-2` and `text-embedding-004` with flexible output dimensions (768d, 1536d, 3072d) for up to 75% vector storage savings.
 - **Recursive Language Model (RLM) Engine:** Implements the MIT / Prime-Intellect architecture. When context exceeds window limits, the agent operates in a sandboxed Python REPL, spawning subagents and searching the corpus recursively.
 - **4-Store Typed Memory with Promotion Gate:** Durable memory partitioned into **Policy**, **Preference**, **Semantic Fact**, and **Episodic Summary**, governed by a strict 4-stage promotion gate and compiled via an 8-layer prompt assembler.
 - **Grounding Verification Gate:** Deterministic Natural Language Inference (NLI) and quote overlap checks that score evidence support before emitting final answers.
@@ -53,6 +56,7 @@ Most modern RAG systems suffer from three critical flaws:
                                  ┌────────────────────────────────────────────────────────┐
                                  │                FastAPI Application Layer               │
                                  │       • SSE Token Streaming    • REST Endpoints        │
+                                 │       • Deferred Embedding Streaming Resumption        │
                                  └───────────────────────────┬────────────────────────────┘
                                                              │
                                                              ▼
@@ -64,12 +68,12 @@ Most modern RAG systems suffer from three critical flaws:
                     ┌────────────────────┘                   │                    └────────────────────┐
                     ▼                                        ▼                                         ▼
    ┌─────────────────────────────────┐     ┌───────────────────────────────────┐     ┌──────────────────────────────────┐
-   │       Hybrid RAG Pipeline       │     │       Agentic Planner Loop        │     │       RLM Recursion Engine       │
-   │  1. BM25 Text Search            │     │  • Iterative Sub-Query Generation │     │  • Sandboxed Python REPL Kernel  │
-   │  2. Dense Vector (Gemini/NIM)   │     │  • Multi-Hop Retrieval            │     │  • Regex & Keyword Search APIs   │
+   │  Anthropic Contextual Hybrid    │     │       Agentic Planner Loop        │     │       RLM Recursion Engine       │
+   │  1. Weighted BM25 (Summary+Text)│     │  • Iterative Sub-Query Generation │     │  • Sandboxed Python REPL Kernel  │
+   │  2. Dense Vector (Vertex/Gemini)│     │  • Multi-Hop Retrieval            │     │  • Regex & Keyword Search APIs   │
    │  3. Reciprocal Rank Fusion (RRF)│     │  • Chunk Deduplication            │     │  • Async Subagent Spawn & Mailbox│
    │  4. Multi-Strategy Precision    │     │  • Bounded Token Budgeting        │     │  • Structured Answer Synthesis   │
-   │     Reranker (Cross/LLM/Embed)  │     └─────────────────┬─────────────────┘     └────────────────┬─────────────────┘
+   │     Reranker (Cross/EcoHash)    │     └─────────────────┬─────────────────┘     └────────────────┬─────────────────┘
    │  5. Child -> Parent Resolution  │                       │                                        │
    └────────────────┬────────────────┘                       │                                        │
                     │                                        │                                        │
@@ -92,6 +96,7 @@ Most modern RAG systems suffer from three critical flaws:
                                  ┌────────────────────────────────────────────────────────┐
                                  │                Storage & Vector Engine                 │
                                  │   • PostgreSQL + pgvector (HNSW)   • SQLite + FTS5     │
+                                 │   • Checkpoint 1 Zero-Loss Writes  • search_tsv Trigger│
                                  └───────────────────────────┬────────────────────────────┘
 ```
 
@@ -103,12 +108,12 @@ Most modern RAG systems suffer from three critical flaws:
 
 The platform features dynamic model routing, automatic failover, and dynamic `.env` hot-reloading:
 
-| Provider              | Supported Models                                                                | Capabilities                                                                 |
-| :-------------------- | :------------------------------------------------------------------------------ | :--------------------------------------------------------------------------- |
-| **Google GenAI**      | `gemini-2.5-flash`, `gemini-2.5-pro`                                            | Ultra-fast multimodal reasoning, streaming synthesis                         |
-| **Google Embeddings** | `gemini-embedding-2`, `gemini-embedding-001`                                    | Multimodal text MRL (768d, 1536d, 3072d), task-specific prefixing            |
-| **Groq Cloud**        | `qwen/qwen3.6-27b`, `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`           | Real-time reasoning token streaming (`<think>` blocks), sub-second execution |
-| **NVIDIA NIM**        | `meta/llama-3.1-8b-instruct`, `z-ai/glm-5.2`, `nv-embedqa-e5-v5`, `baai/bge-m3` | High-throughput enterprise LLMs & 1024-dim dense embeddings                  |
+| Provider | Supported Models | Capabilities & Auth |
+| :--- | :--- | :--- |
+| **Google Cloud Vertex AI** | `gemini-embedding-2`, `text-embedding-004` | Enterprise multimodal MRL (768d), authenticated via OAuth 2.0 Application Default Credentials (ADC), billed to Cloud Credits |
+| **Google AI Studio** | `gemini-2.5-flash`, `gemini-embedding-2` | Fast reasoning & multimodal text embeddings via API Key |
+| **Groq Cloud** | `qwen/qwen3.8-27b`, `qwen/qwen3.6-27b` | Sub-second ultra-fast reasoning token streaming (`<think>` blocks) |
+| **Local Neural Models** | `Qwen/Qwen3-0.6B` (FP16) | On-device contextual chunk summarization with Apple Silicon Metal (MPS) and NVIDIA CUDA hardware acceleration |
 
 ### 2. Multi-Strategy Precision Reranking
 

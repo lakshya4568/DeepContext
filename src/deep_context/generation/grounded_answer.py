@@ -64,8 +64,12 @@ def _parse_extract_payload(text: str) -> dict[str, Any]:
 
 def _get_chunk_content(c: Any) -> str:
     if isinstance(c, dict):
-        return str(c.get("content", ""))
-    return str(getattr(c, "content", ""))
+        return str(c.get("content") or c.get("snippet") or c.get("text") or "")
+    for attr in ("content", "snippet", "text"):
+        val = getattr(c, attr, None)
+        if val:
+            return str(val)
+    return ""
 
 
 def _strip_unsupported(answer: str, evidence: list[Any]) -> str:

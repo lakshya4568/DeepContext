@@ -23,8 +23,8 @@ The `chunks` table utilizes four complementary indexes designed to maximize sear
 
 | Index Name | Type / Method | Target Columns | Purpose |
 |---|---|---|---|
-| `idx_chunks_embedding_hnsw` | **HNSW** (`vector_cosine_ops`) | `embedding` (1024-dim) | High-speed approximate nearest neighbor search ($\approx 10\times$ faster than IVFFlat). |
-| `idx_chunks_search_tsv` | **GIN** | `search_tsv` (tsvector) | Full-text BM25 search over weighted content ('B') + semantic summary ('C'). |
+| `idx_chunks_embedding_hnsw` | **HNSW** (`vector_cosine_ops`) | `embedding` (768-dim) | High-speed approximate nearest neighbor search ($\approx 10\times$ faster than IVFFlat). |
+| `idx_chunks_search_tsv` | **GIN** | `search_tsv` (tsvector) | Full-text BM25 search over weighted summary ('A') + raw content ('B'). |
 | `idx_chunks_parent_null` | **B-Tree** (Partial) | `(id, document_id)` WHERE `parent_chunk_id IS NULL` | Sub-millisecond parent chunk resolution without table scans over child chunks. |
 | `idx_chunks_document_id` | **B-Tree** (Composite) | `(document_id, id)` | Fast filtering and chunk counting scoped by document. |
 
@@ -38,8 +38,8 @@ A PostgreSQL `BEFORE INSERT OR UPDATE` trigger function (`update_chunks_tsv`) au
 CREATE OR REPLACE FUNCTION update_chunks_tsv() RETURNS trigger AS $$
 BEGIN
   NEW.search_tsv := 
-    setweight(to_tsvector('english', COALESCE(NEW.content, '')), 'B') ||
-    setweight(to_tsvector('english', COALESCE(NEW.summary_text, '')), 'C');
+    setweight(to_tsvector('english', COALESCE(NEW.summary_text, '')), 'A') ||
+    setweight(to_tsvector('english', COALESCE(NEW.content, '')), 'B');
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -49,8 +49,8 @@ BEFORE INSERT OR UPDATE ON chunks
 FOR EACH ROW EXECUTE FUNCTION update_chunks_tsv();
 ```
 
-- **Weight 'B' (1.2x rank)**: Assigned to the raw chunk content (`content`).
-- **Weight 'C' (1.0x rank)**: Assigned to the LLM-generated semantic summary (`summary_text`).
+- **Weight 'A' (Highest rank priority)**: Assigned to the LLM-generated contextual summary (`summary_text`).
+- **Weight 'B' (Standard rank priority)**: Assigned to the raw chunk content (`content`).
 
 ---
 

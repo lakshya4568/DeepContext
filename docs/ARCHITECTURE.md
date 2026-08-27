@@ -73,7 +73,69 @@ A rendered version of this diagram is in `diagrams/system_architecture.mermaid`.
 
 ---
 
-## 3. Layered view
+## 2.1 Anthropic Contextual Retrieval & Ingestion Pipeline
+
+The platform implements Anthropic's **Contextual Retrieval Architecture (September 2024)** combined with a **Decoupled Zero-Loss Ingestion Pipeline**:
+
+```text
+                                  RAW INPUT DOCUMENT (PDF / Markdown / Code)
+                                                      │
+                                                      ▼
+                                       Structure-Aware Section Parsing
+                                                      │
+                                                      ▼
+                                        Hierarchical Chunk Creation
+                                 (Parents: ~1500 tokens | Children: ~300 tokens)
+                                                      │
+                                                      ▼
+                                     Qwen3 Contextual Summary Generator
+                           (Runs locally on GPU via PyTorch MPS/Metal or CUDA FP16;
+                            situates chunk within document title, enclosing section,
+                            and resolves ambiguous pronouns/entities)
+                                                      │
+                                                      ▼
+                                   [CHECKPOINT 1: ATOMIC DATABASE WRITE]
+                        (Document, Parent Chunks, Child Chunks, Qwen3 Summaries,
+                         and Weighted search_tsv written immediately to PostgreSQL.
+                         Guarantees zero data loss if upstream embedding APIs rate limit.)
+                                                      │
+                                                      ▼
+                                      Progressive Batch Vector Embedding
+                         (gemini-embedding-2 via Google Cloud Vertex AI ADC,
+                          embedding: summary_text + "\n\n" + raw_content -> 768d MRL vector.
+                          Gracefully throttles with exponential backoff on HTTP 429.)
+                                                      │
+                                                      ▼
+                                   [POST-INGESTION & DEFERRED RESUMPTION]
+                         (If interrupted, /v1/documents/{id}/embed-stream resumes embedding
+                          remaining chunks without re-parsing or re-summarizing.)
+```
+
+### Contextual Embedding Mechanics: Why Prepend Context?
+
+Rather than embedding raw chunks alone (which lose referential context for pronouns and entities) or embedding summaries alone (which lose exact numbers, quotes, and technical symbols), the system embeds the composite text:
+
+$$\text{Embedding Input} = \text{Contextual Summary} \mathbin{\Vert} \text{"\n\n"} \mathbin{\Vert} \text{Raw Passage Content}$$
+
+Modern multi-head self-attention models (e.g. `gemini-embedding-2` with 8,192 token context) perform cross-attention between the contextual prefix and the passage body. This anchors ambiguous terms to their document-level entities without diluting fine-grained lexical details, reducing retrieval failure rates by up to 67%.
+
+### Dual Search Index & Weighted Full-Text Integration
+
+PostgreSQL maintains two complementary search structures on the `chunks` table:
+1. **Dense Vector Index (`idx_chunks_embedding_hnsw`)**: HNSW cosine similarity index ($m=16, ef_{\text{construction}}=64$) over the 768-dimensional contextual vector.
+2. **Weighted BM25 TSVector (`search_tsv`)**: Auto-generated via database trigger:
+   $$\text{search\_tsv} = \text{setweight}(\text{to\_tsvector}(\text{content}), \text{'B'}) \mathbin{\Vert} \text{setweight}(\text{to\_tsvector}(\text{summary\_text}), \text{'A'})$$
+   Summary terms receive highest priority (`Weight A`), while raw text terms receive base priority (`Weight B`).
+
+### Multi-Chunk Synthesis & Parent Resolution
+
+When a user query retrieves multiple disparate chunks (e.g. Chunk #3 in Section 1, Chunk #21 in Section 4, Chunk #81 in Section 9):
+1. **Parent Resolution**: Deep Context automatically looks up the enclosing Parent Chunk for each matching child to supply full surrounding section context.
+2. **Context Assembly**: Retrieved parent sections are merged and deduplicated into a structured evidence payload.
+3. **Two-Pass Grounded Generation**:
+   - **Pass 1 (Fact Extraction)**: The LLM reads all evidence passages simultaneously to isolate supported facts answering the user query.
+   - **Pass 2 (Grounded Synthesis)**: The LLM drafts a coherent answer synthesizing facts across all retrieved sections.
+   - **Pass 3 (Grounding Verification)**: The Evidence Verifier verifies each claim against the citations and generates traceable citation markers.
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────────┐

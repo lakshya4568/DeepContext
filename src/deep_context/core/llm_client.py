@@ -143,9 +143,49 @@ class LLMClient:
                             if val:
                                 current_key = val
                                 settings.gemini_api_key = val
+                        elif line.startswith("GOOGLE_CLOUD_PROJECT=") or line.startswith("GCP_PROJECT="):
+                            val = line.split("=", 1)[1].strip().strip('"').strip("'")
+                            if val:
+                                settings.google_cloud_project = val
+                        elif line.startswith("GOOGLE_CLOUD_LOCATION=") or line.startswith("GCP_REGION="):
+                            val = line.split("=", 1)[1].strip().strip('"').strip("'")
+                            if val:
+                                settings.google_cloud_location = val
+                        elif line.startswith("VERTEX_AI_ENABLED="):
+                            val = line.split("=", 1)[1].strip().lower()
+                            settings.vertex_ai_enabled = val in ("true", "1", "yes")
             except Exception:
                 pass
 
+        # 1. Vertex AI Mode: Uses Google Cloud Project & Application Default Credentials (ADC)
+        use_vertex = (
+            settings.vertex_ai_enabled
+            or bool(settings.google_cloud_project)
+            or os.environ.get("GOOGLE_GENAI_USE_VERTEXAI", "").lower() in ("true", "1")
+        )
+        if use_vertex:
+            proj = settings.google_cloud_project or os.environ.get("GOOGLE_CLOUD_PROJECT", "agentic-core")
+            loc = settings.google_cloud_location or os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1")
+            creds_path = settings.google_application_credentials or os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+            if creds_path and os.path.exists(creds_path):
+                os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = creds_path
+
+            client_key = f"vertexai:{proj}:{loc}"
+            if getattr(self, "_current_gemini_key", None) != client_key or self._gemini_client is None:
+                self._current_gemini_key = client_key
+                try:
+                    self._gemini_client = genai.Client(
+                        vertexai=True,
+                        project=proj,
+                        location=loc,
+                    )
+                    logger.info("Initialized Google GenAI client with Vertex AI (Project: %s, Region: %s, ADC)", proj, loc)
+                except Exception as e:
+                    logger.warning("Failed to initialize Vertex AI client: %s", e)
+                    self._gemini_client = None
+            return self._gemini_client
+
+        # 2. Public Google AI Studio API Key Mode
         if not current_key or current_key.startswith("AIzaSy-your-key") or len(current_key) < 10:
             self._gemini_client = None
             self._current_gemini_key = None
@@ -280,7 +320,7 @@ class LLMClient:
         # Determine target dimension
         if dim:
             target_dim = dim
-        elif "gemini" in target_model.lower():
+        elif "gemini" in target_model.lower() or "text-embedding" in target_model.lower():
             target_dim = settings.embedding_dim or 768
         else:
             target_dim = settings.embedding_dim or 1024
@@ -293,7 +333,7 @@ class LLMClient:
             or target_model.startswith("text-embedding")
         )
 
-        # --- Attempt 1: Google Gemini API (gemini-embedding-2 / gemini-embedding-001) ---
+        # --- Attempt 1: Google Gemini / Vertex AI API ---
         if is_gemini:
             gemini_client = self._refresh_gemini_client()
             if gemini_client:
@@ -328,14 +368,36 @@ class LLMClient:
                             async def _do_embed_v2(
                                 cur_contents=formatted_contents, cur_config=config
                             ):
-                                return await asyncio.wait_for(
-                                    gemini_client.aio.models.embed_content(
-                                        model=target_model,
-                                        contents=cur_contents,
-                                        config=cur_config,
-                                    ),
-                                    timeout=20.0,
-                                )
+                                try:
+                                    return await asyncio.wait_for(
+                                        gemini_client.aio.models.embed_content(
+                                            model=target_model,
+                                            contents=cur_contents,
+                                            config=cur_config,
+                                        ),
+                                        timeout=20.0,
+                                    )
+                                except Exception as e_v2:
+                                    err_str = str(e_v2).lower()
+                                    if "only supports one content" in err_str:
+                                        tasks = [
+                                            gemini_client.aio.models.embed_content(
+                                                model=target_model,
+                                                contents=c,
+                                                config=cur_config,
+                                            )
+                                            for c in cur_contents
+                                        ]
+                                        responses = await asyncio.gather(*tasks)
+                                        combined_embeddings = []
+                                        for r in responses:
+                                            if hasattr(r, "embeddings") and r.embeddings:
+                                                combined_embeddings.extend(r.embeddings)
+                                            elif hasattr(r, "embedding") and r.embedding:
+                                                combined_embeddings.append(r.embedding)
+                                        from types import SimpleNamespace
+                                        return SimpleNamespace(embeddings=combined_embeddings)
+                                    raise
 
                             resp = await self._call_gemini_with_backoff(
                                 _do_embed_v2, f"embed_content ({target_model})"
@@ -700,8 +762,8 @@ class LLMClient:
         groq_client = self._refresh_groq_client()
         if groq_client:
             m = self.llm_model if (not model or is_gemini_model or is_nim_model) else model
-            if not m or m.startswith("gemini-") or ("meta/" in m and "groq" not in m):
-                m = "qwen/qwen3.6-27b"
+            if not m or m.startswith("gemini-") or ("meta/" in m and "groq" not in m) or m == "llama-3.3-70b-versatile":
+                m = "qwen/qwen3.8-27b"
             try:
                 groq_resp: Any = await asyncio.wait_for(
                     groq_client.chat.completions.create(
