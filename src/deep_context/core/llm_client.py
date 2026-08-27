@@ -660,11 +660,11 @@ class LLMClient:
             )
         )
 
-        # --- Attempt 0: Google Gemini API (When Gemini model requested) ---
+        # --- Attempt 0: Google Gemini / Vertex AI API (When Gemini model requested) ---
         if is_gemini_model:
             gemini_client = self._refresh_gemini_client()
             if gemini_client:
-                target_model = model or "gemini-2.5-flash"
+                target_model = model or "gemini-3.7-flash"
                 system_prompt = ""
                 gemini_contents = []
                 for m_item in messages:
@@ -686,21 +686,34 @@ class LLMClient:
                         )
                     )
 
+                # Configure thinking for Gemini 3.7 Flash
+                thinking_cfg = None
+                if enable_thinking and ("3.7" in target_model or "flash" in target_model or "gemini" in target_model):
+                    try:
+                        thinking_cfg = genai_types.ThinkingConfig(
+                            thinking_level="MEDIUM",
+                        )
+                    except Exception:
+                        thinking_cfg = None
+
                 try:
 
                     async def _do_gemini_gen():
+                        gen_kwargs: dict[str, Any] = {
+                            "system_instruction": system_prompt.strip() if system_prompt else None,
+                            "max_output_tokens": min(max_tokens, 8192) if max_tokens else 8192,
+                        }
+                        if thinking_cfg is not None:
+                            gen_kwargs["thinking_config"] = thinking_cfg
+                        else:
+                            gen_kwargs["temperature"] = temperature
+                            gen_kwargs["top_p"] = top_p
+
                         return await asyncio.wait_for(
                             gemini_client.aio.models.generate_content(
                                 model=target_model,
                                 contents=gemini_contents,  # type: ignore[arg-type]
-                                config=genai_types.GenerateContentConfig(
-                                    system_instruction=system_prompt.strip()
-                                    if system_prompt
-                                    else None,
-                                    temperature=temperature,
-                                    top_p=top_p,
-                                    max_output_tokens=min(max_tokens, 8192) if max_tokens else 8192,
-                                ),
+                                config=genai_types.GenerateContentConfig(**gen_kwargs),
                             ),
                             timeout=timeout,
                         )
@@ -708,6 +721,26 @@ class LLMClient:
                     gemini_resp = await self._call_gemini_with_backoff(
                         _do_gemini_gen, f"generate_content ({target_model})"
                     )
+
+                    reasoning_parts: list[str] = []
+                    content_parts: list[str] = []
+                    if getattr(gemini_resp, "candidates", None) and len(gemini_resp.candidates) > 0:
+                        cand_content = getattr(gemini_resp.candidates[0], "content", None)
+                        if cand_content and getattr(cand_content, "parts", None):
+                            for part in cand_content.parts:
+                                part_text = getattr(part, "text", "") or ""
+                                if getattr(part, "thought", False):
+                                    reasoning_parts.append(part_text)
+                                else:
+                                    content_parts.append(part_text)
+
+                    if reasoning_parts or content_parts:
+                        content = "".join(content_parts)
+                        reasoning = "".join(reasoning_parts) if reasoning_parts else None
+                        if not reasoning:
+                            content, reasoning = self._parse_think_tags(content, None)
+                        return content, reasoning
+
                     raw_content = gemini_resp.text or ""
                     content, reasoning = self._parse_think_tags(raw_content, None)
                     return content, reasoning
@@ -868,11 +901,11 @@ class LLMClient:
             )
         )
 
-        # --- Attempt 0: Google Gemini API Streaming ---
+        # --- Attempt 0: Google Gemini / Vertex AI API Streaming ---
         if is_gemini_model:
             gemini_client = self._refresh_gemini_client()
             if gemini_client:
-                target_model = model or "gemini-2.5-flash"
+                target_model = model or "gemini-3.7-flash"
                 system_prompt = ""
                 gemini_contents = []
                 for m_item in messages:
@@ -894,25 +927,57 @@ class LLMClient:
                         )
                     )
 
+                # Configure thinking for Gemini 3.7 Flash
+                thinking_cfg = None
+                if enable_thinking and ("3.7" in target_model or "flash" in target_model or "gemini" in target_model):
+                    try:
+                        thinking_cfg = genai_types.ThinkingConfig(
+                            thinking_level="MEDIUM",
+                        )
+                    except Exception:
+                        thinking_cfg = None
+
                 try:
+                    gen_kwargs: dict[str, Any] = {
+                        "system_instruction": system_prompt.strip() if system_prompt else None,
+                        "max_output_tokens": min(max_tokens, 8192) if max_tokens else 8192,
+                    }
+                    if thinking_cfg is not None:
+                        gen_kwargs["thinking_config"] = thinking_cfg
+                    else:
+                        gen_kwargs["temperature"] = temperature
+                        gen_kwargs["top_p"] = top_p
+
                     gemini_stream = await gemini_client.aio.models.generate_content_stream(
                         model=target_model,
                         contents=gemini_contents,  # type: ignore[arg-type]
-                        config=genai_types.GenerateContentConfig(
-                            system_instruction=system_prompt.strip() if system_prompt else None,
-                            temperature=temperature,
-                            top_p=top_p,
-                            max_output_tokens=min(max_tokens, 8192) if max_tokens else 8192,
-                        ),
+                        config=genai_types.GenerateContentConfig(**gen_kwargs),
                     )
                     stream_emitted = False
                     async for chunk in gemini_stream:
-                        text_val = chunk.text or ""
-                        if text_val:
-                            stream_emitted = True
-                            self.last_rate_limit = None
-                            LLMClient.global_rate_limit = None
-                            yield {"type": "content", "text": text_val}
+                        has_parts = False
+                        if getattr(chunk, "candidates", None) and len(chunk.candidates) > 0:
+                            content_obj = getattr(chunk.candidates[0], "content", None)
+                            if content_obj and getattr(content_obj, "parts", None):
+                                for part in content_obj.parts:
+                                    part_text = getattr(part, "text", "") or ""
+                                    if not part_text:
+                                        continue
+                                    has_parts = True
+                                    stream_emitted = True
+                                    self.last_rate_limit = None
+                                    LLMClient.global_rate_limit = None
+                                    if getattr(part, "thought", False):
+                                        yield {"type": "reasoning", "text": part_text}
+                                    else:
+                                        yield {"type": "content", "text": part_text}
+                        if not has_parts:
+                            text_val = chunk.text or ""
+                            if text_val:
+                                stream_emitted = True
+                                self.last_rate_limit = None
+                                LLMClient.global_rate_limit = None
+                                yield {"type": "content", "text": text_val}
                     if stream_emitted:
                         return
                 except Exception as e:

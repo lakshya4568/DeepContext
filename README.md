@@ -110,9 +110,8 @@ The platform features dynamic model routing, automatic failover, and dynamic `.e
 
 | Provider | Supported Models | Capabilities & Auth |
 | :--- | :--- | :--- |
-| **Google Cloud Vertex AI** | `gemini-embedding-2`, `text-embedding-004` | Enterprise multimodal MRL (768d), authenticated via OAuth 2.0 Application Default Credentials (ADC), billed to Cloud Credits |
-| **Google AI Studio** | `gemini-2.5-flash`, `gemini-embedding-2` | Fast reasoning & multimodal text embeddings via API Key |
-| **Groq Cloud** | `qwen/qwen3.8-27b`, `qwen/qwen3.6-27b` | Sub-second ultra-fast reasoning token streaming (`<think>` blocks) |
+| **Google Cloud Vertex AI** | `gemini-3.7-flash`, `gemini-embedding-2` | Fast reasoning with medium thinking effort & multimodal text embeddings via ADC / Cloud Credits |
+| **Groq Cloud** | `qwen/qwen3.6-27b` | Sub-second ultra-fast reasoning token streaming (`<think>` blocks) |
 | **Local Neural Models** | `Qwen/Qwen3-0.6B` (FP16) | On-device contextual chunk summarization with Apple Silicon Metal (MPS) and NVIDIA CUDA hardware acceleration |
 
 ### 2. Multi-Strategy Precision Reranking
@@ -251,7 +250,7 @@ uv run deep-context ingest-folder ./documents/ -e gemini-embedding-2 -d 768
 uv run deep-context retrieve "What is the core finding?" -k 5 -r cross_encoder
 
 # 4. Run full grounded query synthesis
-uv run deep-context query "Explain the architecture" -m gemini-2.5-flash
+uv run deep-context query "Explain the architecture" -m gemini-3.7-flash
 
 # 5. Manage user preferences in durable memory
 uv run deep-context set-preference --user user_42 -e gemini-embedding-2 -d 768 -r ecohash
@@ -313,7 +312,7 @@ curl -X POST http://localhost:8000/v1/preferences \
     "embedding_model": "gemini-embedding-2",
     "embedding_dim": 768,
     "reranker": "ecohash",
-    "llm_model": "gemini-2.5-flash"
+    "llm_model": "gemini-3.7-flash"
   }'
 ```
 

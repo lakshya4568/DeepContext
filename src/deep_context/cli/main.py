@@ -366,7 +366,7 @@ def query_cmd(
         "",
         "--model",
         "-m",
-        help="Reasoning model to use (e.g. 'qwen/qwen3.6-27b', 'gemini-2.5-flash', 'z-ai/glm-5.2')",
+        help="Reasoning model to use ('qwen/qwen3.6-27b' or 'gemini-3.7-flash')",
     ),
     embedding_model: str = typer.Option(
         "",
@@ -507,7 +507,7 @@ def set_preference_cmd(
         "",
         "--model",
         "-m",
-        help="Preferred LLM model (e.g. 'qwen/qwen3.6-27b', 'gemini-2.5-flash')",
+        help="Preferred LLM model ('qwen/qwen3.6-27b' or 'gemini-3.7-flash')",
     ),
 ) -> None:
     """Save user preferences for embeddings and rerankers into durable memory_preference store."""

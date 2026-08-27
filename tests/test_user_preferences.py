@@ -22,14 +22,14 @@ async def test_memory_store_embedding_preferences() -> None:
         embedding_model="gemini-embedding-2",
         embedding_dim=768,
         reranker="ecohash",
-        llm_model="gemini-2.5-flash",
+        llm_model="gemini-3.7-flash",
     )
 
     prefs = await mgr.get_embedding_preferences("engineer_alice")
     assert prefs["embedding_model"] == "gemini-embedding-2"
     assert prefs["embedding_dim"] == 768
     assert prefs["reranker"] == "ecohash"
-    assert prefs["llm_model"] == "gemini-2.5-flash"
+    assert prefs["llm_model"] == "gemini-3.7-flash"
 
 
 @pytest.mark.asyncio
@@ -44,7 +44,7 @@ async def test_preferences_api_endpoints() -> None:
                 "embedding_model": "gemini-embedding-2",
                 "embedding_dim": 1536,
                 "reranker": "cross_encoder",
-                "llm_model": "gemini-2.5-pro",
+                "llm_model": "gemini-3.7-flash",
             },
         )
         assert post_res.status_code == 200
