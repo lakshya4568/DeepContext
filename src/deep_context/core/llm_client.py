@@ -148,20 +148,22 @@ class LLMClient:
                 with open(".env", "r", encoding="utf-8") as f:
                     for line in f:
                         line = line.strip()
-                        if line.startswith("GEMINI_API_KEY=") or line.startswith("GOOGLE_API_KEY="):
+                        if line.startswith("GEMINI_API_KEY=") or line.startswith(
+                            "GOOGLE_API_KEY="
+                        ):
                             val = line.split("=", 1)[1].strip().strip('"').strip("'")
                             if val:
                                 current_key = val
                                 settings.gemini_api_key = val
-                        elif line.startswith("GOOGLE_CLOUD_PROJECT=") or line.startswith(
-                            "GCP_PROJECT="
-                        ):
+                        elif line.startswith(
+                            "GOOGLE_CLOUD_PROJECT="
+                        ) or line.startswith("GCP_PROJECT="):
                             val = line.split("=", 1)[1].strip().strip('"').strip("'")
                             if val:
                                 settings.google_cloud_project = val
-                        elif line.startswith("GOOGLE_CLOUD_LOCATION=") or line.startswith(
-                            "GCP_REGION="
-                        ):
+                        elif line.startswith(
+                            "GOOGLE_CLOUD_LOCATION="
+                        ) or line.startswith("GCP_REGION="):
                             val = line.split("=", 1)[1].strip().strip('"').strip("'")
                             if val:
                                 settings.google_cloud_location = val
@@ -213,12 +215,19 @@ class LLMClient:
             return self._gemini_client
 
         # 2. Public Google AI Studio API Key Mode
-        if not current_key or current_key.startswith("AIzaSy-your-key") or len(current_key) < 10:
+        if (
+            not current_key
+            or current_key.startswith("AIzaSy-your-key")
+            or len(current_key) < 10
+        ):
             self._gemini_client = None
             self._current_gemini_key = None
             return None
 
-        if getattr(self, "_current_gemini_key", None) != current_key or self._gemini_client is None:
+        if (
+            getattr(self, "_current_gemini_key", None) != current_key
+            or self._gemini_client is None
+        ):
             self._current_gemini_key = current_key
             try:
                 self._gemini_client = genai.Client(api_key=current_key)
@@ -277,7 +286,9 @@ class LLMClient:
                 with open(".env", "r", encoding="utf-8") as f:
                     for line in f:
                         line = line.strip()
-                        if line.startswith("GROQ_API_KEY=") or line.startswith("GROK_API_KEY="):
+                        if line.startswith("GROQ_API_KEY=") or line.startswith(
+                            "GROK_API_KEY="
+                        ):
                             val = line.split("=", 1)[1].strip().strip('"').strip("'")
                             if val:
                                 current_key = val
@@ -290,7 +301,10 @@ class LLMClient:
             self._current_groq_key = None
             return None
 
-        if getattr(self, "_current_groq_key", None) != current_key or self._groq_client is None:
+        if (
+            getattr(self, "_current_groq_key", None) != current_key
+            or self._groq_client is None
+        ):
             self._current_groq_key = current_key
             self._groq_client = AsyncOpenAI(
                 api_key=current_key,
@@ -316,7 +330,9 @@ class LLMClient:
 
     def _has_live_client(self) -> bool:
         return bool(
-            self._gemini_client or self._groq_client or (self._client and settings.has_nvidia_key)
+            self._gemini_client
+            or self._groq_client
+            or (self._client and settings.has_nvidia_key)
         )
 
     # -----------------------------------------------------------------------
@@ -347,7 +363,9 @@ class LLMClient:
         # Determine target dimension
         if dim:
             target_dim = dim
-        elif "gemini" in target_model.lower() or "text-embedding" in target_model.lower():
+        elif (
+            "gemini" in target_model.lower() or "text-embedding" in target_model.lower()
+        ):
             target_dim = settings.embedding_dim or 768
         else:
             target_dim = settings.embedding_dim or 1024
@@ -385,7 +403,9 @@ class LLMClient:
                                     text_val = f"title: {doc_title} | text: {t}"
                                 formatted_contents.append(
                                     genai_types.Content(
-                                        parts=[genai_types.Part.from_text(text=text_val)]
+                                        parts=[
+                                            genai_types.Part.from_text(text=text_val)
+                                        ]
                                     )
                                 )
                             config = genai_types.EmbedContentConfig(
@@ -418,13 +438,20 @@ class LLMClient:
                                         responses = await asyncio.gather(*tasks)
                                         combined_embeddings = []
                                         for r in responses:
-                                            if hasattr(r, "embeddings") and r.embeddings:
-                                                combined_embeddings.extend(r.embeddings)
-                                            elif hasattr(r, "embedding") and r.embedding:
-                                                combined_embeddings.append(r.embedding)
+                                            response_data = cast(Any, r)
+                                            if response_data.embeddings:
+                                                combined_embeddings.extend(
+                                                    response_data.embeddings
+                                                )
+                                            elif response_data.embedding:
+                                                combined_embeddings.append(
+                                                    response_data.embedding
+                                                )
                                         from types import SimpleNamespace
 
-                                        return SimpleNamespace(embeddings=combined_embeddings)
+                                        return SimpleNamespace(
+                                            embeddings=combined_embeddings
+                                        )
                                     raise
 
                             resp = await self._call_gemini_with_backoff(
@@ -440,14 +467,18 @@ class LLMClient:
                                 "RETRIEVAL_QUERY" if is_query else "RETRIEVAL_DOCUMENT"
                             )
                             formatted_contents = [
-                                genai_types.Content(parts=[genai_types.Part.from_text(text=t)])
+                                genai_types.Content(
+                                    parts=[genai_types.Part.from_text(text=t)]
+                                )
                                 for t in batch
                             ]
                             config = genai_types.EmbedContentConfig(
                                 task_type=g_task_type,
-                                output_dimensionality=target_dim
-                                if target_dim in (768, 1536, 3072)
-                                else None,
+                                output_dimensionality=(
+                                    target_dim
+                                    if target_dim in (768, 1536, 3072)
+                                    else None
+                                ),
                             )
 
                             async def _do_embed_001(
@@ -495,7 +526,9 @@ class LLMClient:
             all_embeddings = []
             batch_size = 32
             bounded_texts = [t[:2500] if len(t) > 2500 else t for t in cleaned_texts]
-            nim_model = target_model if not is_gemini else "nvidia/llama-3.2-nv-embedqa-1b-v2"
+            nim_model = (
+                target_model if not is_gemini else "nvidia/llama-3.2-nv-embedqa-1b-v2"
+            )
             try:
                 for i in range(0, len(bounded_texts), batch_size):
                     batch = bounded_texts[i : i + batch_size]
@@ -510,7 +543,9 @@ class LLMClient:
                         timeout=15.0,
                     )
                     for item in response.data:
-                        raw_emb = list(item.embedding) if hasattr(item, "embedding") else []
+                        raw_emb = (
+                            list(item.embedding) if hasattr(item, "embedding") else []
+                        )
                         emb_vals: list[float] = [float(x) for x in raw_emb]
                         if len(emb_vals) != target_dim:
                             if len(emb_vals) > target_dim:
@@ -520,7 +555,9 @@ class LLMClient:
                                     vals = vals / n
                                 emb_vals = vals.tolist()
                             else:
-                                emb_vals = emb_vals + [0.0] * (target_dim - len(emb_vals))
+                                emb_vals = emb_vals + [0.0] * (
+                                    target_dim - len(emb_vals)
+                                )
                         all_embeddings.append(emb_vals)
                 if len(all_embeddings) == len(cleaned_texts):
                     return all_embeddings
@@ -545,17 +582,25 @@ class LLMClient:
                             timeout=15.0,
                         )
                         for item in response.data:
-                            raw_emb = list(item.embedding) if hasattr(item, "embedding") else []
+                            raw_emb = (
+                                list(item.embedding)
+                                if hasattr(item, "embedding")
+                                else []
+                            )
                             emb_vals = [float(x) for x in raw_emb]
                             if len(emb_vals) != target_dim:
                                 if len(emb_vals) > target_dim:
-                                    vals = np.array(emb_vals[:target_dim], dtype=np.float32)
+                                    vals = np.array(
+                                        emb_vals[:target_dim], dtype=np.float32
+                                    )
                                     n = np.linalg.norm(vals)
                                     if n > 0:
                                         vals = vals / n
                                     emb_vals = vals.tolist()
                                 else:
-                                    emb_vals = emb_vals + [0.0] * (target_dim - len(emb_vals))
+                                    emb_vals = emb_vals + [0.0] * (
+                                        target_dim - len(emb_vals)
+                                    )
                             all_embeddings.append(emb_vals)
                     if len(all_embeddings) == len(cleaned_texts):
                         return all_embeddings
@@ -617,7 +662,9 @@ class LLMClient:
     # -----------------------------------------------------------------------
 
     @staticmethod
-    def _parse_think_tags(text: str, reasoning: str | None = None) -> tuple[str, str | None]:
+    def _parse_think_tags(
+        text: str, reasoning: str | None = None
+    ) -> tuple[str, str | None]:
         """Extract <think>...</think> reasoning blocks and thinking headers from model content."""
         if not text:
             return "", reasoning
@@ -690,18 +737,21 @@ class LLMClient:
                 if not gemini_contents:
                     gemini_contents.append(
                         genai_types.Content(
-                            role="user", parts=[genai_types.Part.from_text(text="Hello")]
+                            role="user",
+                            parts=[genai_types.Part.from_text(text="Hello")],
                         )
                     )
 
                 # Configure thinking for Gemini 3.7 Flash
                 thinking_cfg = None
                 if enable_thinking and (
-                    "3.7" in target_model or "flash" in target_model or "gemini" in target_model
+                    "3.7" in target_model
+                    or "flash" in target_model
+                    or "gemini" in target_model
                 ):
                     try:
                         thinking_cfg = genai_types.ThinkingConfig(
-                            thinking_level="MEDIUM",
+                            thinking_level=genai_types.ThinkingLevel.MEDIUM,
                         )
                     except Exception:
                         thinking_cfg = None
@@ -710,8 +760,12 @@ class LLMClient:
 
                     async def _do_gemini_gen():
                         gen_kwargs: dict[str, Any] = {
-                            "system_instruction": system_prompt.strip() if system_prompt else None,
-                            "max_output_tokens": min(max_tokens, 8192) if max_tokens else 8192,
+                            "system_instruction": (
+                                system_prompt.strip() if system_prompt else None
+                            ),
+                            "max_output_tokens": (
+                                min(max_tokens, 8192) if max_tokens else 8192
+                            ),
                         }
                         if thinking_cfg is not None:
                             gen_kwargs["thinking_config"] = thinking_cfg
@@ -734,8 +788,13 @@ class LLMClient:
 
                     reasoning_parts: list[str] = []
                     content_parts: list[str] = []
-                    if getattr(gemini_resp, "candidates", None) and len(gemini_resp.candidates) > 0:
-                        cand_content = getattr(gemini_resp.candidates[0], "content", None)
+                    if (
+                        getattr(gemini_resp, "candidates", None)
+                        and len(gemini_resp.candidates) > 0
+                    ):
+                        cand_content = getattr(
+                            gemini_resp.candidates[0], "content", None
+                        )
                         if cand_content and getattr(cand_content, "parts", None):
                             for part in cand_content.parts:
                                 part_text = getattr(part, "text", "") or ""
@@ -746,7 +805,9 @@ class LLMClient:
 
                     if reasoning_parts or content_parts:
                         content = "".join(content_parts)
-                        reasoning = "".join(reasoning_parts) if reasoning_parts else None
+                        reasoning = (
+                            "".join(reasoning_parts) if reasoning_parts else None
+                        )
                         if not reasoning:
                             content, reasoning = self._parse_think_tags(content, None)
                         return content, reasoning
@@ -755,7 +816,9 @@ class LLMClient:
                     content, reasoning = self._parse_think_tags(raw_content, None)
                     return content, reasoning
                 except Exception as e:
-                    logger.warning("Gemini model %s complete failed: %s", target_model, e)
+                    logger.warning(
+                        "Gemini model %s complete failed: %s", target_model, e
+                    )
 
         # --- Attempt 1: Groq API (Ultra-fast reasoning) ---
         groq_client = self._refresh_groq_client()
@@ -845,26 +908,33 @@ class LLMClient:
                 if not gemini_contents:
                     gemini_contents.append(
                         genai_types.Content(
-                            role="user", parts=[genai_types.Part.from_text(text="Hello")]
+                            role="user",
+                            parts=[genai_types.Part.from_text(text="Hello")],
                         )
                     )
 
                 # Configure thinking for Gemini 3.7 Flash
                 thinking_cfg = None
                 if enable_thinking and (
-                    "3.7" in target_model or "flash" in target_model or "gemini" in target_model
+                    "3.7" in target_model
+                    or "flash" in target_model
+                    or "gemini" in target_model
                 ):
                     try:
                         thinking_cfg = genai_types.ThinkingConfig(
-                            thinking_level="MEDIUM",
+                            thinking_level=genai_types.ThinkingLevel.MEDIUM,
                         )
                     except Exception:
                         thinking_cfg = None
 
                 try:
                     gen_kwargs: dict[str, Any] = {
-                        "system_instruction": system_prompt.strip() if system_prompt else None,
-                        "max_output_tokens": min(max_tokens, 8192) if max_tokens else 8192,
+                        "system_instruction": (
+                            system_prompt.strip() if system_prompt else None
+                        ),
+                        "max_output_tokens": (
+                            min(max_tokens, 8192) if max_tokens else 8192
+                        ),
                     }
                     if thinking_cfg is not None:
                         gen_kwargs["thinking_config"] = thinking_cfg
@@ -872,16 +942,19 @@ class LLMClient:
                         gen_kwargs["temperature"] = temperature
                         gen_kwargs["top_p"] = top_p
 
-                    gemini_stream = await gemini_client.aio.models.generate_content_stream(
-                        model=target_model,
-                        contents=gemini_contents,  # type: ignore[arg-type]
-                        config=genai_types.GenerateContentConfig(**gen_kwargs),
+                    gemini_stream = (
+                        await gemini_client.aio.models.generate_content_stream(
+                            model=target_model,
+                            contents=gemini_contents,  # type: ignore[arg-type]
+                            config=genai_types.GenerateContentConfig(**gen_kwargs),
+                        )
                     )
                     stream_emitted = False
                     async for chunk in gemini_stream:
                         has_parts = False
-                        if getattr(chunk, "candidates", None) and len(chunk.candidates) > 0:
-                            content_obj = getattr(chunk.candidates[0], "content", None)
+                        candidates = getattr(chunk, "candidates", None)
+                        if candidates:
+                            content_obj = getattr(candidates[0], "content", None)
                             if content_obj and getattr(content_obj, "parts", None):
                                 for part in content_obj.parts:
                                     part_text = getattr(part, "text", "") or ""
@@ -905,7 +978,9 @@ class LLMClient:
                     if stream_emitted:
                         return
                 except Exception as e:
-                    logger.warning("Gemini model %s streaming failed: %s", target_model, e)
+                    logger.warning(
+                        "Gemini model %s streaming failed: %s", target_model, e
+                    )
 
         # --- Attempt 1: Groq API ---
         groq_client = self._refresh_groq_client()
@@ -980,7 +1055,9 @@ class LLMClient:
                         extracted = full_r.split("ANSWER:", 1)[1].strip()
                     else:
                         paras = [p.strip() for p in full_r.split("\n\n") if p.strip()]
-                        extracted = "\n\n".join(paras[-2:]) if len(paras) >= 2 else full_r
+                        extracted = (
+                            "\n\n".join(paras[-2:]) if len(paras) >= 2 else full_r
+                        )
                     if extracted:
                         yield {"type": "content", "text": extracted}
 
@@ -1009,11 +1086,15 @@ class LLMClient:
             yield {"type": "reasoning", "text": reasoning}
         yield {"type": "content", "text": content}
 
-    def _mock_completion(self, messages: list[dict[str, Any]]) -> tuple[str, str | None]:
+    def _mock_completion(
+        self, messages: list[dict[str, Any]]
+    ) -> tuple[str, str | None]:
         """Generate structured synthetic answer for testing purposes."""
         last_msg = messages[-1]["content"] if messages else ""
         system_msg = (
-            messages[0]["content"] if len(messages) > 1 and messages[0]["role"] == "system" else ""
+            messages[0]["content"]
+            if len(messages) > 1 and messages[0]["role"] == "system"
+            else ""
         )
 
         active_notice = self.last_rate_limit or LLMClient.global_rate_limit
@@ -1040,12 +1121,19 @@ class LLMClient:
                     "sub_queries": [last_msg],
                 }
                 return json.dumps(out), reasoning
-            if "check_answer_support" in system_msg.lower() or "verifier" in system_msg.lower():
+            if (
+                "check_answer_support" in system_msg.lower()
+                or "verifier" in system_msg.lower()
+            ):
                 out_check: dict[str, Any] = {
                     "passed": True,
                     "confidence": 0.95,
                     "claims": [
-                        {"text": last_msg[:50], "support": "retrieved", "evidence_id": "chunk-1"}
+                        {
+                            "text": last_msg[:50],
+                            "support": "retrieved",
+                            "evidence_id": "chunk-1",
+                        }
                     ],
                     "failure_reasons": [],
                 }
