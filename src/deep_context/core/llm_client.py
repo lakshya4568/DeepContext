@@ -742,22 +742,20 @@ class LLMClient:
                         )
                     )
 
-                # Configure thinking for Gemini 3.7 Flash
+                # Configure thinking for Gemini thinking models
                 thinking_cfg = None
                 if enable_thinking and (
                     "3.7" in target_model
-                    or "flash" in target_model
-                    or "gemini" in target_model
+                    or "thinking" in target_model
                 ):
                     try:
                         thinking_cfg = genai_types.ThinkingConfig(
-                            thinking_level=genai_types.ThinkingLevel.MEDIUM,
+                            thinking_budget=1024,
                         )
                     except Exception:
                         thinking_cfg = None
 
                 try:
-
                     async def _do_gemini_gen():
                         gen_kwargs: dict[str, Any] = {
                             "system_instruction": (
@@ -773,14 +771,29 @@ class LLMClient:
                             gen_kwargs["temperature"] = temperature
                             gen_kwargs["top_p"] = top_p
 
-                        return await asyncio.wait_for(
-                            gemini_client.aio.models.generate_content(
-                                model=target_model,
-                                contents=gemini_contents,  # type: ignore[arg-type]
-                                config=genai_types.GenerateContentConfig(**gen_kwargs),
-                            ),
-                            timeout=timeout,
-                        )
+                        try:
+                            return await asyncio.wait_for(
+                                gemini_client.aio.models.generate_content(
+                                    model=target_model,
+                                    contents=gemini_contents,  # type: ignore[arg-type]
+                                    config=genai_types.GenerateContentConfig(**gen_kwargs),
+                                ),
+                                timeout=timeout,
+                            )
+                        except Exception as e_gen:
+                            if "thinking" in str(e_gen).lower() and thinking_cfg is not None:
+                                gen_kwargs.pop("thinking_config", None)
+                                gen_kwargs["temperature"] = temperature
+                                gen_kwargs["top_p"] = top_p
+                                return await asyncio.wait_for(
+                                    gemini_client.aio.models.generate_content(
+                                        model=target_model,
+                                        contents=gemini_contents,  # type: ignore[arg-type]
+                                        config=genai_types.GenerateContentConfig(**gen_kwargs),
+                                    ),
+                                    timeout=timeout,
+                                )
+                            raise e_gen
 
                     gemini_resp = await self._call_gemini_with_backoff(
                         _do_gemini_gen, f"generate_content ({target_model})"
@@ -913,16 +926,15 @@ class LLMClient:
                         )
                     )
 
-                # Configure thinking for Gemini 3.7 Flash
+                # Configure thinking for Gemini thinking models
                 thinking_cfg = None
                 if enable_thinking and (
                     "3.7" in target_model
-                    or "flash" in target_model
-                    or "gemini" in target_model
+                    or "thinking" in target_model
                 ):
                     try:
                         thinking_cfg = genai_types.ThinkingConfig(
-                            thinking_level=genai_types.ThinkingLevel.MEDIUM,
+                            thinking_budget=1024,
                         )
                     except Exception:
                         thinking_cfg = None
@@ -942,13 +954,28 @@ class LLMClient:
                         gen_kwargs["temperature"] = temperature
                         gen_kwargs["top_p"] = top_p
 
-                    gemini_stream = (
-                        await gemini_client.aio.models.generate_content_stream(
-                            model=target_model,
-                            contents=gemini_contents,  # type: ignore[arg-type]
-                            config=genai_types.GenerateContentConfig(**gen_kwargs),
+                    try:
+                        gemini_stream = (
+                            await gemini_client.aio.models.generate_content_stream(
+                                model=target_model,
+                                contents=gemini_contents,  # type: ignore[arg-type]
+                                config=genai_types.GenerateContentConfig(**gen_kwargs),
+                            )
                         )
-                    )
+                    except Exception as e_stream_init:
+                        if "thinking" in str(e_stream_init).lower() and thinking_cfg is not None:
+                            gen_kwargs.pop("thinking_config", None)
+                            gen_kwargs["temperature"] = temperature
+                            gen_kwargs["top_p"] = top_p
+                            gemini_stream = (
+                                await gemini_client.aio.models.generate_content_stream(
+                                    model=target_model,
+                                    contents=gemini_contents,  # type: ignore[arg-type]
+                                    config=genai_types.GenerateContentConfig(**gen_kwargs),
+                                )
+                            )
+                        else:
+                            raise e_stream_init
                     stream_emitted = False
                     async for chunk in gemini_stream:
                         has_parts = False
