@@ -117,3 +117,44 @@ async def test_gemini_embedding_2_query_formatting() -> None:
     assert "task: search result | query: How does RLM handle recursive memory?" in str(
         contents[0].parts[0].text
     )
+
+
+def test_gemini_candidates_generation() -> None:
+    client = LLMClient()
+    # 3.x models prioritize global endpoint where they are hosted on Vertex AI
+    c_37 = client._get_gemini_candidates("gemini-3.7-flash")
+    assert c_37[0] == ("gemini-3.7-flash", "global")
+    assert ("gemini-2.5-flash", "global") in c_37
+
+    c_38 = client._get_gemini_candidates("gemini-3.8-flash")
+    assert c_38[0] == ("gemini-3.8-flash", "global")
+    assert ("gemini-2.5-flash", "global") in c_38
+
+    # 2.5 flash has candidate coverage across regional and global
+    c_25 = client._get_gemini_candidates("gemini-2.5-flash")
+    assert ("gemini-2.5-flash", None) in c_25
+    assert ("gemini-2.5-flash", "global") in c_25
+
+
+@pytest.mark.asyncio
+async def test_gemini_complete_404_fallback() -> None:
+    client = LLMClient()
+
+    mock_client = MagicMock()
+
+    async def mock_gen(model, contents, config):
+        if "nonexistent" in model:
+            raise Exception("404 NOT_FOUND. Publisher model was not found")
+        resp = MagicMock()
+        resp.candidates = []
+        resp.text = "Hello from fallback 2.5 flash"
+        return resp
+
+    mock_client.aio.models.generate_content = AsyncMock(side_effect=mock_gen)
+    setattr(client, "_refresh_gemini_client", lambda location=None: mock_client)
+
+    content, _ = await client.complete(
+        [{"role": "user", "content": "Hi"}],
+        model="gemini-nonexistent-model",
+    )
+    assert "Hello from fallback 2.5 flash" in content

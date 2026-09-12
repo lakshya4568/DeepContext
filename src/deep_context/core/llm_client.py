@@ -100,14 +100,9 @@ class LLMClient:
 
         # Google GenAI client (Gemini embeddings & reasoning)
         self._gemini_client: genai.Client | None = None
-        if settings.has_gemini_key and not (
-            settings.allow_mock_fallback and os.environ.get("PYTEST_CURRENT_TEST")
-        ):
-            try:
-                self._gemini_client = genai.Client(api_key=settings.gemini_api_key)
-            except Exception as e:
-                logger.warning("Failed to initialize Google GenAI client: %s", e)
-                self._gemini_client = None
+        self._vertex_clients: dict[str, genai.Client] = {}
+        if not (settings.allow_mock_fallback and os.environ.get("PYTEST_CURRENT_TEST")):
+            self._gemini_client = self._refresh_gemini_client()
 
         # Groq client (primary ultra-fast reasoning LLM)
         self._groq_client: AsyncOpenAI | None
@@ -135,99 +130,121 @@ class LLMClient:
         else:
             self._client = None
 
-    def _refresh_gemini_client(self) -> genai.Client | None:
-        """Dynamically check .env and reload Gemini API key if changed."""
+    def _refresh_gemini_client(self, location: str | None = None) -> genai.Client | None:
+        """Dynamically configure and reload Google GenAI / Vertex AI client.
+
+        Prioritizes environment variables (bash $env) over .env file, and auto-discovers
+        Google Cloud Project ID via ADC or gcloud if not explicitly supplied.
+        """
         import os
 
         if settings.allow_mock_fallback and os.environ.get("PYTEST_CURRENT_TEST"):
             return None
 
-        current_key = settings.gemini_api_key
-        if os.path.exists(".env"):
-            try:
-                with open(".env", "r", encoding="utf-8") as f:
-                    for line in f:
-                        line = line.strip()
-                        if line.startswith("GEMINI_API_KEY=") or line.startswith(
-                            "GOOGLE_API_KEY="
-                        ):
-                            val = line.split("=", 1)[1].strip().strip('"').strip("'")
-                            if val:
-                                current_key = val
-                                settings.gemini_api_key = val
-                        elif line.startswith(
-                            "GOOGLE_CLOUD_PROJECT="
-                        ) or line.startswith("GCP_PROJECT="):
-                            val = line.split("=", 1)[1].strip().strip('"').strip("'")
-                            if val:
-                                settings.google_cloud_project = val
-                        elif line.startswith(
-                            "GOOGLE_CLOUD_LOCATION="
-                        ) or line.startswith("GCP_REGION="):
-                            val = line.split("=", 1)[1].strip().strip('"').strip("'")
-                            if val:
-                                settings.google_cloud_location = val
-                        elif line.startswith("VERTEX_AI_ENABLED="):
-                            val = line.split("=", 1)[1].strip().lower()
-                            settings.vertex_ai_enabled = val in ("true", "1", "yes")
-            except Exception:
-                pass
-
         # 1. Vertex AI Mode: Uses Google Cloud Project & Application Default Credentials (ADC)
-        use_vertex = (
-            settings.vertex_ai_enabled
-            or bool(settings.google_cloud_project)
-            or os.environ.get("GOOGLE_GENAI_USE_VERTEXAI", "").lower() in ("true", "1")
-        )
+        # Environment variables from bash $env take precedence over settings/.env
+        env_vertex = os.environ.get("VERTEX_AI_ENABLED")
+        if env_vertex is not None:
+            use_vertex = env_vertex.lower() in ("true", "1", "yes")
+        else:
+            use_vertex = (
+                settings.vertex_ai_enabled
+                or bool(settings.google_cloud_project)
+                or os.environ.get("GOOGLE_GENAI_USE_VERTEXAI", "").lower() in ("true", "1")
+            )
+
         if use_vertex:
-            proj = settings.google_cloud_project or os.environ.get(
-                "GOOGLE_CLOUD_PROJECT", "agentic-core"
+            proj = (
+                os.environ.get("GOOGLE_CLOUD_PROJECT")
+                or os.environ.get("GCP_PROJECT")
+                or os.environ.get("PROJECT_ID")
+                or settings.google_cloud_project
             )
-            loc = settings.google_cloud_location or os.environ.get(
-                "GOOGLE_CLOUD_LOCATION", "us-central1"
+            # Auto-detect Google Cloud Project via ADC or gcloud if unset
+            if not proj:
+                try:
+                    import google.auth
+
+                    _, default_proj = google.auth.default()
+                    if default_proj:
+                        proj = default_proj
+                except Exception:
+                    pass
+            if not proj:
+                try:
+                    import subprocess
+
+                    out = subprocess.check_output(
+                        ["gcloud", "config", "get-value", "project"],
+                        stderr=subprocess.DEVNULL,
+                        text=True,
+                    ).strip()
+                    if out and out != "(unset)":
+                        proj = out
+                except Exception:
+                    pass
+
+            if not proj:
+                proj = "agentic-core"
+
+            loc = (
+                location
+                or os.environ.get("GOOGLE_CLOUD_LOCATION")
+                or os.environ.get("GCP_REGION")
+                or settings.google_cloud_location
+                or "us-central1"
             )
-            creds_path = settings.google_application_credentials or os.environ.get(
-                "GOOGLE_APPLICATION_CREDENTIALS"
+
+            creds_path = (
+                os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+                or settings.google_application_credentials
             )
             if creds_path and os.path.exists(creds_path):
                 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = creds_path
 
             client_key = f"vertexai:{proj}:{loc}"
-            if (
-                getattr(self, "_current_gemini_key", None) != client_key
-                or self._gemini_client is None
-            ):
-                self._current_gemini_key = client_key
-                try:
-                    self._gemini_client = genai.Client(
-                        vertexai=True,
-                        project=proj,
-                        location=loc,
-                    )
-                    logger.info(
-                        "Initialized Google GenAI client with Vertex AI (Project: %s, Region: %s, ADC)",
-                        proj,
-                        loc,
-                    )
-                except Exception as e:
-                    logger.warning("Failed to initialize Vertex AI client: %s", e)
-                    self._gemini_client = None
-            return self._gemini_client
+            if not hasattr(self, "_vertex_clients"):
+                self._vertex_clients = {}
+
+            if client_key in self._vertex_clients:
+                client = self._vertex_clients[client_key]
+                if location is None:
+                    self._gemini_client = client
+                    self._current_gemini_key = client_key
+                return client
+
+            try:
+                client = genai.Client(
+                    vertexai=True,
+                    project=proj,
+                    location=loc,
+                )
+                logger.info(
+                    "Initialized Google GenAI client with Vertex AI (Project: %s, Region: %s, ADC)",
+                    proj,
+                    loc,
+                )
+                self._vertex_clients[client_key] = client
+                if location is None:
+                    self._gemini_client = client
+                    self._current_gemini_key = client_key
+                return client
+            except Exception as e:
+                logger.warning("Failed to initialize Vertex AI client: %s", e)
+                return None
 
         # 2. Public Google AI Studio API Key Mode
-        if (
-            not current_key
-            or current_key.startswith("AIzaSy-your-key")
-            or len(current_key) < 10
-        ):
+        current_key = (
+            os.environ.get("GEMINI_API_KEY")
+            or os.environ.get("GOOGLE_API_KEY")
+            or settings.gemini_api_key
+        )
+        if not current_key or current_key.startswith("AIzaSy-your-key") or len(current_key) < 10:
             self._gemini_client = None
             self._current_gemini_key = None
             return None
 
-        if (
-            getattr(self, "_current_gemini_key", None) != current_key
-            or self._gemini_client is None
-        ):
+        if getattr(self, "_current_gemini_key", None) != current_key or self._gemini_client is None:
             self._current_gemini_key = current_key
             try:
                 self._gemini_client = genai.Client(api_key=current_key)
@@ -236,6 +253,37 @@ class LLMClient:
                 self._gemini_client = None
 
         return self._gemini_client
+
+    def _get_gemini_candidates(self, model: str | None) -> list[tuple[str, str | None]]:
+        """Determine ordered candidate pairs of (model_name, location) for Gemini.
+
+        Vertex AI publisher models for 3.x (e.g. gemini-3.7-flash, gemini-3.8-flash)
+        are hosted on the 'global' endpoint. 2.5 models are available on both regional
+        (e.g. us-central1) and global endpoints.
+        """
+        primary_model = model or (
+            self.llm_model if "gemini" in self.llm_model else "gemini-2.5-flash"
+        )
+        candidates: list[tuple[str, str | None]] = []
+        if "3." in primary_model:
+            candidates.append((primary_model, "global"))
+            candidates.append((primary_model, None))
+        else:
+            candidates.append((primary_model, None))
+            candidates.append((primary_model, "global"))
+
+        # Resilient fallback to gemini-2.5-flash on global and regional
+        if primary_model != "gemini-2.5-flash":
+            candidates.append(("gemini-2.5-flash", "global"))
+            candidates.append(("gemini-2.5-flash", None))
+
+        seen: set[tuple[str, str | None]] = set()
+        deduped: list[tuple[str, str | None]] = []
+        for m, loc in candidates:
+            if (m, loc) not in seen:
+                seen.add((m, loc))
+                deduped.append((m, loc))
+        return deduped
 
     async def _call_gemini_with_backoff(
         self,
@@ -286,9 +334,7 @@ class LLMClient:
                 with open(".env", "r", encoding="utf-8") as f:
                     for line in f:
                         line = line.strip()
-                        if line.startswith("GROQ_API_KEY=") or line.startswith(
-                            "GROK_API_KEY="
-                        ):
+                        if line.startswith("GROQ_API_KEY=") or line.startswith("GROK_API_KEY="):
                             val = line.split("=", 1)[1].strip().strip('"').strip("'")
                             if val:
                                 current_key = val
@@ -301,10 +347,7 @@ class LLMClient:
             self._current_groq_key = None
             return None
 
-        if (
-            getattr(self, "_current_groq_key", None) != current_key
-            or self._groq_client is None
-        ):
+        if getattr(self, "_current_groq_key", None) != current_key or self._groq_client is None:
             self._current_groq_key = current_key
             self._groq_client = AsyncOpenAI(
                 api_key=current_key,
@@ -330,9 +373,7 @@ class LLMClient:
 
     def _has_live_client(self) -> bool:
         return bool(
-            self._gemini_client
-            or self._groq_client
-            or (self._client and settings.has_nvidia_key)
+            self._gemini_client or self._groq_client or (self._client and settings.has_nvidia_key)
         )
 
     # -----------------------------------------------------------------------
@@ -363,9 +404,7 @@ class LLMClient:
         # Determine target dimension
         if dim:
             target_dim = dim
-        elif (
-            "gemini" in target_model.lower() or "text-embedding" in target_model.lower()
-        ):
+        elif "gemini" in target_model.lower() or "text-embedding" in target_model.lower():
             target_dim = settings.embedding_dim or 768
         else:
             target_dim = settings.embedding_dim or 1024
@@ -380,7 +419,27 @@ class LLMClient:
 
         # --- Attempt 1: Google Gemini / Vertex AI API ---
         if is_gemini:
-            gemini_client = self._refresh_gemini_client()
+            embed_client = None
+            if "embedding-2" in target_model.lower():
+                env_vertex = os.environ.get("VERTEX_AI_ENABLED")
+                use_vertex = (
+                    env_vertex.lower() in ("true", "1", "yes")
+                    if env_vertex is not None
+                    else (settings.vertex_ai_enabled or bool(settings.google_cloud_project))
+                )
+                if use_vertex:
+                    user_loc = (
+                        os.environ.get("GOOGLE_CLOUD_LOCATION")
+                        or settings.google_cloud_location
+                        or "us-central1"
+                    )
+                    if user_loc not in ("global", "us", "eu"):
+                        try:
+                            embed_client = self._refresh_gemini_client(location="global")
+                        except TypeError:
+                            embed_client = self._refresh_gemini_client()
+
+            gemini_client = embed_client or self._refresh_gemini_client()
             if gemini_client:
                 all_embeddings: list[list[float]] = []
                 batch_size = max(1, settings.gemini_batch_size)
@@ -403,9 +462,7 @@ class LLMClient:
                                     text_val = f"title: {doc_title} | text: {t}"
                                 formatted_contents.append(
                                     genai_types.Content(
-                                        parts=[
-                                            genai_types.Part.from_text(text=text_val)
-                                        ]
+                                        parts=[genai_types.Part.from_text(text=text_val)]
                                     )
                                 )
                             config = genai_types.EmbedContentConfig(
@@ -440,18 +497,12 @@ class LLMClient:
                                         for r in responses:
                                             response_data = cast(Any, r)
                                             if response_data.embeddings:
-                                                combined_embeddings.extend(
-                                                    response_data.embeddings
-                                                )
+                                                combined_embeddings.extend(response_data.embeddings)
                                             elif response_data.embedding:
-                                                combined_embeddings.append(
-                                                    response_data.embedding
-                                                )
+                                                combined_embeddings.append(response_data.embedding)
                                         from types import SimpleNamespace
 
-                                        return SimpleNamespace(
-                                            embeddings=combined_embeddings
-                                        )
+                                        return SimpleNamespace(embeddings=combined_embeddings)
                                     raise
 
                             resp = await self._call_gemini_with_backoff(
@@ -467,17 +518,13 @@ class LLMClient:
                                 "RETRIEVAL_QUERY" if is_query else "RETRIEVAL_DOCUMENT"
                             )
                             formatted_contents = [
-                                genai_types.Content(
-                                    parts=[genai_types.Part.from_text(text=t)]
-                                )
+                                genai_types.Content(parts=[genai_types.Part.from_text(text=t)])
                                 for t in batch
                             ]
                             config = genai_types.EmbedContentConfig(
                                 task_type=g_task_type,
                                 output_dimensionality=(
-                                    target_dim
-                                    if target_dim in (768, 1536, 3072)
-                                    else None
+                                    target_dim if target_dim in (768, 1536, 3072) else None
                                 ),
                             )
 
@@ -526,9 +573,7 @@ class LLMClient:
             all_embeddings = []
             batch_size = 32
             bounded_texts = [t[:2500] if len(t) > 2500 else t for t in cleaned_texts]
-            nim_model = (
-                target_model if not is_gemini else "nvidia/llama-3.2-nv-embedqa-1b-v2"
-            )
+            nim_model = target_model if not is_gemini else "nvidia/llama-3.2-nv-embedqa-1b-v2"
             try:
                 for i in range(0, len(bounded_texts), batch_size):
                     batch = bounded_texts[i : i + batch_size]
@@ -543,9 +588,7 @@ class LLMClient:
                         timeout=15.0,
                     )
                     for item in response.data:
-                        raw_emb = (
-                            list(item.embedding) if hasattr(item, "embedding") else []
-                        )
+                        raw_emb = list(item.embedding) if hasattr(item, "embedding") else []
                         emb_vals: list[float] = [float(x) for x in raw_emb]
                         if len(emb_vals) != target_dim:
                             if len(emb_vals) > target_dim:
@@ -555,9 +598,7 @@ class LLMClient:
                                     vals = vals / n
                                 emb_vals = vals.tolist()
                             else:
-                                emb_vals = emb_vals + [0.0] * (
-                                    target_dim - len(emb_vals)
-                                )
+                                emb_vals = emb_vals + [0.0] * (target_dim - len(emb_vals))
                         all_embeddings.append(emb_vals)
                 if len(all_embeddings) == len(cleaned_texts):
                     return all_embeddings
@@ -582,25 +623,17 @@ class LLMClient:
                             timeout=15.0,
                         )
                         for item in response.data:
-                            raw_emb = (
-                                list(item.embedding)
-                                if hasattr(item, "embedding")
-                                else []
-                            )
+                            raw_emb = list(item.embedding) if hasattr(item, "embedding") else []
                             emb_vals = [float(x) for x in raw_emb]
                             if len(emb_vals) != target_dim:
                                 if len(emb_vals) > target_dim:
-                                    vals = np.array(
-                                        emb_vals[:target_dim], dtype=np.float32
-                                    )
+                                    vals = np.array(emb_vals[:target_dim], dtype=np.float32)
                                     n = np.linalg.norm(vals)
                                     if n > 0:
                                         vals = vals / n
                                     emb_vals = vals.tolist()
                                 else:
-                                    emb_vals = emb_vals + [0.0] * (
-                                        target_dim - len(emb_vals)
-                                    )
+                                    emb_vals = emb_vals + [0.0] * (target_dim - len(emb_vals))
                             all_embeddings.append(emb_vals)
                     if len(all_embeddings) == len(cleaned_texts):
                         return all_embeddings
@@ -662,9 +695,7 @@ class LLMClient:
     # -----------------------------------------------------------------------
 
     @staticmethod
-    def _parse_think_tags(
-        text: str, reasoning: str | None = None
-    ) -> tuple[str, str | None]:
+    def _parse_think_tags(text: str, reasoning: str | None = None) -> tuple[str, str | None]:
         """Extract <think>...</think> reasoning blocks and thinking headers from model content."""
         if not text:
             return "", reasoning
@@ -707,47 +738,48 @@ class LLMClient:
         import asyncio
 
         is_gemini_model = bool(
-            model
-            and (
-                model.startswith("gemini-")
-                or model.startswith("models/gemini")
-                or model.startswith("google/gemini")
+            (
+                model
+                and (
+                    "gemini" in model.lower()
+                    or model.startswith("models/gemini")
+                    or model.startswith("google/gemini")
+                )
             )
+            or (not model and settings.llm_provider == "gemini")
         )
 
         # --- Attempt 0: Google Gemini / Vertex AI API (When Gemini model requested) ---
         if is_gemini_model:
-            gemini_client = self._refresh_gemini_client()
-            if gemini_client:
-                target_model = model or "gemini-3.7-flash"
-                system_prompt = ""
-                gemini_contents = []
-                for m_item in messages:
-                    if m_item.get("role") == "system":
-                        system_prompt += m_item.get("content", "") + "\n"
-                    else:
-                        r = "user" if m_item.get("role") == "user" else "model"
-                        c = m_item.get("content", "")
-                        if c:
-                            gemini_contents.append(
-                                genai_types.Content(
-                                    role=r, parts=[genai_types.Part.from_text(text=c)]
-                                )
-                            )
-                if not gemini_contents:
-                    gemini_contents.append(
-                        genai_types.Content(
-                            role="user",
-                            parts=[genai_types.Part.from_text(text="Hello")],
+            candidates = self._get_gemini_candidates(model)
+            system_prompt = ""
+            gemini_contents = []
+            for m_item in messages:
+                if m_item.get("role") == "system":
+                    system_prompt += m_item.get("content", "") + "\n"
+                else:
+                    r = "user" if m_item.get("role") == "user" else "model"
+                    c = m_item.get("content", "")
+                    if c:
+                        gemini_contents.append(
+                            genai_types.Content(role=r, parts=[genai_types.Part.from_text(text=c)])
                         )
+            if not gemini_contents:
+                gemini_contents.append(
+                    genai_types.Content(
+                        role="user",
+                        parts=[genai_types.Part.from_text(text="Hello")],
                     )
+                )
+
+            for attempt_idx, (target_model, target_loc) in enumerate(candidates):
+                gemini_client = self._refresh_gemini_client(location=target_loc)
+                if not gemini_client:
+                    continue
 
                 # Configure thinking for Gemini thinking models
                 thinking_cfg = None
-                if enable_thinking and (
-                    "3.7" in target_model
-                    or "thinking" in target_model
-                ):
+                if enable_thinking and ("3." in target_model or "thinking" in target_model):
                     try:
                         thinking_cfg = genai_types.ThinkingConfig(
                             thinking_budget=1024,
@@ -756,38 +788,48 @@ class LLMClient:
                         thinking_cfg = None
 
                 try:
-                    async def _do_gemini_gen():
+
+                    async def _do_gemini_gen(
+                        cur_model: str = target_model,
+                        cur_thinking: Any = thinking_cfg,
+                        cur_client: genai.Client = gemini_client,
+                    ) -> Any:
                         gen_kwargs: dict[str, Any] = {
                             "system_instruction": (
                                 system_prompt.strip() if system_prompt else None
                             ),
-                            "max_output_tokens": (
-                                min(max_tokens, 8192) if max_tokens else 8192
-                            ),
+                            "max_output_tokens": (min(max_tokens, 8192) if max_tokens else 8192),
                         }
-                        if thinking_cfg is not None:
-                            gen_kwargs["thinking_config"] = thinking_cfg
+                        try:
+                            gen_kwargs["automatic_function_calling"] = (
+                                genai_types.AutomaticFunctionCallingConfig(disable=True)
+                            )
+                        except Exception:
+                            pass
+
+                        if cur_thinking is not None:
+                            gen_kwargs["thinking_config"] = cur_thinking
                         else:
                             gen_kwargs["temperature"] = temperature
                             gen_kwargs["top_p"] = top_p
 
                         try:
                             return await asyncio.wait_for(
-                                gemini_client.aio.models.generate_content(
-                                    model=target_model,
+                                cur_client.aio.models.generate_content(
+                                    model=cur_model,
                                     contents=gemini_contents,  # type: ignore[arg-type]
                                     config=genai_types.GenerateContentConfig(**gen_kwargs),
                                 ),
                                 timeout=timeout,
                             )
                         except Exception as e_gen:
-                            if "thinking" in str(e_gen).lower() and thinking_cfg is not None:
+                            if "thinking" in str(e_gen).lower() and cur_thinking is not None:
                                 gen_kwargs.pop("thinking_config", None)
                                 gen_kwargs["temperature"] = temperature
                                 gen_kwargs["top_p"] = top_p
                                 return await asyncio.wait_for(
-                                    gemini_client.aio.models.generate_content(
-                                        model=target_model,
+                                    cur_client.aio.models.generate_content(
+                                        model=cur_model,
                                         contents=gemini_contents,  # type: ignore[arg-type]
                                         config=genai_types.GenerateContentConfig(**gen_kwargs),
                                     ),
@@ -796,18 +838,14 @@ class LLMClient:
                             raise e_gen
 
                     gemini_resp = await self._call_gemini_with_backoff(
-                        _do_gemini_gen, f"generate_content ({target_model})"
+                        _do_gemini_gen,
+                        f"generate_content ({target_model}@{target_loc or 'default'})",
                     )
 
                     reasoning_parts: list[str] = []
                     content_parts: list[str] = []
-                    if (
-                        getattr(gemini_resp, "candidates", None)
-                        and len(gemini_resp.candidates) > 0
-                    ):
-                        cand_content = getattr(
-                            gemini_resp.candidates[0], "content", None
-                        )
+                    if getattr(gemini_resp, "candidates", None) and len(gemini_resp.candidates) > 0:
+                        cand_content = getattr(gemini_resp.candidates[0], "content", None)
                         if cand_content and getattr(cand_content, "parts", None):
                             for part in cand_content.parts:
                                 part_text = getattr(part, "text", "") or ""
@@ -818,9 +856,7 @@ class LLMClient:
 
                     if reasoning_parts or content_parts:
                         content = "".join(content_parts)
-                        reasoning = (
-                            "".join(reasoning_parts) if reasoning_parts else None
-                        )
+                        reasoning = "".join(reasoning_parts) if reasoning_parts else None
                         if not reasoning:
                             content, reasoning = self._parse_think_tags(content, None)
                         return content, reasoning
@@ -829,9 +865,37 @@ class LLMClient:
                     content, reasoning = self._parse_think_tags(raw_content, None)
                     return content, reasoning
                 except Exception as e:
-                    logger.warning(
-                        "Gemini model %s complete failed: %s", target_model, e
+                    err_str = str(e).lower()
+                    is_not_found = any(
+                        k in err_str
+                        for k in ("404", "not_found", "not found", "does not have access")
                     )
+                    if is_not_found and attempt_idx < len(candidates) - 1:
+                        next_model, next_loc = candidates[attempt_idx + 1]
+                        logger.warning(
+                            "Gemini model %s at %s failed (404 Not Found). Retrying with candidate %s at %s...",
+                            target_model,
+                            target_loc or "default",
+                            next_model,
+                            next_loc or "default",
+                        )
+                        continue
+                    logger.warning(
+                        "Gemini model %s at %s complete failed: %s",
+                        target_model,
+                        target_loc or "default",
+                        e,
+                    )
+                    if attempt_idx < len(candidates) - 1 and is_not_found:
+                        continue
+                    break
+
+            if model and ("gemini" in model.lower()):
+                logger.error("All Gemini candidates failed for requested model %s", model)
+                return (
+                    f"⚠️ Gemini model `{model}` could not be completed on Vertex AI / Google GenAI. Please verify your Google Cloud permissions and quota.",
+                    None,
+                )
 
         # --- Attempt 1: Groq API (Ultra-fast reasoning) ---
         groq_client = self._refresh_groq_client()
@@ -891,47 +955,48 @@ class LLMClient:
         """Yields chunks with type (reasoning or content) and text."""
 
         is_gemini_model = bool(
-            model
-            and (
-                model.startswith("gemini-")
-                or model.startswith("models/gemini")
-                or model.startswith("google/gemini")
+            (
+                model
+                and (
+                    "gemini" in model.lower()
+                    or model.startswith("models/gemini")
+                    or model.startswith("google/gemini")
+                )
             )
+            or (not model and settings.llm_provider == "gemini")
         )
 
         # --- Attempt 0: Google Gemini / Vertex AI API Streaming ---
         if is_gemini_model:
-            gemini_client = self._refresh_gemini_client()
-            if gemini_client:
-                target_model = model or "gemini-3.7-flash"
-                system_prompt = ""
-                gemini_contents = []
-                for m_item in messages:
-                    if m_item.get("role") == "system":
-                        system_prompt += m_item.get("content", "") + "\n"
-                    else:
-                        r = "user" if m_item.get("role") == "user" else "model"
-                        c = m_item.get("content", "")
-                        if c:
-                            gemini_contents.append(
-                                genai_types.Content(
-                                    role=r, parts=[genai_types.Part.from_text(text=c)]
-                                )
-                            )
-                if not gemini_contents:
-                    gemini_contents.append(
-                        genai_types.Content(
-                            role="user",
-                            parts=[genai_types.Part.from_text(text="Hello")],
+            candidates = self._get_gemini_candidates(model)
+            system_prompt = ""
+            gemini_contents = []
+            for m_item in messages:
+                if m_item.get("role") == "system":
+                    system_prompt += m_item.get("content", "") + "\n"
+                else:
+                    r = "user" if m_item.get("role") == "user" else "model"
+                    c = m_item.get("content", "")
+                    if c:
+                        gemini_contents.append(
+                            genai_types.Content(role=r, parts=[genai_types.Part.from_text(text=c)])
                         )
+            if not gemini_contents:
+                gemini_contents.append(
+                    genai_types.Content(
+                        role="user",
+                        parts=[genai_types.Part.from_text(text="Hello")],
                     )
+                )
+
+            for attempt_idx, (target_model, target_loc) in enumerate(candidates):
+                gemini_client = self._refresh_gemini_client(location=target_loc)
+                if not gemini_client:
+                    continue
 
                 # Configure thinking for Gemini thinking models
                 thinking_cfg = None
-                if enable_thinking and (
-                    "3.7" in target_model
-                    or "thinking" in target_model
-                ):
+                if enable_thinking and ("3." in target_model or "thinking" in target_model):
                     try:
                         thinking_cfg = genai_types.ThinkingConfig(
                             thinking_budget=1024,
@@ -941,13 +1006,16 @@ class LLMClient:
 
                 try:
                     gen_kwargs: dict[str, Any] = {
-                        "system_instruction": (
-                            system_prompt.strip() if system_prompt else None
-                        ),
-                        "max_output_tokens": (
-                            min(max_tokens, 8192) if max_tokens else 8192
-                        ),
+                        "system_instruction": (system_prompt.strip() if system_prompt else None),
+                        "max_output_tokens": (min(max_tokens, 8192) if max_tokens else 8192),
                     }
+                    try:
+                        gen_kwargs["automatic_function_calling"] = (
+                            genai_types.AutomaticFunctionCallingConfig(disable=True)
+                        )
+                    except Exception:
+                        pass
+
                     if thinking_cfg is not None:
                         gen_kwargs["thinking_config"] = thinking_cfg
                     else:
@@ -955,33 +1023,30 @@ class LLMClient:
                         gen_kwargs["top_p"] = top_p
 
                     try:
-                        gemini_stream = (
-                            await gemini_client.aio.models.generate_content_stream(
-                                model=target_model,
-                                contents=gemini_contents,  # type: ignore[arg-type]
-                                config=genai_types.GenerateContentConfig(**gen_kwargs),
-                            )
+                        gemini_stream = await gemini_client.aio.models.generate_content_stream(
+                            model=target_model,
+                            contents=gemini_contents,  # type: ignore[arg-type]
+                            config=genai_types.GenerateContentConfig(**gen_kwargs),
                         )
                     except Exception as e_stream_init:
                         if "thinking" in str(e_stream_init).lower() and thinking_cfg is not None:
                             gen_kwargs.pop("thinking_config", None)
                             gen_kwargs["temperature"] = temperature
                             gen_kwargs["top_p"] = top_p
-                            gemini_stream = (
-                                await gemini_client.aio.models.generate_content_stream(
-                                    model=target_model,
-                                    contents=gemini_contents,  # type: ignore[arg-type]
-                                    config=genai_types.GenerateContentConfig(**gen_kwargs),
-                                )
+                            gemini_stream = await gemini_client.aio.models.generate_content_stream(
+                                model=target_model,
+                                contents=gemini_contents,  # type: ignore[arg-type]
+                                config=genai_types.GenerateContentConfig(**gen_kwargs),
                             )
                         else:
                             raise e_stream_init
+
                     stream_emitted = False
                     async for chunk in gemini_stream:
                         has_parts = False
-                        candidates = getattr(chunk, "candidates", None)
-                        if candidates:
-                            content_obj = getattr(candidates[0], "content", None)
+                        candidates_chunk = getattr(chunk, "candidates", None)
+                        if candidates_chunk:
+                            content_obj = getattr(candidates_chunk[0], "content", None)
                             if content_obj and getattr(content_obj, "parts", None):
                                 for part in content_obj.parts:
                                     part_text = getattr(part, "text", "") or ""
@@ -1005,9 +1070,38 @@ class LLMClient:
                     if stream_emitted:
                         return
                 except Exception as e:
-                    logger.warning(
-                        "Gemini model %s streaming failed: %s", target_model, e
+                    err_str = str(e).lower()
+                    is_not_found = any(
+                        k in err_str
+                        for k in ("404", "not_found", "not found", "does not have access")
                     )
+                    if is_not_found and attempt_idx < len(candidates) - 1:
+                        next_model, next_loc = candidates[attempt_idx + 1]
+                        logger.warning(
+                            "Gemini model %s at %s streaming failed (404 Not Found). Retrying with candidate %s at %s...",
+                            target_model,
+                            target_loc or "default",
+                            next_model,
+                            next_loc or "default",
+                        )
+                        continue
+                    logger.warning(
+                        "Gemini model %s at %s streaming failed: %s",
+                        target_model,
+                        target_loc or "default",
+                        e,
+                    )
+                    if attempt_idx < len(candidates) - 1 and is_not_found:
+                        continue
+                    break
+
+            if model and ("gemini" in model.lower()):
+                logger.error("All Gemini streaming candidates failed for requested model %s", model)
+                yield {
+                    "type": "content",
+                    "text": f"⚠️ Gemini model `{model}` could not be reached or completed on Vertex AI / Google GenAI. Please verify your Google Cloud permissions and quota.",
+                }
+                return
 
         # --- Attempt 1: Groq API ---
         groq_client = self._refresh_groq_client()
@@ -1082,9 +1176,7 @@ class LLMClient:
                         extracted = full_r.split("ANSWER:", 1)[1].strip()
                     else:
                         paras = [p.strip() for p in full_r.split("\n\n") if p.strip()]
-                        extracted = (
-                            "\n\n".join(paras[-2:]) if len(paras) >= 2 else full_r
-                        )
+                        extracted = "\n\n".join(paras[-2:]) if len(paras) >= 2 else full_r
                     if extracted:
                         yield {"type": "content", "text": extracted}
 
@@ -1113,15 +1205,11 @@ class LLMClient:
             yield {"type": "reasoning", "text": reasoning}
         yield {"type": "content", "text": content}
 
-    def _mock_completion(
-        self, messages: list[dict[str, Any]]
-    ) -> tuple[str, str | None]:
+    def _mock_completion(self, messages: list[dict[str, Any]]) -> tuple[str, str | None]:
         """Generate structured synthetic answer for testing purposes."""
         last_msg = messages[-1]["content"] if messages else ""
         system_msg = (
-            messages[0]["content"]
-            if len(messages) > 1 and messages[0]["role"] == "system"
-            else ""
+            messages[0]["content"] if len(messages) > 1 and messages[0]["role"] == "system" else ""
         )
 
         active_notice = self.last_rate_limit or LLMClient.global_rate_limit
@@ -1148,10 +1236,7 @@ class LLMClient:
                     "sub_queries": [last_msg],
                 }
                 return json.dumps(out), reasoning
-            if (
-                "check_answer_support" in system_msg.lower()
-                or "verifier" in system_msg.lower()
-            ):
+            if "check_answer_support" in system_msg.lower() or "verifier" in system_msg.lower():
                 out_check: dict[str, Any] = {
                     "passed": True,
                     "confidence": 0.95,

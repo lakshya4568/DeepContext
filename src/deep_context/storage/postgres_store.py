@@ -23,6 +23,24 @@ from deep_context.core.types import (
 from deep_context.storage.base import StorageInterface
 
 
+def _clean_pg_str(val: str | None) -> str | None:
+    """Strip null bytes (0x00) which are forbidden in PostgreSQL UTF-8 text."""
+    if val is None:
+        return None
+    return val.replace("\x00", "")
+
+
+def _clean_pg_json(val: Any) -> Any:
+    """Recursively strip null bytes (0x00 and \\u0000) from JSON structures for PostgreSQL JSONB."""
+    if isinstance(val, str):
+        return val.replace("\x00", "").replace("\\u0000", "")
+    elif isinstance(val, dict):
+        return {(_clean_pg_str(k) or ""): _clean_pg_json(v) for k, v in val.items()}
+    elif isinstance(val, list):
+        return [_clean_pg_json(x) for x in val]
+    return val
+
+
 class PostgresStore(StorageInterface):
     """PostgreSQL 15+ with pgvector storage implementing docs/DATA_MODEL.sql."""
 
@@ -261,6 +279,11 @@ class PostgresStore(StorageInterface):
 
     async def insert_document(self, document: Document) -> str:
         pool = self._get_pool()
+        clean_meta = _clean_pg_json(document.metadata)
+        clean_title = _clean_pg_str(document.title) or ""
+        clean_uri = _clean_pg_str(document.source_uri)
+        clean_doctype = _clean_pg_str(document.doc_type) or "markdown"
+        clean_tenant = _clean_pg_str(document.tenant_id) or "default"
         async with pool.acquire() as conn:
             row = await conn.fetchrow(
                 """
@@ -279,13 +302,13 @@ class PostgresStore(StorageInterface):
                 RETURNING id;
                 """,
                 document.id,
-                document.tenant_id,
-                document.title,
-                document.source_uri,
-                document.doc_type,
+                clean_tenant,
+                clean_title,
+                clean_uri,
+                clean_doctype,
                 document.permission_scope,
                 document.retrieval_mode.value,
-                json.dumps(document.metadata),
+                json.dumps(clean_meta),
                 document.ingested_at,
                 document.updated_at,
             )
@@ -294,6 +317,11 @@ class PostgresStore(StorageInterface):
     async def insert_document_and_chunks(self, document: Document, chunks: list[Chunk]) -> str:
         """Atomically inserts document and all its chunks in a single transaction."""
         pool = self._get_pool()
+        clean_meta = _clean_pg_json(document.metadata)
+        clean_title = _clean_pg_str(document.title) or ""
+        clean_uri = _clean_pg_str(document.source_uri)
+        clean_doctype = _clean_pg_str(document.doc_type) or "markdown"
+        clean_tenant = _clean_pg_str(document.tenant_id) or "default"
         async with pool.acquire() as conn:
             async with conn.transaction():
                 mode_val = (
@@ -317,13 +345,13 @@ class PostgresStore(StorageInterface):
                         updated_at = EXCLUDED.updated_at;
                     """,
                     document.id,
-                    document.tenant_id,
-                    document.title,
-                    document.source_uri,
-                    document.doc_type,
+                    clean_tenant,
+                    clean_title,
+                    clean_uri,
+                    clean_doctype,
                     document.permission_scope,
                     mode_val,
-                    json.dumps(document.metadata),
+                    json.dumps(clean_meta),
                     document.ingested_at,
                     document.updated_at,
                 )
@@ -360,14 +388,14 @@ class PostgresStore(StorageInterface):
                             c.document_id,
                             c.parent_chunk_id,
                             level_str,
-                            c.content,
+                            _clean_pg_str(c.content) or "",
                             c.token_count,
-                            c.section_path,
+                            _clean_pg_str(c.section_path),
                             c.page_number,
                             emb_val,
-                            c.summary_text,
+                            _clean_pg_str(c.summary_text),
                             c.summary_tokens,
-                            c.summary_model,
+                            _clean_pg_str(c.summary_model),
                             c.generated_at,
                             c.created_at,
                         )
@@ -667,14 +695,14 @@ class PostgresStore(StorageInterface):
                         c.document_id,
                         c.parent_chunk_id,
                         level_str,
-                        c.content,
+                        _clean_pg_str(c.content) or "",
                         c.token_count,
-                        c.section_path,
+                        _clean_pg_str(c.section_path),
                         c.page_number,
                         emb_val,
-                        c.summary_text,
+                        _clean_pg_str(c.summary_text),
                         c.summary_tokens,
-                        c.summary_model,
+                        _clean_pg_str(c.summary_model),
                         c.generated_at,
                         c.created_at,
                     )
@@ -698,6 +726,16 @@ class PostgresStore(StorageInterface):
         if not updates:
             return
         pool = self._get_pool()
+        clean_updates = [
+            (
+                chunk_id,
+                _clean_pg_str(sum_text) or "",
+                tokens,
+                _clean_pg_str(model) or "",
+                gen_time,
+            )
+            for chunk_id, sum_text, tokens, model, gen_time in updates
+        ]
         async with pool.acquire() as conn:
             await conn.executemany(
                 """
@@ -708,7 +746,7 @@ class PostgresStore(StorageInterface):
                     generated_at = $5
                 WHERE id = $1::uuid;
                 """,
-                updates,
+                clean_updates,
             )
 
     async def update_chunk_embeddings_batch(self, updates: list[tuple[str, list[float]]]) -> None:

@@ -17,6 +17,14 @@ class ParsedSection:
     page_number: int | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
+    def __post_init__(self) -> None:
+        if isinstance(self.title, str) and "\x00" in self.title:
+            self.title = self.title.replace("\x00", "")
+        if isinstance(self.content, str) and "\x00" in self.content:
+            self.content = self.content.replace("\x00", "")
+        if isinstance(self.section_path, str) and "\x00" in self.section_path:
+            self.section_path = self.section_path.replace("\x00", "")
+
 
 def count_approx_tokens(text: str) -> int:
     """Rough approximation: 1 token ~= 4 characters or 0.75 words."""
@@ -38,6 +46,9 @@ class DocumentParser:
         Structure-aware parser using IBM Docling as the primary engine for PDF,
         Markdown, DOCX, and HTML, with resilient native fallbacks.
         """
+        if isinstance(content, str) and "\x00" in content:
+            content = content.replace("\x00", "")
+
         doc_type_lower = doc_type.lower()
 
         # 1. Code AST parsing
@@ -200,8 +211,7 @@ class DocumentParser:
 
             for page_idx in range(total_pages):
                 page = reader.pages[page_idx]
-                page_text = page.extract_text() or ""
-                page_text = page_text.strip()
+                page_text = (page.extract_text() or "").replace("\x00", "").strip()
                 if not page_text:
                     continue
 

@@ -1,45 +1,75 @@
-%% Deep Context Platform — system at a glance
-%% Rendered version of docs/ARCHITECTURE.md §2. Render with the Mermaid CLI, mermaid.live,
-%% or any Markdown viewer with Mermaid support.
+%% Deep Context Platform — System Architecture at a Glance
+%% Render with Mermaid CLI, mermaid.live, or any Markdown viewer with Mermaid support.
 
 flowchart TD
-    Client["Client\n(LangGraph graph, Claude Code / MCP,\nPrime-Agent-style harness, plain HTTP)"]
-    Ingress["FastAPI ingress (FR22)"]
-    Classifier["Query & Task Classifier\n(routes on shape, not on hype)"]
+    subgraph ClientLayer ["Client & Ingress"]
+        Client["Client / User Interface\n(Web Studio UI, CLI, SSE Stream, REST)"]
+        Ingress["FastAPI Ingress Layer\n(/v1/query/stream, /v1/agentic-rag, /v1/ingest)"]
+        Client --> Ingress
+    end
 
-    Hybrid["Simple QA path\nHybrid Retrieval\nBM25 + vector + RRF\n+ cross-encoder rerank"]
-    Agentic["Multi-step task path\nAgentic Planner\ntool selection, iteration limits, multi-hop loop"]
-    RLM["Global-analysis path\nRLM Engine\nHost + Kernel (see §4, §5)"]
+    subgraph RoutingLayer ["Query Classification & Path Routing"]
+        Classifier["Query Shape Classifier\n(Factual, How-To, Multi-Hop, Aggregation, Navigation)"]
+        Ingress --> Classifier
+        Classifier --> RouterDecision{"Query Router"}
+        RouterDecision -->|Factual / How-To / Aggregation| HybridPath["Hybrid RAG Path"]
+        RouterDecision -->|Multi-Hop / Complex Task| AgenticPath["Agentic Planner & CRAG Loop"]
+    end
 
-    Gate{"Evidence-Sufficiency Check\n(shared gate, §7)"}
-    Retry["Rewrite query / widen filters / escalate mechanism\n(max 1 retry before 'insufficient evidence' is a valid answer)"]
-    Generate["Generate answer + citations"]
-    MemExtract["Memory Extraction (background)"]
-    Gate2["Promotion Gate (§6)"]
+    subgraph HybridEngine ["Hybrid Retrieval & Reranking"]
+        HybridPath --> SubQueries["Query Rewriter & Sub-Queries"]
+        SubQueries --> BM25Search["BM25 Lexical Search\n(ParadeDB / TSVector, Top 100)"]
+        SubQueries --> DenseSearch["Dense Vector Cosine Search\n(pgvector HNSW, Top 100)"]
+        
+        BM25Search & DenseSearch --> RRF["Reciprocal Rank Fusion (k=60)\n& Prefix / ID Deduplication (Cap 100)"]
+        RRF --> PoolCut["Rerank Window Cutoff\npool_size <= 24"]
+        PoolCut --> Reranker["Neural / Heuristic Reranker\nSigmoid Normalization + 60/40 Score Blend"]
+        Reranker --> ConsensusGuard["Consensus Protection Guard\n(Preserve Dual-Channel Top Hits)"]
+        ConsensusGuard --> ParentResolver["Parent Chunk Resolver\n(Child -> 1500 tok Parent Section)"]
+    end
 
-    Session["Short-term / session state\n(Redis or in-process)"]
-    LongTerm["Long-term typed memory\n(Postgres: policy / preference / fact)"]
-    Episodic["Episodic summary\n+ trace log (append-only)"]
+    subgraph QualityGates ["Quality & Sufficiency Gates"]
+        ParentResolver --> HopGate{"Hop Coverage Gate\n(Entity/Topic Coverage >= 0.40?)"}
+        HopGate -->|Fail: < 0.40| RetryHop["Corrective Retry (1x)\n(Widen Retrieval Pool)"]
+        RetryHop -.-> SubQueries
+        HopGate -->|Pass| SuffGate{"Evidence Sufficiency Gate\n(Query Term Overlap >= 0.25?)"}
+        SuffGate -->|Fail: Insufficient| Refusal["Honest Refusal\n('Insufficient evidence to answer')"]
+    end
 
-    Client --> Ingress --> Classifier
-    Classifier --> Hybrid
-    Classifier --> Agentic
-    Classifier --> RLM
+    subgraph AgenticLoop ["Corrective Agentic State Machine (CRAG)"]
+        AgenticPath --> CRAGRetrieve["Retrieve Candidates"]
+        CRAGRetrieve --> GradeDocs{"Document Grader\n(Relevance Score >= 0.70?)"}
+        GradeDocs -->|Irrelevant & rewrites < 2| RewriteQ["Query Rewriter (LLM + Heuristic)"]
+        RewriteQ --> CRAGRetrieve
+        GradeDocs -->|Exhausted rewrites| Refusal
+        GradeDocs -->|Relevant| Grounding
+    end
 
-    Hybrid --> Gate
-    Agentic --> Gate
-    RLM --> Gate
+    subgraph Grounding ["Two-Pass Grounded Generation & Verification"]
+        SuffGate -->|Pass| Pass1["Pass 1: Structured Fact Extraction\n(JSON: supported vs missing facts)"]
+        Pass1 --> FactSanitize["Fact Sanitizer\n(Strip unsupported claims)"]
+        FactSanitize --> Pass2["Pass 2: Grounded Synthesis\n(Draft answer strictly from supported facts)"]
+        Pass2 --> Verifier{"Evidence Support Verifier\n(Claim-to-Chunk NLI Linking)"}
+        Verifier -->|Confidence >= 0.75| FormatAnswer["Final Answer + Inline Traceable Citations"]
+        Verifier -->|Confidence < 0.75| Refusal
+    end
 
-    Gate -- "No" --> Retry
-    Retry -.-> Classifier
-    Gate -- "Yes" --> Generate
+    subgraph MemoryLayer ["4-Store Typed Memory Layer"]
+        Ingress -.-> MemoryReader["MemoryStoreManager\n(Read Active Policies, User Prefs, Semantic Facts)"]
+        MemoryReader --> PromptAssembler["8-Layer Prompt Assembler\n(Compiles System Prompt + Grounded Context)"]
+        PromptAssembler -.-> Pass1
+        
+        FormatAnswer --> BackgroundMem["Background Memory Extractor"]
+        BackgroundMem --> PromoGate{"4-Stage Promotion Gate\n(Observed -> Candidate -> Scored -> Durable)"}
+        PromoGate -->|Score >= Threshold| MemoryStores[("Durable Memory Stores\npolicy | preference | fact | episode")]
+    end
 
-    Generate --> MemExtract --> Gate2
-    Gate2 --> Session
-    Gate2 --> LongTerm
-    Gate2 --> Episodic
+    FormatAnswer --> Output["Stream to Client via SSE / REST Response"]
+    Refusal --> Output
 
     classDef path fill:#1e1e2e,stroke:#89b4fa,color:#cdd6f4;
     classDef gate fill:#313244,stroke:#f9e2af,color:#f9e2af;
-    class Hybrid,Agentic,RLM path;
-    class Gate,Gate2 gate;
+    classDef storage fill:#181825,stroke:#a6adc8,color:#cdd6f4;
+    class HybridPath,AgenticPath,CRAGRetrieve,Pass1,Pass2 path;
+    class RouterDecision,HopGate,SuffGate,GradeDocs,Verifier,PromoGate gate;
+    class MemoryStores storage;

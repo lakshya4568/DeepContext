@@ -366,7 +366,7 @@ def query_cmd(
         "",
         "--model",
         "-m",
-        help="Reasoning model to use ('qwen/qwen3.6-27b' or 'gemini-3.7-flash')",
+        help="Reasoning model to use (e.g. 'gemini-2.5-flash', 'gemini-3.7-flash', 'gemini-3.8-flash', 'qwen/qwen3.6-27b')",
     ),
     embedding_model: str = typer.Option(
         "",
@@ -507,7 +507,7 @@ def set_preference_cmd(
         "",
         "--model",
         "-m",
-        help="Preferred LLM model ('qwen/qwen3.6-27b' or 'gemini-3.7-flash')",
+        help="Preferred LLM model (e.g. 'gemini-2.5-flash', 'gemini-3.7-flash', 'gemini-3.8-flash', 'qwen/qwen3.6-27b')",
     ),
 ) -> None:
     """Save user preferences for embeddings and rerankers into durable memory_preference store."""
@@ -668,12 +668,13 @@ def chunks_cmd(
 def serve_cmd(
     host: str = typer.Option("0.0.0.0", "--host", "-h", help="Host interface"),
     port: int = typer.Option(8000, "--port", "-p", help="Port number"),
+    reload: bool = typer.Option(False, "--reload", "-r", help="Enable auto-reload on code changes"),
 ) -> None:
     """Start the FastAPI HTTP service."""
     console.print(
         f"[bold green]Starting Deep Context Platform on http://{host}:{port}[/bold green]"
     )
-    uvicorn.run("deep_context.api.app:app", host=host, port=port, reload=False)
+    uvicorn.run("deep_context.api.app:app", host=host, port=port, reload=reload)
 
 
 @app.command("scheduler")

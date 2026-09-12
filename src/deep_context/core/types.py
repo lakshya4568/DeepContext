@@ -80,6 +80,12 @@ class Document:
     ingested_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
+    def __post_init__(self) -> None:
+        if isinstance(self.title, str) and "\x00" in self.title:
+            self.title = self.title.replace("\x00", "")
+        if isinstance(self.source_uri, str) and "\x00" in self.source_uri:
+            self.source_uri = self.source_uri.replace("\x00", "")
+
 
 @dataclass
 class Chunk:
@@ -99,6 +105,16 @@ class Chunk:
     metadata: dict[str, Any] = field(default_factory=dict)
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
+    def __post_init__(self) -> None:
+        if isinstance(self.content, str) and "\x00" in self.content:
+            self.content = self.content.replace("\x00", "")
+        if isinstance(self.section_path, str) and "\x00" in self.section_path:
+            self.section_path = self.section_path.replace("\x00", "")
+        if isinstance(self.summary_text, str) and "\x00" in self.summary_text:
+            self.summary_text = self.summary_text.replace("\x00", "")
+        if isinstance(self.summary_model, str) and "\x00" in self.summary_model:
+            self.summary_model = self.summary_model.replace("\x00", "")
+
     @property
     def text(self) -> str:
         """Alias for content to match standard RAG conventions."""
@@ -106,7 +122,7 @@ class Chunk:
 
     @text.setter
     def text(self, val: str) -> None:
-        self.content = val
+        self.content = val.replace("\x00", "") if isinstance(val, str) else val
 
 
 @dataclass
