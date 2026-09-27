@@ -106,15 +106,19 @@
         padding: 0 32px;
       }
 
-      /* Header */
-      header {
+      /* Unified Sticky Header & Navigation Bar */
+      .app-header-bar {
         background: var(--bg-surface);
         border-bottom: 1px solid var(--border);
-        padding: 16px 0;
         position: sticky;
         top: 0;
         z-index: 100;
-        box-shadow: var(--shadow-sm);
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+      }
+
+      .header-top {
+        padding: 12px 0;
+        border-bottom: 1px solid var(--border-subtle);
       }
 
       .header-inner {
@@ -152,13 +156,16 @@
 
       .version-tag {
         font-size: 11px;
-        font-family: var(--font-mono);
+        font-family: var(--font-sans);
         background: var(--bg-subtle);
         color: var(--text-secondary);
-        padding: 3px 8px;
+        padding: 2.5px 8px;
         border-radius: 6px;
         font-weight: 600;
         border: 1px solid var(--border);
+        letter-spacing: normal;
+        white-space: nowrap;
+        display: inline-block;
       }
 
       .system-status {
@@ -178,6 +185,7 @@
         background: var(--bg-surface);
         border: 1px solid var(--border);
         color: var(--text-secondary);
+        white-space: nowrap;
       }
 
       .dot {
@@ -197,10 +205,9 @@
       }
 
       /* Navigation Bar */
-      nav {
+      .header-nav {
+        padding: 6px 0;
         background: var(--bg-surface);
-        border-bottom: 1px solid var(--border);
-        padding: 8px 0;
       }
 
       .nav-tabs {
@@ -214,15 +221,16 @@
         border: 1px solid transparent;
         color: var(--text-muted);
         font-family: var(--font-sans);
-        font-size: 13.5px;
+        font-size: 13px;
         font-weight: 600;
-        padding: 9px 18px;
-        border-radius: var(--radius-md);
+        padding: 7px 15px;
+        border-radius: var(--radius-sm);
         cursor: pointer;
-        display: flex;
+        display: inline-flex;
         align-items: center;
-        gap: 8px;
+        gap: 7px;
         transition: all 0.15s ease;
+        white-space: nowrap;
       }
 
       .nav-tab:hover {
@@ -231,14 +239,14 @@
       }
 
       .nav-tab.active {
-        background: var(--bg-subtle);
-        border-color: var(--border);
-        color: var(--text);
+        background: var(--primary);
+        border-color: var(--primary);
+        color: #ffffff;
         font-weight: 700;
       }
 
       .nav-tab.active svg {
-        stroke: var(--primary);
+        stroke: #ffffff;
       }
 
       /* Main Area */
@@ -278,6 +286,61 @@
         .grid-2 {
           grid-template-columns: 1fr;
         }
+      }
+
+      /* Ingest Tab Asymmetric Grid */
+      .ingest-grid {
+        display: grid;
+        grid-template-columns: 460px 1fr;
+        gap: 28px;
+        align-items: start;
+      }
+
+      @media (max-width: 1120px) {
+        .ingest-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      /* Ingestion Strategy Selector Cards */
+      .strategy-card {
+        border: 1.5px solid var(--border);
+        background: var(--bg-card);
+        border-radius: var(--radius-md);
+        padding: 12px 14px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        transition: all 0.15s ease;
+      }
+
+      .strategy-card:hover {
+        border-color: #cbd5e1;
+        background: var(--bg-subtle);
+      }
+
+      .strategy-card.selected-fast {
+        border-color: var(--emerald);
+        background: var(--emerald-bg);
+      }
+
+      .strategy-card.selected-deep {
+        border-color: var(--purple);
+        background: var(--purple-bg);
+      }
+
+      .badge-emerald {
+        background: var(--emerald-bg);
+        color: var(--emerald);
+        border: 1px solid var(--emerald-border);
+      }
+
+      .badge-purple {
+        background: var(--purple-bg);
+        color: var(--purple);
+        border: 1px solid var(--purple-border);
       }
 
       .card {
@@ -392,9 +455,9 @@
         background: var(--primary);
         color: #ffffff;
         border: 1px solid var(--primary);
-        padding: 12px 22px;
+        padding: 11px 20px;
         font-family: var(--font-sans);
-        font-size: 13.5px;
+        font-size: 13px;
         font-weight: 700;
         border-radius: var(--radius-md);
         cursor: pointer;
@@ -404,6 +467,7 @@
         gap: 8px;
         transition: all 0.15s ease;
         box-shadow: var(--shadow-sm);
+        white-space: nowrap;
       }
 
       .btn:hover {
@@ -859,6 +923,7 @@
         overflow-x: auto;
         border-radius: var(--radius-md);
         border: 1px solid var(--border);
+        background: var(--bg-surface);
       }
 
       table {
@@ -870,20 +935,22 @@
 
       th {
         background: var(--bg-subtle);
-        padding: 12px 16px;
+        padding: 12px 14px;
         font-weight: 700;
         color: var(--text-secondary);
         text-transform: uppercase;
         letter-spacing: 0.5px;
         font-size: 11px;
         border-bottom: 1px solid var(--border);
+        white-space: nowrap;
       }
 
       td {
-        padding: 12px 16px;
+        padding: 12px 14px;
         border-bottom: 1px solid var(--border-subtle);
         background: #ffffff;
         color: var(--text);
+        vertical-align: middle;
       }
 
       tr:last-child td {
@@ -1063,84 +1130,86 @@
     </style>
   </head>
   <body>
-    <!-- Header -->
-    <header>
-      <div class="container header-inner">
-        <div class="brand">
-          <div class="logo-badge">
-            <i data-lucide="layers" style="width: 20px; height: 20px"></i>
+    <!-- Unified Sticky Header & Navigation Bar -->
+    <header class="app-header-bar">
+      <div class="header-top">
+        <div class="container header-inner">
+          <div class="brand">
+            <div class="logo-badge">
+              <i data-lucide="layers" style="width: 20px; height: 20px"></i>
+            </div>
+            <div>
+              <div class="brand-title">
+                Deep Context Studio
+                <span class="version-tag"
+                  >Gemini 2 + Groq Qwen + Multi-Reranker</span
+                >
+              </div>
+            </div>
           </div>
-          <div>
-            <div class="brand-title">
-              Deep Context Studio
-              <span class="version-tag"
-                >Gemini 2 + Groq Qwen + Multi-Reranker</span
-              >
+
+          <div class="system-status">
+            <div
+              id="header-quota-pill"
+              class="quota-pill normal"
+              title="Model provider status"
+            >
+              <span class="dot emerald" id="quota-dot"></span>
+              <span id="header-quota-text">LLM Client Active</span>
+            </div>
+            <div class="pill-tag">
+              <span class="dot emerald"></span> PostgreSQL / SQLite
+            </div>
+            <div class="pill-tag" id="header-emb-pill">
+              <span class="dot emerald"></span>
+              <span id="header-emb-badge">gemini-embedding-2 (768d)</span>
+            </div>
+            <div class="pill-tag" id="header-reranker-pill">
+              <span class="dot emerald"></span>
+              <span id="header-reranker-badge">Cross-Encoder</span>
+            </div>
+            <div class="pill-tag">
+              <span class="dot blue"></span>
+              <span id="doc-counter">0</span> Ingested Docs
             </div>
           </div>
         </div>
+      </div>
 
-        <div class="system-status">
-          <div
-            id="header-quota-pill"
-            class="quota-pill normal"
-            title="Model provider status"
-          >
-            <span class="dot emerald" id="quota-dot"></span>
-            <span id="header-quota-text">LLM Client Active</span>
-          </div>
-          <div class="pill-tag">
-            <span class="dot emerald"></span> PostgreSQL / SQLite
-          </div>
-          <div class="pill-tag" id="header-emb-pill">
-            <span class="dot emerald"></span>
-            <span id="header-emb-badge">gemini-embedding-2 (768d)</span>
-          </div>
-          <div class="pill-tag" id="header-reranker-pill">
-            <span class="dot emerald"></span>
-            <span id="header-reranker-badge">Cross-Encoder</span>
-          </div>
-          <div class="pill-tag">
-            <span class="dot blue"></span>
-            <span id="doc-counter">0</span> Ingested Docs
+      <!-- Navigation Tabs (Always Visible & Pinned with Header) -->
+      <nav class="header-nav">
+        <div class="container">
+          <div class="nav-tabs">
+            <button class="nav-tab active" onclick="switchTab('query-tab')">
+              <i data-lucide="sparkles" style="width: 15px; height: 15px"></i>
+              Grounded Query Studio
+            </button>
+            <button class="nav-tab" onclick="switchTab('ingest-tab')">
+              <i data-lucide="file-up" style="width: 15px; height: 15px"></i>
+              1000-Page PDF & Doc Hub
+            </button>
+            <button class="nav-tab" onclick="switchTab('haystack-tab')">
+              <i data-lucide="search-check" style="width: 15px; height: 15px"></i>
+              Needle-in-a-Haystack 5-Stage Lab
+            </button>
+            <button class="nav-tab" onclick="switchTab('memory-tab')">
+              <i
+                data-lucide="brain-circuit"
+                style="width: 15px; height: 15px"
+              ></i>
+              Typed Memory & Telemetry
+            </button>
+            <button class="nav-tab" onclick="switchTab('config-tab')">
+              <i
+                data-lucide="sliders-horizontal"
+                style="width: 15px; height: 15px"
+              ></i>
+              Pipeline Settings & Config
+            </button>
           </div>
         </div>
-      </div>
+      </nav>
     </header>
-
-    <!-- Navigation Tabs -->
-    <nav>
-      <div class="container">
-        <div class="nav-tabs">
-          <button class="nav-tab active" onclick="switchTab('query-tab')">
-            <i data-lucide="sparkles" style="width: 16px; height: 16px"></i>
-            Grounded Query Studio
-          </button>
-          <button class="nav-tab" onclick="switchTab('ingest-tab')">
-            <i data-lucide="file-up" style="width: 16px; height: 16px"></i>
-            1000-Page PDF & Doc Hub
-          </button>
-          <button class="nav-tab" onclick="switchTab('haystack-tab')">
-            <i data-lucide="search-check" style="width: 16px; height: 16px"></i>
-            Needle-in-a-Haystack 5-Stage Lab
-          </button>
-          <button class="nav-tab" onclick="switchTab('memory-tab')">
-            <i
-              data-lucide="brain-circuit"
-              style="width: 16px; height: 16px"
-            ></i>
-            Typed Memory & Telemetry
-          </button>
-          <button class="nav-tab" onclick="switchTab('config-tab')">
-            <i
-              data-lucide="sliders-horizontal"
-              style="width: 16px; height: 16px"
-            ></i>
-            Pipeline Settings & Config
-          </button>
-        </div>
-      </div>
-    </nav>
 
     <!-- Main Content -->
     <main class="container">
@@ -1574,7 +1643,7 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
       <!-- TAB 2: Document & 1000-Page PDF Ingester                       -->
       <!-- ============================================================= -->
       <section id="ingest-tab" class="tab-pane">
-        <div class="grid-2">
+        <div class="ingest-grid">
           <!-- Left: Universal Ingest Drop Box -->
           <div class="card">
             <div class="card-header">
@@ -1619,96 +1688,98 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
 
             <div id="file-queue-box" class="file-queue"></div>
 
-            <div class="grid-2" style="margin-top: 16px; margin-bottom: 8px">
-              <div>
-                <label
-                  ><i
-                    data-lucide="settings"
-                    style="width: 13px; height: 13px"
-                  ></i>
-                  Retrieval Strategy</label
-                >
-                <select id="upload-mode-select">
-                  <option value="hybrid" selected>
-                    Hybrid RAG (Dual BM25 Content & Summaries + Dense Vector)
-                  </option>
-                </select>
-              </div>
-              <div>
-                <label
-                  ><i
-                    data-lucide="layers"
-                    style="width: 13px; height: 13px"
-                  ></i>
-                  Ingest Embedding Model</label
-                >
-                <select id="upload-embedding-select">
-                  <option value="gemini-embedding-2" selected>
-                    Gemini Embedding 2 (768d MRL)
-                  </option>
-                  <option value="nvidia/nv-embedqa-e5-v5">
-                    NVIDIA NV-EmbedQA E5-v5 (1024d)
-                  </option>
-                </select>
-              </div>
+            <!-- Stacked Select Controls (Full Width, No Truncation) -->
+            <div class="form-group" style="margin-top: 16px; margin-bottom: 12px;">
+              <label><i data-lucide="settings" style="width: 13px; height: 13px"></i> Retrieval Strategy</label>
+              <select id="upload-mode-select">
+                <option value="hybrid" selected>
+                  Hybrid RAG (Dual BM25 Content & Summaries + Dense Vector)
+                </option>
+              </select>
             </div>
 
-            <!-- Ingestion Mode Selector -->
-            <div style="margin-top: 14px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px;">
-              <label style="font-size: 11px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Ingestion Strategy</label>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                <label id="mode-fast-card" style="border: 2px solid var(--emerald); background: var(--emerald-bg); border-radius: var(--radius-md); padding: 12px; cursor: pointer; display: flex; flex-direction: column; gap: 4px;">
-                  <div style="display: flex; align-items: center; justify-content: space-between;">
-                    <span style="font-weight: 800; font-size: 13px; color: var(--text); display: flex; align-items: center; gap: 6px;">
-                      <i data-lucide="zap" style="width: 14px; height: 14px; color: var(--emerald);"></i> Fast Ingest
-                    </span>
-                    <input type="radio" name="ingest_speed_mode" id="mode-fast-radio" value="fast" onchange="toggleIngestSpeedMode('fast')" checked style="accent-color: var(--emerald); width: 16px; height: 16px;">
+            <div class="form-group" style="margin-bottom: 14px;">
+              <label><i data-lucide="layers" style="width: 13px; height: 13px"></i> Ingest Embedding Model</label>
+              <select id="upload-embedding-select">
+                <option value="gemini-embedding-2" selected>
+                  Gemini Embedding 2 (768d MRL)
+                </option>
+                <option value="nvidia/nv-embedqa-e5-v5">
+                  NVIDIA NV-EmbedQA E5-v5 (1024d)
+                </option>
+              </select>
+            </div>
+
+            <!-- Ingestion Strategy Stacked Selector Cards -->
+            <div class="form-group" style="margin-bottom: 14px;">
+              <label style="font-size: 11px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">
+                Ingestion Strategy
+              </label>
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <label id="mode-fast-card" class="strategy-card selected-fast" onclick="toggleIngestSpeedMode('fast')">
+                  <div style="display: flex; align-items: flex-start; gap: 10px;">
+                    <div style="background: var(--emerald-bg); color: var(--emerald); padding: 6px; border-radius: 6px; border: 1px solid var(--emerald-border); margin-top: 2px;">
+                      <i data-lucide="zap" style="width: 15px; height: 15px;"></i>
+                    </div>
+                    <div>
+                      <div style="font-weight: 700; font-size: 13px; color: var(--text); display: flex; align-items: center; gap: 6px;">
+                        Fast Ingest
+                        <span class="badge-emerald" style="font-size: 10px; padding: 1px 6px; border-radius: 4px; font-weight: 700;">RECOMMENDED FOR 8GB MAC</span>
+                      </div>
+                      <div style="font-size: 11.5px; color: var(--text-secondary); margin-top: 2px; line-height: 1.4;">
+                        Hierarchical Parent-Child + Gemini 768d MRL + HNSW • <strong style="color: var(--emerald);">⚡ ~30s</strong>
+                      </div>
+                    </div>
                   </div>
-                  <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4;">
-                    Hierarchical Parent-Child + Gemini 768 MRL + HNSW.<br><strong style="color: var(--emerald);">⚡ ~30 seconds</strong> (Recommended for 8GB Mac)
-                  </div>
+                  <input type="radio" name="ingest_speed_mode" id="mode-fast-radio" value="fast" onchange="toggleIngestSpeedMode('fast')" checked style="accent-color: var(--emerald); width: 16px; height: 16px; cursor: pointer;">
                 </label>
 
-                <label id="mode-deep-card" style="border: 1px solid var(--border); background: var(--bg-card); border-radius: var(--radius-md); padding: 12px; cursor: pointer; display: flex; flex-direction: column; gap: 4px;">
-                  <div style="display: flex; align-items: center; justify-content: space-between;">
-                    <span style="font-weight: 800; font-size: 13px; color: var(--text); display: flex; align-items: center; gap: 6px;">
-                      <i data-lucide="sparkles" style="width: 14px; height: 14px; color: var(--purple);"></i> Deep Ingest
-                    </span>
-                    <input type="radio" name="ingest_speed_mode" id="mode-deep-radio" value="deep" onchange="toggleIngestSpeedMode('deep')" style="accent-color: var(--purple); width: 16px; height: 16px;">
+                <label id="mode-deep-card" class="strategy-card" onclick="toggleIngestSpeedMode('deep')">
+                  <div style="display: flex; align-items: flex-start; gap: 10px;">
+                    <div style="background: var(--purple-bg); color: var(--purple); padding: 6px; border-radius: 6px; border: 1px solid var(--purple-border); margin-top: 2px;">
+                      <i data-lucide="sparkles" style="width: 15px; height: 15px;"></i>
+                    </div>
+                    <div>
+                      <div style="font-weight: 700; font-size: 13px; color: var(--text); display: flex; align-items: center; gap: 6px;">
+                        Deep Ingest
+                        <span class="badge-purple" style="font-size: 10px; padding: 1px 6px; border-radius: 4px; font-weight: 700;">QWEN3 SUMMARIES</span>
+                      </div>
+                      <div style="font-size: 11.5px; color: var(--text-secondary); margin-top: 2px; line-height: 1.4;">
+                        Generates local Qwen3 summaries for every child chunk • <strong style="color: var(--purple);">🧠 ~1.6s / chunk</strong>
+                      </div>
+                    </div>
                   </div>
-                  <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4;">
-                    Generates local Qwen3 summaries for every child chunk.<br><strong style="color: var(--amber);">🧠 ~1.6s / chunk</strong> (Real-time live progress)
-                  </div>
+                  <input type="radio" name="ingest_speed_mode" id="mode-deep-radio" value="deep" onchange="toggleIngestSpeedMode('deep')" style="accent-color: var(--purple); width: 16px; height: 16px; cursor: pointer;">
                 </label>
               </div>
             </div>
 
             <!-- Multimodal & Visual Asset Toggle -->
-            <div style="margin-top: 12px; margin-bottom: 12px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 10px 14px; display: flex; align-items: center; justify-content: space-between;">
+            <div style="margin-bottom: 14px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
               <div style="display: flex; align-items: center; gap: 10px;">
-                <div style="background: var(--purple-bg); color: var(--purple); padding: 6px; border-radius: 6px;">
+                <div style="background: var(--purple-bg); color: var(--purple); padding: 6px; border-radius: 6px; border: 1px solid var(--purple-border);">
                   <i data-lucide="camera" style="width: 16px; height: 16px;"></i>
                 </div>
                 <div>
-                  <div style="font-weight: 700; font-size: 12px; color: var(--text);">Multimodal & Visual Asset Extraction</div>
-                  <div style="font-size: 11px; color: var(--text-muted);">Extracts figures, diagrams, and charts via Docling with durable 768d vector indexing</div>
+                  <div style="font-weight: 700; font-size: 12.5px; color: var(--text);">Multimodal & Visual Asset Extraction</div>
+                  <div style="font-size: 11.5px; color: var(--text-muted); line-height: 1.3;">Extracts figures, diagrams, and charts via Docling with durable 768d vector indexing</div>
                 </div>
               </div>
-              <input type="checkbox" id="upload-multimodal-checkbox" checked style="accent-color: var(--purple); width: 18px; height: 18px; cursor: pointer;" />
+              <input type="checkbox" id="upload-multimodal-checkbox" checked style="accent-color: var(--purple); width: 18px; height: 18px; cursor: pointer; flex-shrink: 0;" />
             </div>
 
-            <div style="display: flex; gap: 10px; margin-top: 10px">
+            <div style="display: flex; gap: 10px; margin-top: 14px">
               <button
                 class="btn"
                 id="upload-action-btn"
-                style="flex: 1"
+                style="flex: 1; white-space: nowrap;"
                 onclick="submitBatchUpload()"
               >
                 <span id="upload-action-spinner" class="spinner hidden"></span>
                 <i data-lucide="zap" style="width: 15px; height: 15px"></i>
                 Ingest & Embed Files
               </button>
-              <button class="btn btn-secondary" onclick="syncDocumentsFolder()">
+              <button class="btn btn-secondary" onclick="syncDocumentsFolder()" style="white-space: nowrap;">
                 <i
                   data-lucide="folder-sync"
                   style="width: 15px; height: 15px"
@@ -1812,15 +1883,15 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
               <table>
                 <thead>
                   <tr>
-                    <th>Title</th>
-                    <th>Type</th>
-                    <th>Mode</th>
-                    <th>Parents</th>
-                    <th>Children</th>
-                    <th>Summaries (Qwen3)</th>
-                    <th>Embeddings</th>
-                    <th>Inspect</th>
-                    <th>Action</th>
+                    <th style="min-width: 180px;">Title</th>
+                    <th style="text-align: center; width: 75px;">Type</th>
+                    <th style="text-align: center; width: 85px;">Mode</th>
+                    <th style="text-align: center; width: 70px;">Parents</th>
+                    <th style="text-align: center; width: 70px;">Children</th>
+                    <th style="text-align: center; min-width: 115px;">Summaries (Qwen3)</th>
+                    <th style="text-align: center; min-width: 115px;">Embeddings</th>
+                    <th style="text-align: center; min-width: 160px;">Explore</th>
+                    <th style="text-align: center; width: 85px;">Actions</th>
                   </tr>
                 </thead>
                 <tbody id="doc-library-tbody">
@@ -2956,17 +3027,13 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
         const deepRadio = document.getElementById("mode-deep-radio");
 
         if (mode === "fast") {
-          fastCard.style.borderColor = "var(--emerald)";
-          fastCard.style.background = "var(--emerald-bg)";
-          deepCard.style.borderColor = "var(--border)";
-          deepCard.style.background = "var(--bg-card)";
-          fastRadio.checked = true;
+          if (fastCard) fastCard.className = "strategy-card selected-fast";
+          if (deepCard) deepCard.className = "strategy-card";
+          if (fastRadio) fastRadio.checked = true;
         } else {
-          deepCard.style.borderColor = "var(--purple)";
-          deepCard.style.background = "var(--purple-bg)";
-          fastCard.style.borderColor = "var(--border)";
-          fastCard.style.background = "var(--bg-card)";
-          deepRadio.checked = true;
+          if (deepCard) deepCard.className = "strategy-card selected-deep";
+          if (fastCard) fastCard.className = "strategy-card";
+          if (deepRadio) deepRadio.checked = true;
         }
       }
 
@@ -3191,28 +3258,28 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
 
             row.innerHTML = `
             <td style="font-weight: 700; color: var(--text);">${d.title}</td>
-            <td><span class="version-tag">${d.doc_type.toUpperCase()}</span></td>
-            <td><span class="version-tag">${d.retrieval_mode}</span></td>
-            <td style="color: var(--emerald); font-weight: 700;">${d.parent_chunks_count}</td>
-            <td style="color: var(--amber); font-weight: 700;">${d.child_chunks_count}</td>
-            <td>${summariesBadge}</td>
-            <td>${embBadge}</td>
-            <td>
-              <div style="display: flex; gap: 4px; align-items: center;">
-                <button class="btn btn-secondary btn-sm" onclick="inspectDocumentChunks('${d.id}', '${d.title.replace(/'/g, "\\'")}')" style="display: inline-flex; align-items: center; gap: 4px;">
+            <td style="text-align: center;"><span class="version-tag">${d.doc_type.toUpperCase()}</span></td>
+            <td style="text-align: center;"><span class="version-tag">${d.retrieval_mode}</span></td>
+            <td style="text-align: center; color: var(--emerald); font-weight: 700;">${d.parent_chunks_count}</td>
+            <td style="text-align: center; color: var(--amber); font-weight: 700;">${d.child_chunks_count}</td>
+            <td style="text-align: center;">${summariesBadge}</td>
+            <td style="text-align: center;">${embBadge}</td>
+            <td style="text-align: center;">
+              <div style="display: inline-flex; gap: 6px; align-items: center; justify-content: center;">
+                <button class="btn btn-secondary btn-sm" onclick="inspectDocumentChunks('${d.id}', '${d.title.replace(/'/g, "\\'")}')" style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; white-space: nowrap;" title="Inspect chunks hierarchy">
                   <i data-lucide="layers" style="width: 12px; height: 12px;"></i> Inspect
                 </button>
-                <button class="btn btn-secondary btn-sm" onclick="viewDocumentAssets('${d.id}', '${d.title.replace(/'/g, "\\'")}')" style="display: inline-flex; align-items: center; gap: 4px; color: var(--purple);" title="View extracted figures, charts, and diagrams">
+                <button class="btn btn-secondary btn-sm" onclick="viewDocumentAssets('${d.id}', '${d.title.replace(/'/g, "\\'")}')" style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; color: var(--purple); border-color: var(--purple-border); background: var(--purple-bg); white-space: nowrap;" title="View extracted figures, charts, and diagrams">
                   <i data-lucide="image" style="width: 12px; height: 12px;"></i> Assets
                 </button>
               </div>
             </td>
-            <td>
-              <div style="display: flex; gap: 4px; align-items: center;">
-                <button class="btn btn-secondary btn-sm" onclick="resumeDocEmbeddings('${d.id}', '${d.title.replace(/'/g, "\\'")}')" title="Generate or resume missing embeddings" style="padding: 4px 8px;">
-                  <i data-lucide="zap" style="width: 12px; height: 12px; color: var(--amber);"></i>
+            <td style="text-align: center;">
+              <div style="display: inline-flex; gap: 6px; align-items: center; justify-content: center;">
+                <button class="btn btn-secondary btn-sm" onclick="resumeDocEmbeddings('${d.id}', '${d.title.replace(/'/g, "\\'")}')" title="Generate or resume missing embeddings" style="padding: 5px 8px;">
+                  <i data-lucide="zap" style="width: 13px; height: 13px; color: var(--amber);"></i>
                 </button>
-                <button class="btn btn-danger btn-sm" onclick="deleteDoc('${d.id}')" title="Delete document" style="padding: 4px 8px;">
+                <button class="btn btn-danger btn-sm" onclick="deleteDoc('${d.id}')" title="Delete document" style="padding: 5px 8px;">
                   <i data-lucide="trash" style="width: 12px; height: 12px;"></i>
                 </button>
               </div>
