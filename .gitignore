@@ -17,3 +17,4 @@ build/
 *.sqlite
 .env
 !.env.example
+data/

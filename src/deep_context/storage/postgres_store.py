@@ -18,11 +18,14 @@ from deep_context.core.types import (
     Document,
     DocumentElementType,
     DocumentNode,
+    EquationDataModel,
     ExistingMemory,
     FigureDataModel,
+    MultimodalAsset,
     Provenance,
     RetrievalFilters,
     RetrievalMode,
+    SourceCodeDataModel,
     TableDataModel,
 )
 from deep_context.storage.base import StorageInterface
@@ -159,8 +162,47 @@ class PostgresStore(StorageInterface):
                     metadata JSONB NOT NULL DEFAULT '{}',
                     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
                 );
+                ALTER TABLE document_tree_nodes ADD COLUMN IF NOT EXISTS source_uri TEXT;
+                ALTER TABLE document_tree_nodes ADD COLUMN IF NOT EXISTS char_span JSONB;
+                ALTER TABLE document_tree_nodes ADD COLUMN IF NOT EXISTS raw_ref TEXT;
+                ALTER TABLE document_tree_nodes ADD COLUMN IF NOT EXISTS parser TEXT;
+                ALTER TABLE document_tree_nodes ADD COLUMN IF NOT EXISTS parser_version TEXT;
+                ALTER TABLE document_tree_nodes ADD COLUMN IF NOT EXISTS extraction_method TEXT;
+                ALTER TABLE document_tree_nodes ADD COLUMN IF NOT EXISTS confidence REAL;
+                ALTER TABLE document_tree_nodes ADD COLUMN IF NOT EXISTS line_range JSONB;
+                ALTER TABLE document_tree_nodes ADD COLUMN IF NOT EXISTS equation_data JSONB;
+                ALTER TABLE document_tree_nodes ADD COLUMN IF NOT EXISTS code_data JSONB;
+                ALTER TABLE document_tree_nodes ADD COLUMN IF NOT EXISTS asset_id TEXT;
                 CREATE INDEX IF NOT EXISTS idx_tree_nodes_document ON document_tree_nodes (document_id);
                 CREATE INDEX IF NOT EXISTS idx_tree_nodes_parent ON document_tree_nodes (parent_node_id);
+
+                CREATE TABLE IF NOT EXISTS document_assets (
+                    id TEXT PRIMARY KEY,
+                    document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+                    node_id UUID REFERENCES document_tree_nodes(id) ON DELETE SET NULL,
+                    asset_type TEXT NOT NULL DEFAULT 'image',
+                    mime_type TEXT NOT NULL DEFAULT 'image/png',
+                    width INTEGER,
+                    height INTEGER,
+                    byte_size INTEGER NOT NULL DEFAULT 0,
+                    sha256 TEXT NOT NULL,
+                    storage_path TEXT NOT NULL,
+                    caption TEXT,
+                    ocr_text TEXT,
+                    description TEXT,
+                    embedding VECTOR(768),
+                    page_number INTEGER,
+                    bbox JSONB,
+                    tenant_id TEXT NOT NULL DEFAULT 'default',
+                    permission_scope TEXT[] NOT NULL DEFAULT ARRAY['default'],
+                    metadata JSONB NOT NULL DEFAULT '{}',
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                );
+                CREATE INDEX IF NOT EXISTS idx_assets_document ON document_assets (document_id);
+                CREATE INDEX IF NOT EXISTS idx_assets_node ON document_assets (node_id);
+                CREATE INDEX IF NOT EXISTS idx_assets_tenant ON document_assets (tenant_id);
+                CREATE INDEX IF NOT EXISTS idx_assets_sha256 ON document_assets (sha256);
+                CREATE INDEX IF NOT EXISTS idx_assets_embedding_hnsw ON document_assets USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 200);
 
                 CREATE OR REPLACE FUNCTION update_chunks_tsv() RETURNS trigger AS $$
                 BEGIN
@@ -879,18 +921,61 @@ class PostgresStore(StorageInterface):
     def _row_to_tree_node(self, r: Any) -> DocumentNode:
         bbox_data = json.loads(r["bbox"]) if isinstance(r["bbox"], str) else r["bbox"]
         bbox_tuple = tuple(bbox_data) if bbox_data else None
+
+        char_span_raw = (
+            json.loads(r["char_span"])
+            if isinstance(r.get("char_span"), str)
+            else r.get("char_span")
+        )
+        char_span_tuple = tuple(char_span_raw) if char_span_raw else None
+
+        line_range_raw = (
+            json.loads(r["line_range"])
+            if isinstance(r.get("line_range"), str)
+            else r.get("line_range")
+        )
+        line_range_tuple = tuple(line_range_raw) if line_range_raw else None
+
         prov = Provenance(
+            source_uri=r.get("source_uri"),
             page_number=r["page_number"],
             page_end=r.get("page_end"),
             bbox=bbox_tuple,
+            char_span=char_span_tuple,
+            raw_ref=r.get("raw_ref"),
+            parser=r.get("parser"),
+            parser_version=r.get("parser_version"),
+            extraction_method=r.get("extraction_method"),
+            confidence=float(r["confidence"]) if r.get("confidence") is not None else None,
+            line_range=line_range_tuple,
         )
-        t_raw = json.loads(r["table_data"]) if isinstance(r["table_data"], str) else r["table_data"]
+        t_raw = (
+            json.loads(r["table_data"])
+            if isinstance(r.get("table_data"), str)
+            else r.get("table_data")
+        )
         t_data = TableDataModel.from_dict(t_raw) if t_raw else None
 
         f_raw = (
-            json.loads(r["figure_data"]) if isinstance(r["figure_data"], str) else r["figure_data"]
+            json.loads(r["figure_data"])
+            if isinstance(r.get("figure_data"), str)
+            else r.get("figure_data")
         )
         f_data = FigureDataModel.from_dict(f_raw) if f_raw else None
+
+        eq_raw = (
+            json.loads(r["equation_data"])
+            if isinstance(r.get("equation_data"), str)
+            else r.get("equation_data")
+        )
+        eq_data = EquationDataModel.from_dict(eq_raw) if eq_raw else None
+
+        code_raw = (
+            json.loads(r["code_data"])
+            if isinstance(r.get("code_data"), str)
+            else r.get("code_data")
+        )
+        code_data = SourceCodeDataModel.from_dict(code_raw) if code_raw else None
 
         meta = (
             json.loads(r["metadata"])
@@ -901,7 +986,7 @@ class PostgresStore(StorageInterface):
         return DocumentNode(
             id=str(r["id"]),
             document_id=str(r["document_id"]),
-            parent_id=str(r["parent_node_id"]) if r["parent_node_id"] else None,
+            parent_id=str(r["parent_node_id"]) if r.get("parent_node_id") else None,
             node_type=DocumentElementType(r["node_type"]),
             reading_order=r["reading_order"],
             text=r["text"] or "",
@@ -910,6 +995,9 @@ class PostgresStore(StorageInterface):
             provenance=prov,
             table_data=t_data,
             figure_data=f_data,
+            equation_data=eq_data,
+            code_data=code_data,
+            asset_id=r.get("asset_id"),
             metadata=meta,
         )
 
@@ -921,11 +1009,15 @@ class PostgresStore(StorageInterface):
         INSERT INTO document_tree_nodes (
             id, document_id, parent_node_id, node_type, reading_order,
             title, text, raw_text, section_path, page_number, page_end,
-            bbox, table_data, figure_data, metadata, created_at
+            bbox, table_data, figure_data, metadata,
+            source_uri, char_span, raw_ref, parser, parser_version,
+            extraction_method, confidence, line_range, equation_data, code_data, asset_id, created_at
         ) VALUES (
             $1::uuid, $2::uuid, $3::uuid, $4, $5,
             $6, $7, $8, $9, $10, $11,
-            $12::jsonb, $13::jsonb, $14::jsonb, $15::jsonb, $16
+            $12::jsonb, $13::jsonb, $14::jsonb, $15::jsonb,
+            $16, $17::jsonb, $18, $19, $20,
+            $21, $22, $23::jsonb, $24::jsonb, $25::jsonb, $26, $27
         )
         ON CONFLICT (id) DO UPDATE SET
             parent_node_id = EXCLUDED.parent_node_id,
@@ -940,18 +1032,39 @@ class PostgresStore(StorageInterface):
             bbox = EXCLUDED.bbox,
             table_data = EXCLUDED.table_data,
             figure_data = EXCLUDED.figure_data,
-            metadata = EXCLUDED.metadata;
+            metadata = EXCLUDED.metadata,
+            source_uri = EXCLUDED.source_uri,
+            char_span = EXCLUDED.char_span,
+            raw_ref = EXCLUDED.raw_ref,
+            parser = EXCLUDED.parser,
+            parser_version = EXCLUDED.parser_version,
+            extraction_method = EXCLUDED.extraction_method,
+            confidence = EXCLUDED.confidence,
+            line_range = EXCLUDED.line_range,
+            equation_data = EXCLUDED.equation_data,
+            code_data = EXCLUDED.code_data,
+            asset_id = EXCLUDED.asset_id;
         """
 
         now = datetime.now()
 
         def _to_node_rec(n: DocumentNode) -> tuple:
             bbox_json = json.dumps(n.provenance.bbox) if n.provenance.bbox else None
+            char_span_json = json.dumps(n.provenance.char_span) if n.provenance.char_span else None
+            line_range_json = (
+                json.dumps(n.provenance.line_range) if n.provenance.line_range else None
+            )
             t_data_json = (
                 json.dumps(_clean_pg_json(n.table_data.to_dict())) if n.table_data else None
             )
             f_data_json = (
                 json.dumps(_clean_pg_json(n.figure_data.to_dict())) if n.figure_data else None
+            )
+            eq_data_json = (
+                json.dumps(_clean_pg_json(n.equation_data.to_dict())) if n.equation_data else None
+            )
+            code_data_json = (
+                json.dumps(_clean_pg_json(n.code_data.to_dict())) if n.code_data else None
             )
             meta_json = json.dumps(_clean_pg_json(n.metadata)) if n.metadata else "{}"
             node_type_str = n.node_type.value if hasattr(n.node_type, "value") else str(n.node_type)
@@ -972,6 +1085,17 @@ class PostgresStore(StorageInterface):
                 t_data_json,
                 f_data_json,
                 meta_json,
+                _clean_pg_str(n.provenance.source_uri),
+                char_span_json,
+                _clean_pg_str(n.provenance.raw_ref),
+                _clean_pg_str(n.provenance.parser),
+                _clean_pg_str(n.provenance.parser_version),
+                _clean_pg_str(n.provenance.extraction_method),
+                n.provenance.confidence,
+                line_range_json,
+                eq_data_json,
+                code_data_json,
+                n.asset_id,
                 now,
             )
 
@@ -987,7 +1111,12 @@ class PostgresStore(StorageInterface):
                 "SELECT * FROM document_tree_nodes WHERE document_id = $1::uuid ORDER BY reading_order ASC",
                 document_id,
             )
-            return [self._row_to_tree_node(r) for r in rows]
+            nodes = [self._row_to_tree_node(r) for r in rows]
+            node_map = {n.id: n for n in nodes}
+            for n in nodes:
+                if n.parent_id and n.parent_id in node_map:
+                    node_map[n.parent_id].children_ids.append(n.id)
+            return nodes
 
     async def get_tree_node(self, node_id: str) -> DocumentNode | None:
         pool = self._get_pool()
@@ -997,6 +1126,216 @@ class PostgresStore(StorageInterface):
                 node_id,
             )
             return self._row_to_tree_node(row) if row else None
+
+    async def get_tree_nodes_by_ids(self, node_ids: list[str]) -> list[DocumentNode]:
+        if not node_ids:
+            return []
+        pool = self._get_pool()
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT * FROM document_tree_nodes WHERE id::text = ANY($1::text[])",
+                node_ids,
+            )
+            return [self._row_to_tree_node(r) for r in rows]
+
+    # -----------------------------------------------------------------------
+    # Multimodal Assets
+    # -----------------------------------------------------------------------
+
+    def _row_to_asset(self, r: Any) -> MultimodalAsset:
+        bbox_data = json.loads(r["bbox"]) if isinstance(r["bbox"], str) else r["bbox"]
+        bbox_tuple = tuple(bbox_data) if bbox_data else None
+        emb_data = None
+        if r["embedding"] is not None:
+            if isinstance(r["embedding"], str):
+                emb_data = json.loads(r["embedding"])
+            else:
+                emb_data = list(r["embedding"])
+        scopes = (
+            json.loads(r["permission_scope"])
+            if isinstance(r["permission_scope"], str)
+            else list(r["permission_scope"] or ["default"])
+        )
+        meta = (
+            json.loads(r["metadata"]) if isinstance(r["metadata"], str) else (r["metadata"] or {})
+        )
+        return MultimodalAsset(
+            id=str(r["id"]),
+            document_id=str(r["document_id"]),
+            node_id=str(r["node_id"]) if r.get("node_id") else None,
+            asset_type=r["asset_type"],
+            mime_type=r["mime_type"],
+            width=r["width"],
+            height=r["height"],
+            byte_size=r["byte_size"],
+            sha256=r["sha256"],
+            storage_path=r["storage_path"],
+            caption=r["caption"],
+            ocr_text=r["ocr_text"],
+            description=r["description"],
+            embedding=emb_data,
+            page_number=r["page_number"],
+            bbox=bbox_tuple,
+            tenant_id=r["tenant_id"],
+            permission_scope=scopes,
+            metadata=meta,
+            created_at=r["created_at"],
+        )
+
+    async def insert_assets(self, assets: list[MultimodalAsset]) -> list[str]:
+        if not assets:
+            return []
+        pool = self._get_pool()
+        insert_sql = """
+        INSERT INTO document_assets (
+            id, document_id, node_id, asset_type, mime_type,
+            width, height, byte_size, sha256, storage_path,
+            caption, ocr_text, description, embedding,
+            page_number, bbox, tenant_id, permission_scope,
+            metadata, created_at
+        ) VALUES (
+            $1, $2::uuid, $3::uuid, $4, $5,
+            $6, $7, $8, $9, $10,
+            $11, $12, $13, $14,
+            $15, $16::jsonb, $17, $18,
+            $19::jsonb, $20
+        )
+        ON CONFLICT (id) DO UPDATE SET
+            node_id = EXCLUDED.node_id,
+            asset_type = EXCLUDED.asset_type,
+            mime_type = EXCLUDED.mime_type,
+            width = EXCLUDED.width,
+            height = EXCLUDED.height,
+            byte_size = EXCLUDED.byte_size,
+            sha256 = EXCLUDED.sha256,
+            storage_path = EXCLUDED.storage_path,
+            caption = EXCLUDED.caption,
+            ocr_text = EXCLUDED.ocr_text,
+            description = EXCLUDED.description,
+            embedding = EXCLUDED.embedding,
+            page_number = EXCLUDED.page_number,
+            bbox = EXCLUDED.bbox,
+            tenant_id = EXCLUDED.tenant_id,
+            permission_scope = EXCLUDED.permission_scope,
+            metadata = EXCLUDED.metadata;
+        """
+
+        now = datetime.now()
+
+        def _to_asset_rec(a: MultimodalAsset) -> tuple:
+            bbox_json = json.dumps(a.bbox) if a.bbox else None
+            meta_json = json.dumps(_clean_pg_json(a.metadata)) if a.metadata else "{}"
+            vec = np.array(a.embedding, dtype=np.float32) if a.embedding else None
+            return (
+                a.id,
+                a.document_id,
+                a.node_id,
+                a.asset_type,
+                a.mime_type,
+                a.width,
+                a.height,
+                a.byte_size,
+                a.sha256,
+                a.storage_path,
+                _clean_pg_str(a.caption),
+                _clean_pg_str(a.ocr_text),
+                _clean_pg_str(a.description),
+                vec,
+                a.page_number,
+                bbox_json,
+                a.tenant_id,
+                a.permission_scope,
+                meta_json,
+                a.created_at or now,
+            )
+
+        async with pool.acquire() as conn:
+            records = [_to_asset_rec(a) for a in assets]
+            await conn.executemany(insert_sql, records)
+        return [a.id for a in assets]
+
+    async def insert_asset(self, asset: MultimodalAsset) -> str:
+        await self.insert_assets([asset])
+        return asset.id
+
+    async def get_asset(self, asset_id: str) -> MultimodalAsset | None:
+        pool = self._get_pool()
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow("SELECT * FROM document_assets WHERE id = $1", asset_id)
+            return self._row_to_asset(row) if row else None
+
+    async def get_assets_by_ids(self, asset_ids: list[str]) -> list[MultimodalAsset]:
+        if not asset_ids:
+            return []
+        pool = self._get_pool()
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT * FROM document_assets WHERE id = ANY($1::text[])",
+                asset_ids,
+            )
+            return [self._row_to_asset(r) for r in rows]
+
+    async def get_assets_for_document(self, document_id: str) -> list[MultimodalAsset]:
+        pool = self._get_pool()
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT * FROM document_assets WHERE document_id = $1::uuid ORDER BY page_number ASC, created_at ASC",
+                document_id,
+            )
+            return [self._row_to_asset(r) for r in rows]
+
+    async def search_assets_vector(
+        self,
+        query_vector: list[float],
+        filters: RetrievalFilters,
+        limit: int = 10,
+    ) -> list[dict[str, Any]]:
+        pool = self._get_pool()
+        vec = np.array(query_vector, dtype=np.float32)
+        async with pool.acquire() as conn:
+            clauses = [
+                "a.embedding IS NOT NULL",
+                "a.tenant_id = $2",
+                "('public' = ANY(a.permission_scope) OR a.permission_scope && $3)",
+            ]
+            params: list[Any] = [vec, filters.tenant_id, filters.permission_scope]
+            if filters.document_ids:
+                clauses.append(f"a.document_id = ANY(${len(params) + 1}::uuid[])")
+                params.append(filters.document_ids)
+
+            where_sql = " AND ".join(clauses)
+            sql = f"""
+                SELECT a.id, a.document_id, a.node_id, a.asset_type, a.mime_type,
+                       a.width, a.height, a.byte_size, a.sha256, a.storage_path,
+                       a.caption, a.ocr_text, a.description, a.page_number, a.bbox,
+                       a.tenant_id, a.permission_scope, a.metadata, a.created_at,
+                       d.title as document_title, d.source_uri,
+                       1 - (a.embedding <=> $1) AS score
+                FROM document_assets a
+                JOIN documents d ON d.id = a.document_id
+                WHERE {where_sql}
+                ORDER BY a.embedding <=> $1 ASC LIMIT {limit};
+            """
+            try:
+                rows = await conn.fetch(sql, *params)
+            except Exception as e:
+                if (
+                    "different vector dimensions" in str(e).lower()
+                    or "dimension mismatch" in str(e).lower()
+                ):
+                    logger.warning("Asset vector search skipped due to dimension mismatch: %s", e)
+                    return []
+                raise
+
+            res = []
+            for r in rows:
+                asset = self._row_to_asset(r)
+                item = asset.to_dict()
+                item["score"] = float(r["score"])
+                item["document_title"] = r["document_title"]
+                item["source_uri"] = r["source_uri"]
+                res.append(item)
+            return res
 
     async def search_bm25(
         self,

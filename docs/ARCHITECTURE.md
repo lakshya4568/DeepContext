@@ -187,6 +187,31 @@ When retrieval returns a matching child or parent chunk, callers can invoke `ret
 1. **Parent Hierarchy**: Expands to the enclosing section, heading, and document ancestors.
 2. **Table Reconstruction**: Yields full row/column data grids, header alignments, cell coordinates, and markdown.
 3. **Figure Association**: Exposes underlying captions, OCR text, and multimodal visual descriptions.
+4. **Multimodal Assets**: Resolves linked figure/chart assets (`asset_id`) with on-disk paths, byte dimensions, MIME type, and bounding box coordinates.
+
+---
+
+## 2.3 Multimodal Provenance, Durable Assets, LaTeX & Code Parsing
+
+Deep Context provides dedicated, provenance-preserving extraction and indexing across diverse modalities:
+
+### 1. Durable Asset Storage (`AssetStore`)
+- **Content-Addressed Hashing**: Extracted picture items and page crops are saved as PNGs under `data/assets/<tenant_id>/<asset_id>.png` where `asset_id = asset_<sha256[:16]>`.
+- **Tenant Isolation & Deduplication**: Identical images across documents are deduplicated by SHA-256, while access is strictly enforced by `tenant_id` and `permission_scope`.
+- **API Serving**: Protected endpoint `GET /v1/assets/{asset_id}` serves image bytes with proper MIME types, headers, and permission checks.
+
+### 2. Typed Multimodal Embeddings
+- **Interface**: `llm_client.embed_image(image_path_or_bytes, model="gemini-embedding-2", dim=768)` generates 768d vectors directly from image pixels.
+- **Provider Parity**: Built on Google GenAI / Vertex AI with ADC credentials.
+- **Cross-Modal Retrieval**: Supports text→image, image→image, and image→text search via cosine similarity in SQLite (`search_assets_vector`) and PostgreSQL pgvector (`idx_assets_embedding_hnsw`).
+
+### 3. LaTeX and Mathematical Papers
+- **Native LaTeX Parsing**: [`LaTeXParser`](../src/deep_context/ingestion/latex_parser.py) handles `.tex` files using `pylatexenc` / `LatexNodes2Text` to parse document structure, environments (`equation`, `align`, `figure`, `table`), macros, labels, and citations without executing unsafe TeX binaries.
+- **Equation Data Model**: Captures LaTeX notation, symbol definitions, equation numbering, and optional SymPy symbolic expressions.
+
+### 4. Syntax-Aware Source Code Parsing
+- **Multi-Language AST**: [`CodeParser`](../src/deep_context/ingestion/code_parser.py) uses Python `ast` for Python files and `tree-sitter` for JavaScript, TypeScript, C, C++, etc.
+- **Symbol Provenance**: Extracts functions, methods, classes, type signatures, docstrings, imports, and line ranges into `SourceCodeDataModel` attached to tree nodes.
 
 ---
 

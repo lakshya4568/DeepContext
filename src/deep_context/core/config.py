@@ -227,6 +227,18 @@ class Settings(BaseSettings):
         default="auto", alias="SUMMARY_DEVICE"
     )  # 'auto' | 'mps' | 'cuda' | 'cpu'
 
+    # Multimodal & Durable Asset Storage
+    asset_storage_dir: str = Field(
+        default="data/assets",
+        alias="ASSET_STORAGE_DIR",
+        description="Local directory for storing extracted image and chart assets",
+    )
+    multimodal_vision_enabled: bool = Field(
+        default=False,
+        alias="MULTIMODAL_VISION_ENABLED",
+        description="Enable external vision LLM interpretation for figures and charts",
+    )
+
     # Fallback/Test helper
     allow_mock_fallback: bool = Field(default=True, alias="ALLOW_MOCK_FALLBACK")
 

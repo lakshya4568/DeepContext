@@ -100,7 +100,7 @@ class TextCleaner:
         repeated_headers = find_repeated(first_lines)
         repeated_footers = find_repeated(last_lines)
 
-        cleaned_pages = []
+        cleaned_pages: list[Any] = []
         for p in page_dicts:
             page_text = p.get("text", "")
             lines = page_text.splitlines()

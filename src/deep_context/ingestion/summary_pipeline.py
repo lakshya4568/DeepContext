@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import time
-import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, AsyncIterator
@@ -53,7 +52,6 @@ class SummaryIngestionPipeline:
         """Ingests a document, creates parent-child chunks, generates LLM summaries, and embeds."""
         t0 = time.time()
         storage = self.storage or await get_storage()
-        doc_id = str(uuid.uuid4())
 
         # 1. Parse document into structure-aware parse tree
         tree = self.parser.parse_tree(
@@ -61,17 +59,16 @@ class SummaryIngestionPipeline:
             doc_type=request.doc_type,
             source_uri=request.source_uri,
             title=request.title,
+            tenant_id=request.tenant_id,
         )
-        tree.document_id = doc_id
-        for n in tree.nodes:
-            n.document_id = doc_id
+        doc_id = tree.document_id
 
         # Multimodal enrichment for figures and charts if requested
         if getattr(request, "enrich_multimodal", False):
             from deep_context.multimodal.enricher import MultimodalEnricher
 
             enricher = MultimodalEnricher()
-            await enricher.enrich_tree(tree)
+            await enricher.enrich_tree(tree, enabled=True)
 
         # 2. Parent-child structure-aware hierarchical chunking
         parent_chunks, child_chunks = self.chunker.chunk_tree(tree)
@@ -108,6 +105,26 @@ class SummaryIngestionPipeline:
         await storage.insert_document_and_chunks(doc, parent_chunks + child_chunks)
         if tree.nodes:
             await storage.insert_tree_nodes(tree.nodes)
+
+        # 3.1. Persist and embed multimodal assets
+        import os
+
+        from deep_context.storage.asset_store import asset_store
+
+        doc_assets = asset_store.get_assets_for_document(doc_id)
+        if doc_assets:
+            for a in doc_assets:
+                a.tenant_id = request.tenant_id
+                a.permission_scope = request.permission_scope
+                if not a.embedding and a.storage_path and os.path.exists(a.storage_path):
+                    try:
+                        emb = await llm_client.embed_image(
+                            a.storage_path, model=emb_model, dim=emb_dim
+                        )
+                        a.embedding = emb
+                    except Exception as e_emb:
+                        logger.debug("Asset embedding notice for %s: %s", a.id, e_emb)
+            await storage.insert_assets(doc_assets)
 
         # 4. Generate Qwen3 contextual summaries for child chunks if enabled
         summaries_count = 0
@@ -271,7 +288,6 @@ class SummaryIngestionPipeline:
         }
 
         storage = self.storage or await get_storage()
-        doc_id = str(uuid.uuid4())
 
         # 1. Parse
         tree = self.parser.parse_tree(
@@ -279,10 +295,16 @@ class SummaryIngestionPipeline:
             doc_type=request.doc_type,
             source_uri=request.source_uri,
             title=request.title,
+            tenant_id=request.tenant_id,
         )
-        tree.document_id = doc_id
-        for n in tree.nodes:
-            n.document_id = doc_id
+        doc_id = tree.document_id
+
+        # Multimodal enrichment for figures and charts if requested
+        if getattr(request, "enrich_multimodal", False):
+            from deep_context.multimodal.enricher import MultimodalEnricher
+
+            enricher = MultimodalEnricher()
+            await enricher.enrich_tree(tree, enabled=True)
 
         yield {
             "stage": "chunking",
@@ -337,6 +359,26 @@ class SummaryIngestionPipeline:
         await storage.insert_document_and_chunks(doc, parent_chunks + child_chunks)
         if tree.nodes:
             await storage.insert_tree_nodes(tree.nodes)
+
+        # 3.1. Persist and embed multimodal assets
+        import os
+
+        from deep_context.storage.asset_store import asset_store
+
+        doc_assets = asset_store.get_assets_for_document(doc_id)
+        if doc_assets:
+            for a in doc_assets:
+                a.tenant_id = request.tenant_id
+                a.permission_scope = request.permission_scope
+                if not a.embedding and a.storage_path and os.path.exists(a.storage_path):
+                    try:
+                        emb = await llm_client.embed_image(
+                            a.storage_path, model=emb_model, dim=emb_dim
+                        )
+                        a.embedding = emb
+                    except Exception as e_emb:
+                        logger.debug("Asset embedding notice for %s: %s", a.id, e_emb)
+            await storage.insert_assets(doc_assets)
 
         # 4. Summarize child chunks in contextual vectorized batches
         summaries_count = 0

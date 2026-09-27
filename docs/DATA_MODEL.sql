@@ -92,7 +92,7 @@ CREATE TABLE document_tree_nodes (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     document_id     UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
     parent_node_id  UUID REFERENCES document_tree_nodes(id) ON DELETE CASCADE,
-    node_type       TEXT NOT NULL,                -- 'document' | 'section' | 'heading' | 'paragraph' | 'table' | 'figure' | 'chart' | 'caption' | 'list_item' | 'code' | ...
+    node_type       TEXT NOT NULL,                -- 'document' | 'section' | 'heading' | 'paragraph' | 'table' | 'figure' | 'chart' | 'caption' | 'list_item' | 'code' | 'equation' | ...
     reading_order   INTEGER NOT NULL DEFAULT 0,
     title           TEXT,
     text            TEXT,
@@ -101,15 +101,56 @@ CREATE TABLE document_tree_nodes (
     page_number     INTEGER,
     page_end        INTEGER,
     bbox            JSONB,                        -- bounding box coordinates [l, b, r, t]
+    source_uri      TEXT,
+    char_span       JSONB,
+    raw_ref         TEXT,
+    parser          TEXT,
+    parser_version  TEXT,
+    extraction_method TEXT,
+    confidence      REAL,
+    line_range      JSONB,
     table_data      JSONB,                        -- cell grid, row/col counts, headers, markdown
     figure_data     JSONB,                        -- captions, OCR text, multimodal enrichment
+    equation_data   JSONB,                        -- latex, sympy, mathml, variables, equation number
+    code_data       JSONB,                        -- language, symbol_type, symbol_name, signature, imports
+    asset_id        TEXT,                         -- foreign reference to document_assets.id
     metadata        JSONB NOT NULL DEFAULT '{}',
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX idx_tree_nodes_document ON document_tree_nodes (document_id);
 CREATE INDEX idx_tree_nodes_parent ON document_tree_nodes (parent_node_id);
-CREATE INDEX idx_tree_nodes_parent ON document_tree_nodes (parent_node_id);
+CREATE INDEX idx_tree_nodes_asset ON document_tree_nodes (asset_id);
+
+-- Multimodal Assets: durable storage of extracted figures, charts, and visual crops with 768d vector embeddings.
+CREATE TABLE document_assets (
+    id              TEXT PRIMARY KEY,              -- 'asset_<sha256[:16]>'
+    document_id     UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    node_id         UUID REFERENCES document_tree_nodes(id) ON DELETE SET NULL,
+    asset_type      TEXT NOT NULL DEFAULT 'image', -- 'image' | 'chart' | 'diagram' | 'equation_crop'
+    mime_type       TEXT NOT NULL DEFAULT 'image/png',
+    width           INTEGER,
+    height          INTEGER,
+    byte_size       INTEGER NOT NULL DEFAULT 0,
+    sha256          TEXT NOT NULL,
+    storage_path    TEXT NOT NULL,
+    caption         TEXT,
+    ocr_text        TEXT,
+    description     TEXT,
+    embedding       VECTOR(768),
+    page_number     INTEGER,
+    bbox            JSONB,
+    tenant_id       TEXT NOT NULL DEFAULT 'default',
+    permission_scope TEXT[] NOT NULL DEFAULT ARRAY['default'],
+    metadata        JSONB NOT NULL DEFAULT '{}',
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_assets_document ON document_assets (document_id);
+CREATE INDEX idx_assets_node ON document_assets (node_id);
+CREATE INDEX idx_assets_tenant ON document_assets (tenant_id);
+CREATE INDEX idx_assets_sha256 ON document_assets (sha256);
+CREATE INDEX idx_assets_embedding_hnsw ON document_assets USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 200);
 
 -- ----------------------------------------------------------------------------
 -- Typed memory (FR7–FR9): four distinct stores, deliberately not merged.

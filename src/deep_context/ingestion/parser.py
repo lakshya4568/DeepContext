@@ -7,7 +7,6 @@ Includes native resilient fallbacks and a separate syntax-aware parser for sourc
 
 from __future__ import annotations
 
-import ast
 import io
 import os
 import re
@@ -20,11 +19,14 @@ from deep_context.core.types import (
     DocumentElementType,
     DocumentNode,
     DocumentTree,
+    EquationDataModel,
     FigureDataModel,
     ParsedSection,
     Provenance,
     TableCellData,
     TableDataModel,
+    generate_stable_doc_id,
+    generate_stable_node_id,
 )
 from deep_context.ingestion.cleaner import TextCleaner
 
@@ -47,6 +49,8 @@ class DocumentParser:
         source_uri: str | None = None,
         title: str = "",
         use_docling: bool = True,
+        page_range: tuple[int, int] | None = None,
+        tenant_id: str = "default",
     ) -> DocumentTree:
         """
         Builds a normalized parse tree representing document logical structure.
@@ -65,7 +69,20 @@ class DocumentParser:
                 content.decode("utf-8", errors="replace") if isinstance(content, bytes) else content
             )
             return cls._parse_code_tree(
-                code_str, doc_type=doc_type_lower, source_uri=source_uri, title=title
+                code_str,
+                doc_type=doc_type_lower,
+                source_uri=source_uri,
+                title=title,
+                tenant_id=tenant_id,
+            )
+
+        # 1.5. LaTeX native parsing path (never sent to Docling)
+        if doc_type_lower in ("latex", "tex") or doc_type_lower.endswith((".tex", ".latex")):
+            tex_str = (
+                content.decode("utf-8", errors="replace") if isinstance(content, bytes) else content
+            )
+            return cls._parse_latex_tree(
+                tex_str, source_uri=source_uri, title=title, tenant_id=tenant_id
             )
 
         # 2. PDF Parsing: Primary Docling with resilient pypdf fallback
@@ -73,7 +90,12 @@ class DocumentParser:
             if use_docling:
                 try:
                     tree = cls._parse_with_docling(
-                        content, suffix=".pdf", source_uri=source_uri, title=title
+                        content,
+                        suffix=".pdf",
+                        source_uri=source_uri,
+                        title=title,
+                        page_range=page_range,
+                        tenant_id=tenant_id,
                     )
                     if tree and len(tree.nodes) > 1:
                         return tree
@@ -82,7 +104,9 @@ class DocumentParser:
                         "Docling primary PDF parser encountered an issue (%s); falling back to native PDF parser.",
                         e,
                     )
-            return cls._parse_pdf_tree_native(content, source_uri=source_uri, title=title)
+            return cls._parse_pdf_tree_native(
+                content, source_uri=source_uri, title=title, tenant_id=tenant_id
+            )
 
         # 3. Primary Docling Parsing for Markdown, DOCX, and HTML
         if doc_type_lower in (
@@ -101,7 +125,11 @@ class DocumentParser:
             if use_docling:
                 try:
                     tree = cls._parse_with_docling(
-                        content, suffix=suffix, source_uri=source_uri, title=title
+                        content,
+                        suffix=suffix,
+                        source_uri=source_uri,
+                        title=title,
+                        tenant_id=tenant_id,
                     )
                     if tree and len(tree.nodes) > 1:
                         return tree
@@ -117,12 +145,18 @@ class DocumentParser:
             content.decode("utf-8", errors="replace") if isinstance(content, bytes) else content
         )
         if doc_type_lower in ("markdown", "md") or doc_type_lower.endswith((".md", ".markdown")):
-            return cls._parse_markdown_tree_native(text_str, source_uri=source_uri, title=title)
+            return cls._parse_markdown_tree_native(
+                text_str, source_uri=source_uri, title=title, tenant_id=tenant_id
+            )
         elif doc_type_lower in ("html", "htm") or doc_type_lower.endswith((".html", ".htm")):
             clean_md = cls._html_to_markdown_fallback(text_str)
-            return cls._parse_markdown_tree_native(clean_md, source_uri=source_uri, title=title)
+            return cls._parse_markdown_tree_native(
+                clean_md, source_uri=source_uri, title=title, tenant_id=tenant_id
+            )
         else:
-            return cls._parse_text_tree_native(text_str, source_uri=source_uri, title=title)
+            return cls._parse_text_tree_native(
+                text_str, source_uri=source_uri, title=title, tenant_id=tenant_id
+            )
 
     @classmethod
     def parse(
@@ -156,6 +190,17 @@ class DocumentParser:
         return tree.to_parsed_sections()
 
     @classmethod
+    def parse_latex(
+        cls, content: str | bytes, source_uri: str | None = None, title: str = ""
+    ) -> list[ParsedSection]:
+        """Parse LaTeX into ParsedSections."""
+        tex_str = (
+            content.decode("utf-8", errors="replace") if isinstance(content, bytes) else content
+        )
+        tree = cls._parse_latex_tree(tex_str, source_uri=source_uri, title=title)
+        return tree.to_parsed_sections()
+
+    @classmethod
     def parse_text(cls, content: str) -> list[ParsedSection]:
         """Parse plain text into ParsedSections."""
         tree = cls._parse_text_tree_native(content)
@@ -178,6 +223,8 @@ class DocumentParser:
         suffix: str = ".pdf",
         source_uri: str | None = None,
         title: str = "",
+        page_range: tuple[int, int] | None = None,
+        tenant_id: str = "default",
     ) -> DocumentTree | None:
         """Parses document via IBM Docling into a rich, normalized DocumentTree."""
         import logging
@@ -204,15 +251,33 @@ class DocumentParser:
                     tmp_path = tmp.name
                 file_to_convert = tmp_path
 
-            converter = DocumentConverter()
-            result = converter.convert(file_to_convert)
+            from docling.datamodel.base_models import InputFormat
+            from docling.datamodel.pipeline_options import PdfPipelineOptions
+            from docling.document_converter import DocumentConverter, PdfFormatOption
+
+            pipeline_options = PdfPipelineOptions()
+            pipeline_options.generate_picture_images = True
+            pipeline_options.generate_page_images = True
+
+            converter = DocumentConverter(
+                format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)}
+            )
+            conv_kwargs: dict[str, Any] = {}
+            if page_range is not None:
+                conv_kwargs["page_range"] = page_range
+            result = converter.convert(file_to_convert, **conv_kwargs)
             docling_doc = result.document
 
-            doc_id = str(uuid.uuid4())
+            doc_id = generate_stable_doc_id(
+                tenant_id=tenant_id,
+                title=title or "Document",
+                source_uri=source_uri,
+                content=content,
+            )
             doc_title = title or getattr(docling_doc, "name", "") or "Document"
 
             root_node = DocumentNode(
-                id=str(uuid.uuid4()),
+                id=generate_stable_node_id(doc_id, "root", 0),
                 document_id=doc_id,
                 parent_id=None,
                 node_type=DocumentElementType.DOCUMENT,
@@ -220,7 +285,13 @@ class DocumentParser:
                 text=doc_title,
                 raw_text=doc_title,
                 section_path=doc_title,
-                provenance=Provenance(source_uri=source_uri),
+                provenance=Provenance(
+                    source_uri=source_uri,
+                    page_number=1,
+                    parser="ibm_docling",
+                    parser_version="2.122.0",
+                    extraction_method="docling_layout",
+                ),
                 metadata={"parser": "ibm_docling", "format": suffix.lstrip(".")},
             )
 
@@ -234,9 +305,8 @@ class DocumentParser:
                 label_val = label_str.value if hasattr(label_str, "value") else str(label_str)
 
                 # 1. Extract provenance (page_no, bbox, charspan)
-                prov_item = (
-                    item.prov[0] if getattr(item, "prov", None) and len(item.prov) > 0 else None
-                )
+                prov_list = getattr(item, "prov", None)
+                prov_item = prov_list[0] if prov_list and len(prov_list) > 0 else None
                 page_no = getattr(prov_item, "page_no", None) if prov_item else None
                 bbox_tuple = None
                 if prov_item and getattr(prov_item, "bbox", None):
@@ -252,6 +322,9 @@ class DocumentParser:
                     bbox=bbox_tuple,
                     char_span=char_span_tuple,
                     raw_ref=raw_ref,
+                    parser="ibm_docling",
+                    parser_version="2.122.0",
+                    extraction_method="docling_layout",
                 )
 
                 # Determine parent heading and current section path
@@ -279,7 +352,9 @@ class DocumentParser:
                     )
 
                     h_node = DocumentNode(
-                        id=str(uuid.uuid4()),
+                        id=generate_stable_node_id(
+                            doc_id, "heading", reading_order, cleaned_text[:60]
+                        ),
                         document_id=doc_id,
                         parent_id=curr_parent,
                         node_type=DocumentElementType.TITLE
@@ -300,7 +375,12 @@ class DocumentParser:
                 elif label_val == "table":
                     table_data = cls._extract_docling_table(item, docling_doc)
                     table_node = DocumentNode(
-                        id=str(uuid.uuid4()),
+                        id=generate_stable_node_id(
+                            doc_id,
+                            "table",
+                            reading_order,
+                            ((table_data.caption or "") if table_data else "")[:60],
+                        ),
                         document_id=doc_id,
                         parent_id=parent_id,
                         node_type=DocumentElementType.TABLE,
@@ -321,9 +401,16 @@ class DocumentParser:
                     is_chart = (
                         label_val == "chart" or "chart" in str(getattr(item, "label", "")).lower()
                     )
-                    fig_data = cls._extract_docling_figure(item, is_chart=is_chart)
+                    fig_data = cls._extract_docling_figure(
+                        item, is_chart=is_chart, doc=docling_doc, document_id=doc_id
+                    )
                     fig_node = DocumentNode(
-                        id=str(uuid.uuid4()),
+                        id=generate_stable_node_id(
+                            doc_id,
+                            "chart" if is_chart else "figure",
+                            reading_order,
+                            (fig_data.caption or "")[:60],
+                        ),
                         document_id=doc_id,
                         parent_id=parent_id,
                         node_type=DocumentElementType.CHART
@@ -335,10 +422,53 @@ class DocumentParser:
                         section_path=section_path,
                         provenance=provenance,
                         figure_data=fig_data,
+                        asset_id=fig_data.asset_id,
                         metadata={"label": label_val},
                     )
                     nodes.append(fig_node)
                     last_fig_or_table_node = fig_node
+                    reading_order += 1
+
+                elif label_val in ("formula", "equation"):
+                    item_text = getattr(item, "text", "") or ""
+                    cleaned_text = TextCleaner.clean(item_text)
+                    if not cleaned_text:
+                        continue
+
+                    symbols: list[str] = []
+                    try:
+                        from deep_context.ingestion.latex_parser import LaTeXParser
+
+                        symbols = LaTeXParser._extract_symbols(cleaned_text)
+                    except Exception:
+                        pass
+
+                    eq_data = EquationDataModel(
+                        latex=cleaned_text,
+                        normalized_latex=cleaned_text,
+                        equation_number=None,
+                        is_inline=False,
+                        variables=symbols,
+                        extraction_method="docling_formula",
+                        confidence=1.0,
+                    )
+
+                    eq_node = DocumentNode(
+                        id=generate_stable_node_id(
+                            doc_id, "equation", reading_order, cleaned_text[:60]
+                        ),
+                        document_id=doc_id,
+                        parent_id=parent_id,
+                        node_type=DocumentElementType.EQUATION,
+                        reading_order=reading_order,
+                        text=f"Equation:\nLaTeX: {cleaned_text}",
+                        raw_text=item_text,
+                        section_path=section_path,
+                        provenance=provenance,
+                        equation_data=eq_data,
+                        metadata={"label": label_val},
+                    )
+                    nodes.append(eq_node)
                     reading_order += 1
 
                 elif label_val == "caption":
@@ -357,7 +487,9 @@ class DocumentParser:
                             last_fig_or_table_node.figure_data.caption = cleaned_text
 
                     cap_node = DocumentNode(
-                        id=str(uuid.uuid4()),
+                        id=generate_stable_node_id(
+                            doc_id, "caption", reading_order, cleaned_text[:60]
+                        ),
                         document_id=doc_id,
                         parent_id=parent_id,
                         node_type=DocumentElementType.CAPTION,
@@ -375,7 +507,9 @@ class DocumentParser:
                     item_text = getattr(item, "text", "") or ""
                     cleaned_text = TextCleaner.clean(item_text)
                     fn_node = DocumentNode(
-                        id=str(uuid.uuid4()),
+                        id=generate_stable_node_id(
+                            doc_id, "footnote", reading_order, cleaned_text[:60]
+                        ),
                         document_id=doc_id,
                         parent_id=parent_id,
                         node_type=DocumentElementType.FOOTNOTE,
@@ -393,7 +527,9 @@ class DocumentParser:
                     item_text = getattr(item, "text", "") or ""
                     cleaned_text = TextCleaner.clean(item_text)
                     li_node = DocumentNode(
-                        id=str(uuid.uuid4()),
+                        id=generate_stable_node_id(
+                            doc_id, "list_item", reading_order, cleaned_text[:60]
+                        ),
                         document_id=doc_id,
                         parent_id=parent_id,
                         node_type=DocumentElementType.LIST_ITEM,
@@ -410,7 +546,7 @@ class DocumentParser:
                 elif label_val == "code":
                     item_text = getattr(item, "text", "") or ""
                     code_node = DocumentNode(
-                        id=str(uuid.uuid4()),
+                        id=generate_stable_node_id(doc_id, "code", reading_order, item_text[:60]),
                         document_id=doc_id,
                         parent_id=parent_id,
                         node_type=DocumentElementType.CODE,
@@ -446,7 +582,9 @@ class DocumentParser:
                             last_fig_or_table_node.figure_data.caption = cleaned_text
 
                     p_node = DocumentNode(
-                        id=str(uuid.uuid4()),
+                        id=generate_stable_node_id(
+                            doc_id, "paragraph", reading_order, cleaned_text[:60]
+                        ),
                         document_id=doc_id,
                         parent_id=parent_id,
                         node_type=DocumentElementType.PARAGRAPH,
@@ -582,20 +720,119 @@ class DocumentParser:
         )
 
     @classmethod
-    def _extract_docling_figure(cls, item: Any, is_chart: bool = False) -> FigureDataModel:
-        """Extracts FigureDataModel from Docling PictureItem or ChartItem."""
+    def _extract_docling_figure(
+        cls,
+        item: Any,
+        is_chart: bool = False,
+        doc: Any = None,
+        document_id: str | None = None,
+    ) -> FigureDataModel:
+        """Extracts FigureDataModel from Docling PictureItem or ChartItem, saving real PIL image bytes if available."""
+        from deep_context.storage import asset_store
+
         caption_text = None
         if getattr(item, "captions", None):
             cap_parts = [getattr(c, "text", str(c)) for c in item.captions]
             caption_text = " ".join(cap_parts).strip() or None
 
-        asset_id = getattr(item, "self_ref", None) or str(uuid.uuid4())
+        asset_id = None
+        storage_uri = None
+        width = None
+        height = None
+        sha256 = None
+
+        if doc is not None and hasattr(item, "get_image"):
+            try:
+                pil_img = item.get_image(doc)
+                if pil_img is not None:
+                    prov_item = (
+                        item.prov[0] if getattr(item, "prov", None) and len(item.prov) > 0 else None
+                    )
+                    page_no = getattr(prov_item, "page_no", None) if prov_item else None
+                    bbox_tuple = None
+                    if prov_item and getattr(prov_item, "bbox", None):
+                        b = prov_item.bbox
+                        bbox_tuple = getattr(b, "as_tuple", lambda: (b.l, b.t, b.r, b.b))()
+
+                    asset = asset_store.save_image(
+                        pil_img,
+                        document_id=document_id or "unknown",
+                        asset_type="chart" if is_chart else "image",
+                        caption=caption_text,
+                        page_number=page_no,
+                        bbox=bbox_tuple,
+                    )
+                    asset_id = asset.id
+                    storage_uri = asset.storage_path
+                    width = asset.width
+                    height = asset.height
+                    sha256 = asset.sha256
+            except Exception as e_img:
+                logger.debug("Docling image extraction notice: %s", e_img)
+
+        # Page crop fallback if get_image was unavailable but page image was generated
+        if not asset_id and doc is not None and getattr(item, "prov", None):
+            prov_item = item.prov[0] if len(item.prov) > 0 else None
+            page_no = getattr(prov_item, "page_no", None) if prov_item else None
+            if (
+                prov_item is not None
+                and page_no
+                and hasattr(doc, "pages")
+                and page_no in doc.pages
+                and hasattr(prov_item, "bbox")
+            ):
+                page_obj = doc.pages[page_no]
+                if getattr(page_obj, "image", None) and getattr(page_obj.image, "pil_image", None):
+                    try:
+                        page_pil = page_obj.image.pil_image
+                        b = prov_item.bbox
+                        w_p, h_p = page_pil.size
+                        coord_origin = str(getattr(b, "coord_origin", "BOTTOMLEFT"))
+                        if "BOTTOM" in coord_origin:
+                            left = max(0, min(w_p, int(b.l)))
+                            right = max(0, min(w_p, int(b.r)))
+                            bottom = max(0, min(h_p, int(h_p - b.b)))
+                            top = max(0, min(h_p, int(h_p - b.t)))
+                            box = (
+                                min(left, right),
+                                min(top, bottom),
+                                max(left, right),
+                                max(top, bottom),
+                            )
+                        else:
+                            box = (int(b.l), int(b.t), int(b.r), int(b.b))
+                        crop_w = box[2] - box[0]
+                        crop_h = box[3] - box[1]
+                        if crop_w > 10 and crop_h > 10:
+                            cropped = page_pil.crop(box)
+                            asset = asset_store.save_image(
+                                cropped,
+                                document_id=document_id or "unknown",
+                                asset_type="chart" if is_chart else "image",
+                                caption=caption_text,
+                                page_number=page_no,
+                                bbox=getattr(b, "as_tuple", lambda: (b.l, b.t, b.r, b.b))(),
+                            )
+                            asset_id = asset.id
+                            storage_uri = asset.storage_path
+                            width = asset.width
+                            height = asset.height
+                            sha256 = asset.sha256
+                    except Exception as e_crop:
+                        logger.debug("Page crop extraction notice: %s", e_crop)
+
+        # Note: If no image was durably stored, asset_id remains None.
+        # The parser's ephemeral self_ref is preserved in node.provenance.raw_ref, never used as a fake asset_id.
         return FigureDataModel(
             asset_id=asset_id,
             caption=caption_text,
             figure_type="chart" if is_chart else "image",
             chart_metadata={},
             ocr_text=getattr(item, "text", None),
+            storage_uri=storage_uri,
+            width=width,
+            height=height,
+            sha256=sha256,
         )
 
     # -----------------------------------------------------------------------
@@ -608,6 +845,7 @@ class DocumentParser:
         content: str | bytes,
         source_uri: str | None = None,
         title: str = "",
+        tenant_id: str = "default",
     ) -> DocumentTree:
         """Streaming page-by-page PDF parser using pypdf, with repeated header/footer suppression."""
         import pypdf
@@ -622,11 +860,16 @@ class DocumentParser:
         else:
             stream = io.BytesIO(content)
 
-        doc_id = str(uuid.uuid4())
         doc_title = title or (source_uri or "PDF Document")
+        doc_id = generate_stable_doc_id(
+            tenant_id=tenant_id,
+            title=doc_title,
+            source_uri=source_uri,
+            content=content,
+        )
 
         root_node = DocumentNode(
-            id=str(uuid.uuid4()),
+            id=generate_stable_node_id(doc_id, "root", 0),
             document_id=doc_id,
             parent_id=None,
             node_type=DocumentElementType.DOCUMENT,
@@ -652,17 +895,23 @@ class DocumentParser:
                 raw_pages.append({"page_number": page_idx + 1, "text": page_text})
 
             # Suppress repeated headers and footers across pages
-            cleaned_pages = TextCleaner.suppress_headers_footers(raw_pages)
+            cleaned_pages_raw: list[Any] = TextCleaner.suppress_headers_footers(raw_pages)  # type: ignore[arg-type]
 
-            for p_info in cleaned_pages:
-                page_num = p_info["page_number"]
-                page_text = p_info["text"]
+            for p_info in cleaned_pages_raw:
+                if isinstance(p_info, dict):
+                    page_num = int(p_info.get("page_number", 1))
+                    page_text = str(p_info.get("text", ""))
+                else:
+                    page_num = 1
+                    page_text = str(p_info)
                 if not page_text:
                     continue
 
                 # Create Page Section Node
                 page_section_node = DocumentNode(
-                    id=str(uuid.uuid4()),
+                    id=generate_stable_node_id(
+                        doc_id, "page_section", reading_order, f"Page_{page_num}"
+                    ),
                     document_id=doc_id,
                     parent_id=root_node.id,
                     node_type=DocumentElementType.SECTION,
@@ -702,7 +951,9 @@ class DocumentParser:
                         )
 
                     p_node = DocumentNode(
-                        id=str(uuid.uuid4()),
+                        id=generate_stable_node_id(
+                            doc_id, n_type.value, reading_order, cleaned_para[:60]
+                        ),
                         document_id=doc_id,
                         parent_id=page_section_node.id,
                         node_type=n_type,
@@ -752,13 +1003,19 @@ class DocumentParser:
         content: str,
         source_uri: str | None = None,
         title: str = "",
+        tenant_id: str = "default",
     ) -> DocumentTree:
         """Native structure-aware markdown parser building a DocumentTree."""
-        doc_id = str(uuid.uuid4())
         doc_title = title or "Markdown Document"
+        doc_id = generate_stable_doc_id(
+            tenant_id=tenant_id,
+            title=doc_title,
+            source_uri=source_uri,
+            content=content,
+        )
 
         root_node = DocumentNode(
-            id=str(uuid.uuid4()),
+            id=generate_stable_node_id(doc_id, "root", 0),
             document_id=doc_id,
             parent_id=None,
             node_type=DocumentElementType.DOCUMENT,
@@ -809,7 +1066,7 @@ class DocumentParser:
                     markdown=raw_p,
                 )
                 node = DocumentNode(
-                    id=str(uuid.uuid4()),
+                    id=generate_stable_node_id(doc_id, "table", reading_order, raw_p[:60]),
                     document_id=doc_id,
                     parent_id=parent_id,
                     node_type=DocumentElementType.TABLE,
@@ -827,7 +1084,7 @@ class DocumentParser:
                 asset_id = m.group(2) if m else None
                 f_data = FigureDataModel(asset_id=asset_id, caption=cap, figure_type="image")
                 node = DocumentNode(
-                    id=str(uuid.uuid4()),
+                    id=generate_stable_node_id(doc_id, "figure", reading_order, (cap or "")[:60]),
                     document_id=doc_id,
                     parent_id=parent_id,
                     node_type=DocumentElementType.FIGURE,
@@ -840,7 +1097,7 @@ class DocumentParser:
                 )
             else:
                 node = DocumentNode(
-                    id=str(uuid.uuid4()),
+                    id=generate_stable_node_id(doc_id, "paragraph", reading_order, cleaned_p[:60]),
                     document_id=doc_id,
                     parent_id=parent_id,
                     node_type=DocumentElementType.PARAGRAPH,
@@ -866,7 +1123,7 @@ class DocumentParser:
                         else doc_title
                     )
                     c_node = DocumentNode(
-                        id=str(uuid.uuid4()),
+                        id=generate_stable_node_id(doc_id, "code", reading_order, code_text[:60]),
                         document_id=doc_id,
                         parent_id=parent_id,
                         node_type=DocumentElementType.CODE,
@@ -907,7 +1164,7 @@ class DocumentParser:
                 )
 
                 h_node = DocumentNode(
-                    id=str(uuid.uuid4()),
+                    id=generate_stable_node_id(doc_id, "heading", reading_order, h_text[:60]),
                     document_id=doc_id,
                     parent_id=curr_parent,
                     node_type=DocumentElementType.HEADING,
@@ -954,179 +1211,34 @@ class DocumentParser:
         doc_type: str = "code",
         source_uri: str | None = None,
         title: str = "",
+        tenant_id: str = "default",
     ) -> DocumentTree:
         """
-        Syntax-aware parser for source code (Python AST and language block parser).
+        Syntax-aware parser for source code (AST and Tree-sitter).
         Never passes code through Docling.
         """
-        doc_id = str(uuid.uuid4())
-        doc_title = title or (source_uri or "Source Code")
+        from deep_context.ingestion.code_parser import CodeParser
 
-        root_node = DocumentNode(
-            id=str(uuid.uuid4()),
-            document_id=doc_id,
-            parent_id=None,
-            node_type=DocumentElementType.DOCUMENT,
-            reading_order=0,
-            text=doc_title,
-            raw_text=doc_title,
-            section_path=doc_title,
-            provenance=Provenance(source_uri=source_uri),
-            metadata={"parser": "code_ast", "language": doc_type},
+        return CodeParser.parse_tree(
+            content, doc_type=doc_type, source_uri=source_uri, title=title, tenant_id=tenant_id
         )
 
-        nodes: list[DocumentNode] = [root_node]
-        reading_order = 1
+    @classmethod
+    def _parse_latex_tree(
+        cls,
+        content: str,
+        source_uri: str | None = None,
+        title: str = "",
+        tenant_id: str = "default",
+    ) -> DocumentTree:
+        """
+        Native LaTeX parser using pylatexenc.
+        Extracts equations, tables, figures, symbols, and section hierarchy.
+        """
+        from deep_context.ingestion.latex_parser import LaTeXParser
 
-        # Python AST parsing
-        if (
-            doc_type in ("python", "py")
-            or (source_uri and source_uri.endswith(".py"))
-            or "def " in content
-            or "class " in content
-        ):
-            import textwrap
-
-            clean_code = textwrap.dedent(content)
-            try:
-                tree = ast.parse(clean_code)
-                lines = clean_code.splitlines()
-
-                # Check module docstring
-                module_doc = ast.get_docstring(tree)
-                if module_doc:
-                    doc_node = DocumentNode(
-                        id=str(uuid.uuid4()),
-                        document_id=doc_id,
-                        parent_id=root_node.id,
-                        node_type=DocumentElementType.PARAGRAPH,
-                        reading_order=reading_order,
-                        text=module_doc,
-                        raw_text=module_doc,
-                        section_path=f"{doc_title} > module_docstring",
-                        provenance=Provenance(source_uri=source_uri, page_number=1),
-                        metadata={"kind": "module_docstring"},
-                    )
-                    nodes.append(doc_node)
-                    root_node.children_ids.append(doc_node.id)
-                    reading_order += 1
-
-                for item in tree.body:
-                    if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                        start_line = item.lineno - 1
-                        end_line = getattr(item, "end_lineno", len(lines))
-                        code_segment = "\n".join(lines[start_line:end_line])
-                        is_class = isinstance(item, ast.ClassDef)
-                        kind = "class" if is_class else "function"
-
-                        item_node = DocumentNode(
-                            id=str(uuid.uuid4()),
-                            document_id=doc_id,
-                            parent_id=root_node.id,
-                            node_type=DocumentElementType.CODE,
-                            reading_order=reading_order,
-                            text=code_segment,
-                            raw_text=code_segment,
-                            section_path=f"{doc_title} > {kind} {item.name}",
-                            provenance=Provenance(source_uri=source_uri, page_number=1),
-                            metadata={
-                                "symbol": item.name,
-                                "kind": kind,
-                                "start_line": start_line + 1,
-                                "end_line": end_line,
-                            },
-                        )
-                        nodes.append(item_node)
-                        root_node.children_ids.append(item_node.id)
-                        reading_order += 1
-
-                        # If class, parse inner methods as children
-                        if is_class and isinstance(item, ast.ClassDef):
-                            for sub in item.body:
-                                if isinstance(sub, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                                    sub_start = sub.lineno - 1
-                                    sub_end = getattr(sub, "end_lineno", len(lines))
-                                    method_code = "\n".join(lines[sub_start:sub_end])
-                                    m_node = DocumentNode(
-                                        id=str(uuid.uuid4()),
-                                        document_id=doc_id,
-                                        parent_id=item_node.id,
-                                        node_type=DocumentElementType.CODE,
-                                        reading_order=reading_order,
-                                        text=method_code,
-                                        raw_text=method_code,
-                                        section_path=f"{doc_title} > class {item.name} > method {sub.name}",
-                                        provenance=Provenance(source_uri=source_uri, page_number=1),
-                                        metadata={
-                                            "symbol": sub.name,
-                                            "class_name": item.name,
-                                            "kind": "method",
-                                            "start_line": sub_start + 1,
-                                            "end_line": sub_end,
-                                        },
-                                    )
-                                    nodes.append(m_node)
-                                    item_node.children_ids.append(m_node.id)
-                                    reading_order += 1
-
-                if len(nodes) > 1:
-                    return DocumentTree(
-                        document_id=doc_id,
-                        title=doc_title,
-                        source_uri=source_uri,
-                        doc_type="code",
-                        nodes=nodes,
-                        root_node_id=root_node.id,
-                    )
-            except Exception:
-                pass  # Fall through to block regex parsing
-
-        # Fallback block parsing for code (JS/TS/Go/Java/C++)
-        blocks = re.split(
-            r"\n(?=(?:def |class |function |export |public |private |func |fn ))", content
-        )
-        for i, block in enumerate(blocks):
-            if not block.strip():
-                continue
-            first_line = block.strip().splitlines()[0][:60]
-            b_node = DocumentNode(
-                id=str(uuid.uuid4()),
-                document_id=doc_id,
-                parent_id=root_node.id,
-                node_type=DocumentElementType.CODE,
-                reading_order=reading_order,
-                text=block.strip(),
-                raw_text=block.strip(),
-                section_path=f"{doc_title} > block_{i + 1}",
-                provenance=Provenance(source_uri=source_uri),
-                metadata={"block_index": i + 1, "first_line": first_line},
-            )
-            nodes.append(b_node)
-            root_node.children_ids.append(b_node.id)
-            reading_order += 1
-
-        if len(nodes) == 1:
-            raw_node = DocumentNode(
-                id=str(uuid.uuid4()),
-                document_id=doc_id,
-                parent_id=root_node.id,
-                node_type=DocumentElementType.CODE,
-                reading_order=1,
-                text=content,
-                raw_text=content,
-                section_path=doc_title,
-                provenance=Provenance(source_uri=source_uri),
-            )
-            nodes.append(raw_node)
-            root_node.children_ids.append(raw_node.id)
-
-        return DocumentTree(
-            document_id=doc_id,
-            title=doc_title,
-            source_uri=source_uri,
-            doc_type="code",
-            nodes=nodes,
-            root_node_id=root_node.id,
+        return LaTeXParser.parse_tree(
+            content, source_uri=source_uri, title=title, tenant_id=tenant_id
         )
 
     @classmethod
@@ -1135,13 +1247,19 @@ class DocumentParser:
         content: str,
         source_uri: str | None = None,
         title: str = "",
+        tenant_id: str = "default",
     ) -> DocumentTree:
         """Plain text parser creating paragraph-bounded DocumentTree."""
-        doc_id = str(uuid.uuid4())
         doc_title = title or (source_uri or "Text Document")
+        doc_id = generate_stable_doc_id(
+            tenant_id=tenant_id,
+            title=doc_title,
+            source_uri=source_uri,
+            content=content,
+        )
 
         root_node = DocumentNode(
-            id=str(uuid.uuid4()),
+            id=generate_stable_node_id(doc_id, "root", 0),
             document_id=doc_id,
             parent_id=None,
             node_type=DocumentElementType.DOCUMENT,
@@ -1161,7 +1279,7 @@ class DocumentParser:
             if not cleaned:
                 continue
             node = DocumentNode(
-                id=str(uuid.uuid4()),
+                id=generate_stable_node_id(doc_id, "paragraph", reading_order, cleaned[:60]),
                 document_id=doc_id,
                 parent_id=root_node.id,
                 node_type=DocumentElementType.PARAGRAPH,

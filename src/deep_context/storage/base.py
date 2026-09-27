@@ -11,6 +11,7 @@ from deep_context.core.types import (
     Document,
     DocumentNode,
     ExistingMemory,
+    MultimodalAsset,
     RetrievalFilters,
 )
 
@@ -154,6 +155,54 @@ class StorageInterface(ABC):
     async def get_tree_node(self, node_id: str) -> DocumentNode | None:
         """Fetch a specific parse tree node by ID."""
         return None
+
+    async def get_tree_nodes_by_ids(self, node_ids: list[str]) -> list[DocumentNode]:
+        """Fetch multiple parse tree nodes by ID in a single batch query (avoids N+1)."""
+        nodes = []
+        for nid in node_ids:
+            n = await self.get_tree_node(nid)
+            if n:
+                nodes.append(n)
+        return nodes
+
+    # -----------------------------------------------------------------------
+    # Multimodal Assets
+    # -----------------------------------------------------------------------
+
+    async def insert_asset(self, asset: MultimodalAsset) -> str:
+        """Insert a single multimodal asset record."""
+        ids = await self.insert_assets([asset])
+        return ids[0] if ids else asset.id
+
+    async def insert_assets(self, assets: list[MultimodalAsset]) -> list[str]:
+        """Insert a batch of multimodal asset records."""
+        return []
+
+    async def get_asset(self, asset_id: str) -> MultimodalAsset | None:
+        """Get a multimodal asset by ID."""
+        return None
+
+    async def get_assets_by_ids(self, asset_ids: list[str]) -> list[MultimodalAsset]:
+        """Fetch multiple multimodal assets by ID in a single batch query (avoids N+1)."""
+        assets = []
+        for aid in asset_ids:
+            a = await self.get_asset(aid)
+            if a:
+                assets.append(a)
+        return assets
+
+    async def get_assets_for_document(self, document_id: str) -> list[MultimodalAsset]:
+        """Get all multimodal assets belonging to a document."""
+        return []
+
+    async def search_assets_vector(
+        self,
+        query_embedding: list[float],
+        filters: RetrievalFilters,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        """Vector similarity search against multimodal asset embeddings."""
+        return []
 
     # -----------------------------------------------------------------------
     # Typed Memory (Policy, Preference, Fact, Episode)

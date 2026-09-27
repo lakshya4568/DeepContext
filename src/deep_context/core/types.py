@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import os
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -60,9 +62,13 @@ class DocumentElementType(str, Enum):
     TABLE_CELL = "table_cell"
     FIGURE = "figure"
     CHART = "chart"
+    DIAGRAM = "diagram"
+    EQUATION = "equation"
     CAPTION = "caption"
     FOOTNOTE = "footnote"
     CODE = "code"
+    CODE_BLOCK = "code_block"
+    CODE_SYMBOL = "code_symbol"
     OTHER = "other"
 
 
@@ -74,6 +80,11 @@ class Provenance:
     bbox: tuple[float, float, float, float] | None = None  # (left, top, right, bottom)
     char_span: tuple[int, int] | None = None
     raw_ref: str | None = None
+    parser: str | None = None
+    parser_version: str | None = None
+    extraction_method: str | None = None  # "native" | "docling" | "ocr" | "ast" | "pylatexenc"
+    confidence: float | None = None
+    line_range: tuple[int, int] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -83,6 +94,11 @@ class Provenance:
             "bbox": list(self.bbox) if self.bbox else None,
             "char_span": list(self.char_span) if self.char_span else None,
             "raw_ref": self.raw_ref,
+            "parser": self.parser,
+            "parser_version": self.parser_version,
+            "extraction_method": self.extraction_method,
+            "confidence": self.confidence,
+            "line_range": list(self.line_range) if self.line_range else None,
         }
 
     @classmethod
@@ -91,6 +107,7 @@ class Provenance:
             return cls()
         bbox = tuple(data["bbox"]) if data.get("bbox") else None
         char_span = tuple(data["char_span"]) if data.get("char_span") else None
+        line_range = tuple(data["line_range"]) if data.get("line_range") else None
         return cls(
             source_uri=data.get("source_uri"),
             page_number=data.get("page_number"),
@@ -98,6 +115,11 @@ class Provenance:
             bbox=bbox,  # type: ignore[arg-type]
             char_span=char_span,  # type: ignore[arg-type]
             raw_ref=data.get("raw_ref"),
+            parser=data.get("parser"),
+            parser_version=data.get("parser_version"),
+            extraction_method=data.get("extraction_method"),
+            confidence=data.get("confidence"),
+            line_range=line_range,  # type: ignore[arg-type]
         )
 
 
@@ -147,6 +169,86 @@ class TableDataModel:
     markdown: str = ""
     html: str | None = None
     page_numbers: list[int] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        if not self.cells and self.rows:
+            generated: list[TableCellData] = []
+            for r_idx, row in enumerate(self.rows):
+                for c_idx, val in enumerate(row):
+                    generated.append(
+                        TableCellData(
+                            row_idx=r_idx,
+                            col_idx=c_idx,
+                            text=str(val),
+                        )
+                    )
+            self.cells = generated
+
+    def get_cell(self, row_idx: int, col_idx: int) -> TableCellData | None:
+        """Returns specific cell by (row, col) coordinates."""
+        for c in self.cells:
+            if c.row_idx == row_idx and c.col_idx == col_idx:
+                return c
+        if 0 <= row_idx < len(self.rows) and 0 <= col_idx < len(self.rows[row_idx]):
+            return TableCellData(row_idx=row_idx, col_idx=col_idx, text=self.rows[row_idx][col_idx])
+        return None
+
+    def find_cells(self, query: str, header: str | None = None) -> list[TableCellData]:
+        """Finds cells containing query string, optionally matching a specific column header."""
+        matched: list[TableCellData] = []
+        target_col: int | None = None
+        if header and self.headers:
+            for idx, h in enumerate(self.headers):
+                if header.lower() in h.lower():
+                    target_col = idx
+                    break
+        q_lower = query.lower()
+        if self.cells:
+            for c in self.cells:
+                if target_col is not None and c.col_idx != target_col:
+                    continue
+                if q_lower in c.text.lower():
+                    matched.append(c)
+        elif self.rows:
+            for r_idx, row in enumerate(self.rows):
+                for c_idx, val in enumerate(row):
+                    if target_col is not None and c_idx != target_col:
+                        continue
+                    if q_lower in str(val).lower():
+                        matched.append(TableCellData(row_idx=r_idx, col_idx=c_idx, text=str(val)))
+        return matched
+
+    def lookup(self, query: str, column_header: str | None = None) -> dict[str, Any] | str | None:
+        """Exact lookup of a line item, figure, or financial value with its row, column, header, and unit.
+        If column_header is provided, returns the cell string value directly under that column."""
+        q_lower = query.lower().strip()
+        target_col: int | None = None
+        if column_header and self.headers:
+            for idx, h in enumerate(self.headers):
+                if column_header.lower() in h.lower():
+                    target_col = idx
+                    break
+
+        for r_idx, row in enumerate(self.rows):
+            if any(q_lower in str(cell_val).lower() for cell_val in row):
+                if column_header is not None:
+                    if target_col is not None and target_col < len(row):
+                        return row[target_col]
+                    return None
+                for c_idx, val in enumerate(row):
+                    if q_lower in str(val).lower():
+                        hdr = self.headers[c_idx] if c_idx < len(self.headers) else None
+                        page = self.page_numbers[0] if self.page_numbers else None
+                        return {
+                            "row_idx": r_idx,
+                            "col_idx": c_idx,
+                            "header": hdr,
+                            "value": val,
+                            "full_row": row,
+                            "page_number": page,
+                            "caption": self.caption,
+                        }
+        return None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -227,6 +329,11 @@ class FigureDataModel:
     chart_metadata: dict[str, Any] = field(default_factory=dict)
     ocr_text: str | None = None
     enrichment: MultimodalEnrichment | None = None
+    storage_uri: str | None = None
+    mime_type: str | None = None
+    width: int | None = None
+    height: int | None = None
+    sha256: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -236,6 +343,11 @@ class FigureDataModel:
             "chart_metadata": self.chart_metadata,
             "ocr_text": self.ocr_text,
             "enrichment": self.enrichment.to_dict() if self.enrichment else None,
+            "storage_uri": self.storage_uri,
+            "mime_type": self.mime_type,
+            "width": self.width,
+            "height": self.height,
+            "sha256": self.sha256,
         }
 
     @classmethod
@@ -252,7 +364,256 @@ class FigureDataModel:
             chart_metadata=data.get("chart_metadata", {}),
             ocr_text=data.get("ocr_text"),
             enrichment=enrichment,
+            storage_uri=data.get("storage_uri"),
+            mime_type=data.get("mime_type"),
+            width=data.get("width"),
+            height=data.get("height"),
+            sha256=data.get("sha256"),
         )
+
+
+@dataclass
+class EquationDataModel:
+    latex: str
+    normalized_latex: str = ""
+    equation_number: str | None = None
+    is_inline: bool = False
+    symbolic_repr: str | None = None
+    variables: list[str] = field(default_factory=list)
+    definitions: dict[str, str] = field(default_factory=dict)
+    derivation_context: str | None = None
+    asset_id: str | None = None
+    extraction_method: str = "docling_formula"
+    confidence: float = 1.0
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "latex": self.latex,
+            "normalized_latex": self.normalized_latex,
+            "equation_number": self.equation_number,
+            "is_inline": self.is_inline,
+            "symbolic_repr": self.symbolic_repr,
+            "variables": self.variables,
+            "definitions": self.definitions,
+            "derivation_context": self.derivation_context,
+            "asset_id": self.asset_id,
+            "extraction_method": self.extraction_method,
+            "confidence": self.confidence,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any] | None) -> EquationDataModel | None:
+        if not data:
+            return None
+        return cls(
+            latex=data.get("latex", ""),
+            normalized_latex=data.get("normalized_latex", ""),
+            equation_number=data.get("equation_number"),
+            is_inline=data.get("is_inline", False),
+            symbolic_repr=data.get("symbolic_repr"),
+            variables=data.get("variables", []),
+            definitions=data.get("definitions", {}),
+            derivation_context=data.get("derivation_context"),
+            asset_id=data.get("asset_id"),
+            extraction_method=data.get("extraction_method", "docling_formula"),
+            confidence=data.get("confidence", 1.0),
+        )
+
+
+@dataclass
+class SourceCodeDataModel:
+    language: str = "python"
+    symbol_name: str | None = None
+    symbol_type: str | None = None  # 'function' | 'class' | 'method' | 'interface' | 'module'
+    parent_symbol: str | None = None
+    imports: list[str] = field(default_factory=list)
+    signature: str | None = None
+    docstring: str | None = None
+    start_line: int | None = None
+    end_line: int | None = None
+    file_path: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "language": self.language,
+            "symbol_name": self.symbol_name,
+            "symbol_type": self.symbol_type,
+            "parent_symbol": self.parent_symbol,
+            "imports": self.imports,
+            "signature": self.signature,
+            "docstring": self.docstring,
+            "start_line": self.start_line,
+            "end_line": self.end_line,
+            "file_path": self.file_path,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any] | None) -> SourceCodeDataModel | None:
+        if not data:
+            return None
+        return cls(
+            language=data.get("language", "python"),
+            symbol_name=data.get("symbol_name"),
+            symbol_type=data.get("symbol_type"),
+            parent_symbol=data.get("parent_symbol"),
+            imports=data.get("imports", []),
+            signature=data.get("signature"),
+            docstring=data.get("docstring"),
+            start_line=data.get("start_line"),
+            end_line=data.get("end_line"),
+            file_path=data.get("file_path"),
+        )
+
+
+@dataclass
+class MultimodalAsset:
+    id: str
+    document_id: str
+    node_id: str | None = None
+    asset_type: str = "image"  # 'image' | 'chart' | 'diagram' | 'equation_crop'
+    mime_type: str = "image/png"
+    width: int | None = None
+    height: int | None = None
+    byte_size: int = 0
+    sha256: str = ""
+    storage_path: str = ""
+    caption: str | None = None
+    ocr_text: str | None = None
+    description: str | None = None
+    embedding: list[float] | None = None
+    page_number: int | None = None
+    bbox: tuple[float, float, float, float] | None = None
+    tenant_id: str = "default"
+    permission_scope: list[str] = field(default_factory=lambda: ["default"])
+    metadata: dict[str, Any] = field(default_factory=dict)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "document_id": self.document_id,
+            "node_id": self.node_id,
+            "asset_type": self.asset_type,
+            "mime_type": self.mime_type,
+            "width": self.width,
+            "height": self.height,
+            "byte_size": self.byte_size,
+            "sha256": self.sha256,
+            "storage_path": self.storage_path,
+            "caption": self.caption,
+            "ocr_text": self.ocr_text,
+            "description": self.description,
+            "embedding": self.embedding,
+            "page_number": self.page_number,
+            "bbox": list(self.bbox) if self.bbox else None,
+            "tenant_id": self.tenant_id,
+            "permission_scope": self.permission_scope,
+            "metadata": self.metadata,
+            "created_at": self.created_at.isoformat(),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any] | None) -> MultimodalAsset | None:
+        if not data:
+            return None
+        created_at = (
+            datetime.fromisoformat(data["created_at"])
+            if data.get("created_at")
+            else datetime.now(timezone.utc)
+        )
+        bbox = tuple(data["bbox"]) if data.get("bbox") else None
+        return cls(
+            id=data["id"],
+            document_id=data.get("document_id", ""),
+            node_id=data.get("node_id"),
+            asset_type=data.get("asset_type", "image"),
+            mime_type=data.get("mime_type", "image/png"),
+            width=data.get("width"),
+            height=data.get("height"),
+            byte_size=data.get("byte_size", 0),
+            sha256=data.get("sha256", ""),
+            storage_path=data.get("storage_path", ""),
+            caption=data.get("caption"),
+            ocr_text=data.get("ocr_text"),
+            description=data.get("description"),
+            embedding=data.get("embedding"),
+            page_number=data.get("page_number"),
+            bbox=bbox,  # type: ignore[arg-type]
+            tenant_id=data.get("tenant_id", "default"),
+            permission_scope=data.get("permission_scope", ["default"]),
+            metadata=data.get("metadata", {}),
+            created_at=created_at,
+        )
+
+
+def generate_stable_doc_id(
+    tenant_id: str | None = "default",
+    title: str = "",
+    source_uri: str | None = None,
+    content: str | bytes | None = None,
+) -> str:
+    # Heuristic for misaligned positional calls: (source_uri, content, doc_type)
+    if (
+        isinstance(title, (str, bytes))
+        and len(title) > 256
+        and content is not None
+        and isinstance(content, str)
+        and len(content) < 50
+    ):
+        actual_source_uri = tenant_id
+        actual_content = title
+        actual_title = content
+        actual_tenant_id = "default"
+        tenant_id, title, source_uri, content = (
+            actual_tenant_id,
+            actual_title,
+            actual_source_uri,
+            actual_content,
+        )
+
+    tid = tenant_id or "default"
+    seed = f"{tid}:{source_uri or title}"
+    if content:
+        c_bytes: bytes
+        if isinstance(content, bytes):
+            c_bytes = content
+        elif isinstance(content, str):
+            if os.path.exists(content):
+                try:
+                    with open(content, "rb") as f:
+                        c_bytes = f.read(1024 * 1024)
+                except Exception:
+                    c_bytes = content.encode("utf-8", errors="replace")
+            else:
+                c_bytes = content.encode("utf-8", errors="replace")
+        else:
+            c_bytes = str(content).encode("utf-8", errors="replace")
+
+        h = hashlib.sha256(c_bytes).hexdigest()[:16]
+        seed = f"{seed}:{h}"
+    return str(uuid.uuid5(uuid.NAMESPACE_DNS, seed))
+
+
+def generate_stable_node_id(
+    doc_id: str,
+    arg2: int | str,
+    arg3: int | str,
+    content_key: str = "",
+) -> str:
+    if isinstance(arg2, int):
+        reading_order, node_type = arg2, str(arg3)
+    else:
+        node_type, reading_order = (
+            str(arg2),
+            int(arg3) if isinstance(arg3, int) or (isinstance(arg3, str) and arg3.isdigit()) else 0,
+        )
+    seed = f"{doc_id}:{reading_order}:{node_type}:{content_key[:64]}"
+    return str(uuid.uuid5(uuid.NAMESPACE_DNS, seed))
+
+
+def generate_stable_asset_id(image_bytes: bytes) -> str:
+    h = hashlib.sha256(image_bytes).hexdigest()[:16]
+    return f"asset_{h}"
 
 
 @dataclass
@@ -269,6 +630,9 @@ class DocumentNode:
     provenance: Provenance = field(default_factory=Provenance)
     table_data: TableDataModel | None = None
     figure_data: FigureDataModel | None = None
+    equation_data: EquationDataModel | None = None
+    code_data: SourceCodeDataModel | None = None
+    asset_id: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -287,6 +651,9 @@ class DocumentNode:
             "provenance": self.provenance.to_dict(),
             "table_data": self.table_data.to_dict() if self.table_data else None,
             "figure_data": self.figure_data.to_dict() if self.figure_data else None,
+            "equation_data": self.equation_data.to_dict() if self.equation_data else None,
+            "code_data": self.code_data.to_dict() if self.code_data else None,
+            "asset_id": self.asset_id,
             "metadata": self.metadata,
         }
 
@@ -305,6 +672,9 @@ class DocumentNode:
             provenance=Provenance.from_dict(data.get("provenance")),
             table_data=TableDataModel.from_dict(data.get("table_data")),
             figure_data=FigureDataModel.from_dict(data.get("figure_data")),
+            equation_data=EquationDataModel.from_dict(data.get("equation_data")),
+            code_data=SourceCodeDataModel.from_dict(data.get("code_data")),
+            asset_id=data.get("asset_id"),
             metadata=data.get("metadata", {}),
         )
 
@@ -544,6 +914,10 @@ class Citation:
     source_uri: str | None = None
     section_path: str | None = None
     page_number: int | None = None
+    asset_id: str | None = None
+    node_id: str | None = None
+    element_type: str | None = None
+    caption: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -553,7 +927,28 @@ class Citation:
             "source_uri": self.source_uri,
             "section_path": self.section_path,
             "page_number": self.page_number,
+            "asset_id": self.asset_id,
+            "node_id": self.node_id,
+            "element_type": self.element_type,
+            "caption": self.caption,
         }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any] | None) -> Citation | None:
+        if not data:
+            return None
+        return cls(
+            chunk_id=data.get("chunk_id", ""),
+            document_id=data.get("document_id", ""),
+            title=data.get("title", ""),
+            source_uri=data.get("source_uri"),
+            section_path=data.get("section_path"),
+            page_number=data.get("page_number"),
+            asset_id=data.get("asset_id"),
+            node_id=data.get("node_id"),
+            element_type=data.get("element_type"),
+            caption=data.get("caption"),
+        )
 
 
 @dataclass
@@ -621,15 +1016,21 @@ class Chunk:
     def element_types(self) -> list[str]:
         return self.metadata.get("element_types", [])
 
+    @property
+    def asset_ids(self) -> list[str]:
+        return self.metadata.get("asset_ids", [])
+
 
 @dataclass
 class RetrievalResult:
     sufficient: bool
     parent_chunks: list[dict[str, Any]] = field(default_factory=list)  # [{content, citation, ...}]
     citations: list[Citation] = field(default_factory=list)
+    assets: list[dict[str, Any]] = field(default_factory=list)
     query_shape: QueryShape | None = None
     retry_count: int = 0
     insufficiency_reason: str | None = None
+    expanded_contexts: list[dict[str, Any]] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -762,12 +1163,16 @@ class RetrieveRequest(BaseModel):
     embedding_model: str | None = None
     embedding_dim: int | None = None
     reranker: str | None = None
+    query_image: str | None = None  # Base64 or local image file path
+    query_asset_id: str | None = None
 
 
 class RetrieveResponse(BaseModel):
     sufficient: bool
     parent_chunks: list[dict[str, Any]]
     citations: list[dict[str, Any]]
+    assets: list[dict[str, Any]] = Field(default_factory=list)
+    expanded_contexts: list[dict[str, Any]] = Field(default_factory=list)
     query_shape: QueryShape
     retry_count: int
     insufficiency_reason: str | None = None
@@ -788,6 +1193,8 @@ class QueryRequest(BaseModel):
     embedding_dim: int | None = None
     reranker: str | None = None
     stream: bool = False
+    query_image: str | None = None  # Base64 or local image file path
+    query_asset_id: str | None = None
 
 
 class UserPreferenceRequest(BaseModel):
@@ -810,6 +1217,8 @@ class UserPreferenceResponse(BaseModel):
 class QueryResponse(BaseModel):
     answer: str
     citations: list[dict[str, Any]]
+    assets: list[dict[str, Any]] = Field(default_factory=list)
+    expanded_contexts: list[dict[str, Any]] = Field(default_factory=list)
     path_taken: RoutingPath
     query_shape: QueryShape
     reasoning: str | None = None

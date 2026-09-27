@@ -30,14 +30,17 @@ class IngestionPipeline:
     async def ingest(self, request: IngestRequest) -> IngestResponse:
         t0 = time.time()
         storage = await get_storage()
-        doc_id = str(uuid.uuid4())
-
         # 1. Parse document into structure-aware parse tree
         tree = self.parser.parse_tree(
             request.content,
             doc_type=request.doc_type,
             source_uri=request.source_uri,
             title=request.title,
+        )
+        doc_id = (
+            request.metadata.get("document_id")
+            or getattr(tree, "document_id", None)
+            or str(uuid.uuid4())
         )
         tree.document_id = doc_id
         for n in tree.nodes:
@@ -48,7 +51,7 @@ class IngestionPipeline:
             from deep_context.multimodal.enricher import MultimodalEnricher
 
             enricher = MultimodalEnricher()
-            await enricher.enrich_tree(tree)
+            await enricher.enrich_tree(tree, enabled=True)
 
         # 2. Parent-child structure-aware chunking preserving natural boundaries
         parent_chunks, child_chunks = self.chunker.chunk_tree(tree)
@@ -109,12 +112,32 @@ class IngestionPipeline:
             metadata=doc_metadata,
         )
 
-        # 5. Persist to storage (document -> tree nodes -> chunks)
+        # 5. Persist to storage (document -> tree nodes -> chunks -> assets)
         await storage.insert_document(doc)
         if tree.nodes:
             await storage.insert_tree_nodes(tree.nodes)
         all_chunks = parent_chunks + child_chunks
         await storage.insert_chunks(all_chunks)
+
+        # 5.1. Persist and embed multimodal assets
+        import os
+
+        from deep_context.storage import asset_store
+
+        doc_assets = asset_store.get_assets_for_document(doc_id)
+        if doc_assets:
+            for a in doc_assets:
+                a.tenant_id = request.tenant_id
+                a.permission_scope = request.permission_scope
+                if not a.embedding and a.storage_path and os.path.exists(a.storage_path):
+                    try:
+                        emb = await llm_client.embed_image(
+                            a.storage_path, model=emb_model, dim=emb_dim
+                        )
+                        a.embedding = emb
+                    except Exception as e_emb:
+                        logger.debug("Asset embedding notice for %s: %s", a.id, e_emb)
+            await storage.insert_assets(doc_assets)
 
         latency_ms = int((time.time() - t0) * 1000)
 

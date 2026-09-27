@@ -18,11 +18,14 @@ from deep_context.core.types import (
     Document,
     DocumentElementType,
     DocumentNode,
+    EquationDataModel,
     ExistingMemory,
     FigureDataModel,
+    MultimodalAsset,
     Provenance,
     RetrievalFilters,
     RetrievalMode,
+    SourceCodeDataModel,
     TableDataModel,
 )
 from deep_context.storage.base import StorageInterface
@@ -179,6 +182,33 @@ class SQLiteStore(StorageInterface):
             );
             CREATE INDEX IF NOT EXISTS idx_tree_nodes_document ON document_tree_nodes (document_id);
             CREATE INDEX IF NOT EXISTS idx_tree_nodes_parent ON document_tree_nodes (parent_node_id);
+
+            CREATE TABLE IF NOT EXISTS document_assets (
+                id TEXT PRIMARY KEY,
+                document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+                node_id TEXT REFERENCES document_tree_nodes(id) ON DELETE SET NULL,
+                asset_type TEXT NOT NULL DEFAULT 'image',
+                mime_type TEXT NOT NULL DEFAULT 'image/png',
+                width INTEGER,
+                height INTEGER,
+                byte_size INTEGER NOT NULL DEFAULT 0,
+                sha256 TEXT NOT NULL,
+                storage_path TEXT NOT NULL,
+                caption TEXT,
+                ocr_text TEXT,
+                description TEXT,
+                embedding TEXT,
+                page_number INTEGER,
+                bbox TEXT,
+                tenant_id TEXT NOT NULL DEFAULT 'default',
+                permission_scope TEXT NOT NULL DEFAULT '["default"]',
+                metadata TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_assets_document ON document_assets (document_id);
+            CREATE INDEX IF NOT EXISTS idx_assets_node ON document_assets (node_id);
+            CREATE INDEX IF NOT EXISTS idx_assets_tenant ON document_assets (tenant_id);
+            CREATE INDEX IF NOT EXISTS idx_assets_sha256 ON document_assets (sha256);
             """)
 
         # Dynamic schema auto-migration for existing SQLite databases
@@ -211,6 +241,26 @@ class SQLiteStore(StorageInterface):
                 await self._conn.execute(
                     "ALTER TABLE documents ADD COLUMN metadata TEXT NOT NULL DEFAULT '{}';"
                 )
+
+        async with self._conn.execute("PRAGMA table_info(document_tree_nodes)") as cursor:
+            node_cols = {row[1] for row in await cursor.fetchall()}
+            for col in (
+                ("source_uri", "TEXT"),
+                ("char_span", "TEXT"),
+                ("raw_ref", "TEXT"),
+                ("parser", "TEXT"),
+                ("parser_version", "TEXT"),
+                ("extraction_method", "TEXT"),
+                ("confidence", "REAL"),
+                ("line_range", "TEXT"),
+                ("equation_data", "TEXT"),
+                ("code_data", "TEXT"),
+                ("asset_id", "TEXT"),
+            ):
+                if col[0] not in node_cols:
+                    await self._conn.execute(
+                        f"ALTER TABLE document_tree_nodes ADD COLUMN {col[0]} {col[1]};"
+                    )
 
         await self._conn.commit()
         logger.info("Initialized SQLite database at %s", self.db_path)
@@ -703,16 +753,44 @@ class SQLiteStore(StorageInterface):
     def _row_to_tree_node(self, r: Any) -> DocumentNode:
         bbox_data = json.loads(r["bbox"]) if r["bbox"] else None
         bbox_tuple = tuple(bbox_data) if bbox_data else None
+        char_span_data = (
+            json.loads(r["char_span"]) if ("char_span" in r.keys() and r["char_span"]) else None
+        )
+        char_span_tuple = tuple(char_span_data) if char_span_data else None
+        line_range_data = (
+            json.loads(r["line_range"]) if ("line_range" in r.keys() and r["line_range"]) else None
+        )
+        line_range_tuple = tuple(line_range_data) if line_range_data else None
+
         prov = Provenance(
+            source_uri=r["source_uri"] if "source_uri" in r.keys() else None,
             page_number=r["page_number"],
             page_end=r["page_end"] if "page_end" in r.keys() else None,
             bbox=bbox_tuple,
+            char_span=char_span_tuple,
+            raw_ref=r["raw_ref"] if "raw_ref" in r.keys() else None,
+            parser=r["parser"] if "parser" in r.keys() else None,
+            parser_version=r["parser_version"] if "parser_version" in r.keys() else None,
+            extraction_method=r["extraction_method"] if "extraction_method" in r.keys() else None,
+            confidence=r["confidence"] if "confidence" in r.keys() else None,
+            line_range=line_range_tuple,
         )
         t_data = TableDataModel.from_dict(json.loads(r["table_data"])) if r["table_data"] else None
         f_data = (
             FigureDataModel.from_dict(json.loads(r["figure_data"])) if r["figure_data"] else None
         )
+        eq_data = (
+            EquationDataModel.from_dict(json.loads(r["equation_data"]))
+            if ("equation_data" in r.keys() and r["equation_data"])
+            else None
+        )
+        code_data = (
+            SourceCodeDataModel.from_dict(json.loads(r["code_data"]))
+            if ("code_data" in r.keys() and r["code_data"])
+            else None
+        )
         meta = json.loads(r["metadata"]) if ("metadata" in r.keys() and r["metadata"]) else {}
+        asset_id = r["asset_id"] if "asset_id" in r.keys() else None
 
         return DocumentNode(
             id=r["id"],
@@ -726,6 +804,9 @@ class SQLiteStore(StorageInterface):
             provenance=prov,
             table_data=t_data,
             figure_data=f_data,
+            equation_data=eq_data,
+            code_data=code_data,
+            asset_id=asset_id,
             metadata=meta,
         )
 
@@ -737,8 +818,14 @@ class SQLiteStore(StorageInterface):
         params = []
         for n in nodes:
             bbox_str = json.dumps(n.provenance.bbox) if n.provenance.bbox else None
+            char_span_str = json.dumps(n.provenance.char_span) if n.provenance.char_span else None
+            line_range_str = (
+                json.dumps(n.provenance.line_range) if n.provenance.line_range else None
+            )
             t_data_str = json.dumps(n.table_data.to_dict()) if n.table_data else None
             f_data_str = json.dumps(n.figure_data.to_dict()) if n.figure_data else None
+            eq_data_str = json.dumps(n.equation_data.to_dict()) if n.equation_data else None
+            code_data_str = json.dumps(n.code_data.to_dict()) if n.code_data else None
             meta_str = json.dumps(n.metadata) if n.metadata else "{}"
             node_type_str = n.node_type.value if hasattr(n.node_type, "value") else str(n.node_type)
             params.append(
@@ -758,6 +845,17 @@ class SQLiteStore(StorageInterface):
                     t_data_str,
                     f_data_str,
                     meta_str,
+                    n.provenance.source_uri,
+                    char_span_str,
+                    n.provenance.raw_ref,
+                    n.provenance.parser,
+                    n.provenance.parser_version,
+                    n.provenance.extraction_method,
+                    n.provenance.confidence,
+                    line_range_str,
+                    eq_data_str,
+                    code_data_str,
+                    n.asset_id,
                     now,
                 )
             )
@@ -767,8 +865,10 @@ class SQLiteStore(StorageInterface):
             INSERT OR REPLACE INTO document_tree_nodes (
                 id, document_id, parent_node_id, node_type, reading_order,
                 title, text, raw_text, section_path, page_number, page_end,
-                bbox, table_data, figure_data, metadata, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                bbox, table_data, figure_data, metadata,
+                source_uri, char_span, raw_ref, parser, parser_version,
+                extraction_method, confidence, line_range, equation_data, code_data, asset_id, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             params,
         )
@@ -782,7 +882,15 @@ class SQLiteStore(StorageInterface):
             (document_id,),
         ) as cursor:
             rows = await cursor.fetchall()
-            return [self._row_to_tree_node(r) for r in rows]
+            nodes = [self._row_to_tree_node(r) for r in rows]
+
+            # Reconstruct children_ids
+            node_map = {n.id: n for n in nodes}
+            for n in nodes:
+                if n.parent_id and n.parent_id in node_map:
+                    node_map[n.parent_id].children_ids.append(n.id)
+
+            return nodes
 
     async def get_tree_node(self, node_id: str) -> DocumentNode | None:
         conn = self._get_conn()
@@ -792,6 +900,194 @@ class SQLiteStore(StorageInterface):
         ) as cursor:
             row = await cursor.fetchone()
             return self._row_to_tree_node(row) if row else None
+
+    async def get_tree_nodes_by_ids(self, node_ids: list[str]) -> list[DocumentNode]:
+        if not node_ids:
+            return []
+        conn = self._get_conn()
+        placeholders = ",".join("?" for _ in node_ids)
+        async with conn.execute(
+            f"SELECT * FROM document_tree_nodes WHERE id IN ({placeholders})",
+            node_ids,
+        ) as cursor:
+            rows = await cursor.fetchall()
+            return [self._row_to_tree_node(r) for r in rows]
+
+    # -----------------------------------------------------------------------
+    # Multimodal Assets
+    # -----------------------------------------------------------------------
+
+    def _row_to_asset(self, r: Any) -> MultimodalAsset:
+        bbox_data = json.loads(r["bbox"]) if r["bbox"] else None
+        bbox_tuple = tuple(bbox_data) if bbox_data else None
+        emb_data = json.loads(r["embedding"]) if r["embedding"] else None
+        scopes = json.loads(r["permission_scope"]) if r["permission_scope"] else ["default"]
+        meta = json.loads(r["metadata"]) if r["metadata"] else {}
+        return MultimodalAsset(
+            id=r["id"],
+            document_id=r["document_id"],
+            node_id=r["node_id"],
+            asset_type=r["asset_type"],
+            mime_type=r["mime_type"],
+            width=r["width"],
+            height=r["height"],
+            byte_size=r["byte_size"],
+            sha256=r["sha256"],
+            storage_path=r["storage_path"],
+            caption=r["caption"],
+            ocr_text=r["ocr_text"],
+            description=r["description"],
+            embedding=emb_data,
+            page_number=r["page_number"],
+            bbox=bbox_tuple,
+            tenant_id=r["tenant_id"],
+            permission_scope=scopes,
+            metadata=meta,
+            created_at=datetime.fromisoformat(r["created_at"]),
+        )
+
+    async def insert_assets(self, assets: list[MultimodalAsset]) -> list[str]:
+        if not assets:
+            return []
+        conn = self._get_conn()
+        params = []
+        for a in assets:
+            params.append(
+                (
+                    a.id,
+                    a.document_id,
+                    a.node_id,
+                    a.asset_type,
+                    a.mime_type,
+                    a.width,
+                    a.height,
+                    a.byte_size,
+                    a.sha256,
+                    a.storage_path,
+                    a.caption,
+                    a.ocr_text,
+                    a.description,
+                    json.dumps(a.embedding) if a.embedding else None,
+                    a.page_number,
+                    json.dumps(a.bbox) if a.bbox else None,
+                    a.tenant_id,
+                    json.dumps(a.permission_scope),
+                    json.dumps(a.metadata) if a.metadata else "{}",
+                    a.created_at.isoformat()
+                    if hasattr(a.created_at, "isoformat")
+                    else str(a.created_at),
+                )
+            )
+        await conn.executemany(
+            """
+            INSERT OR REPLACE INTO document_assets (
+                id, document_id, node_id, asset_type, mime_type, width, height,
+                byte_size, sha256, storage_path, caption, ocr_text, description,
+                embedding, page_number, bbox, tenant_id, permission_scope,
+                metadata, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            params,
+        )
+        await conn.commit()
+        return [a.id for a in assets]
+
+    async def insert_asset(self, asset: MultimodalAsset) -> str:
+        ids = await self.insert_assets([asset])
+        return ids[0] if ids else asset.id
+
+    async def get_asset(self, asset_id: str) -> MultimodalAsset | None:
+        conn = self._get_conn()
+        async with conn.execute(
+            "SELECT * FROM document_assets WHERE id = ?",
+            (asset_id,),
+        ) as cursor:
+            row = await cursor.fetchone()
+            return self._row_to_asset(row) if row else None
+
+    async def get_assets_by_ids(self, asset_ids: list[str]) -> list[MultimodalAsset]:
+        if not asset_ids:
+            return []
+        conn = self._get_conn()
+        placeholders = ",".join("?" for _ in asset_ids)
+        async with conn.execute(
+            f"SELECT * FROM document_assets WHERE id IN ({placeholders})",
+            asset_ids,
+        ) as cursor:
+            rows = await cursor.fetchall()
+            return [self._row_to_asset(r) for r in rows]
+
+    async def get_assets_for_document(self, document_id: str) -> list[MultimodalAsset]:
+        conn = self._get_conn()
+        async with conn.execute(
+            "SELECT * FROM document_assets WHERE document_id = ? ORDER BY page_number ASC, created_at ASC",
+            (document_id,),
+        ) as cursor:
+            rows = await cursor.fetchall()
+            return [self._row_to_asset(r) for r in rows]
+
+    async def search_assets_vector(
+        self,
+        query_embedding: list[float],
+        filters: RetrievalFilters,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        conn = self._get_conn()
+        q_vec = np.array(query_embedding, dtype=np.float32)
+        q_norm = np.linalg.norm(q_vec)
+        if q_norm == 0:
+            return []
+
+        conditions = ["tenant_id = ?"]
+        params: list[Any] = [filters.tenant_id]
+
+        if filters.document_ids:
+            ph = ",".join("?" for _ in filters.document_ids)
+            conditions.append(f"document_id IN ({ph})")
+            params.extend(filters.document_ids)
+
+        where_clause = " AND ".join(conditions)
+        query_sql = f"SELECT * FROM document_assets WHERE {where_clause} AND embedding IS NOT NULL"
+
+        async with conn.execute(query_sql, params) as cursor:
+            rows = await cursor.fetchall()
+
+        results = []
+        user_scopes = set(filters.permission_scope) if filters.permission_scope else {"default"}
+
+        for r in rows:
+            scopes = (
+                set(json.loads(r["permission_scope"])) if r["permission_scope"] else {"default"}
+            )
+            if not (user_scopes & scopes or "public" in scopes):
+                continue
+
+            raw_emb = r["embedding"]
+            if not raw_emb:
+                continue
+            v = np.array(json.loads(raw_emb), dtype=np.float32)
+            v_norm = np.linalg.norm(v)
+            if v_norm == 0:
+                continue
+            sim = float(np.dot(q_vec, v) / (q_norm * v_norm))
+            results.append(
+                {
+                    "id": r["id"],
+                    "document_id": r["document_id"],
+                    "node_id": r["node_id"],
+                    "asset_type": r["asset_type"],
+                    "mime_type": r["mime_type"],
+                    "caption": r["caption"],
+                    "ocr_text": r["ocr_text"],
+                    "description": r["description"],
+                    "page_number": r["page_number"],
+                    "storage_path": r["storage_path"],
+                    "score": sim,
+                }
+            )
+
+        results.sort(key=lambda x: x["score"], reverse=True)
+        return results[:limit]
 
     async def search_bm25(
         self,

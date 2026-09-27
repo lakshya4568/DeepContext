@@ -295,10 +295,11 @@ async def test_multimodal_enricher_error_isolation():
     assert enriched_tree is tree
 
     # Figure should have enrichment record with status="failed" and limitation recorded
+    assert fig_node.figure_data is not None
     enrichment = fig_node.figure_data.enrichment
     assert enrichment is not None
     assert enrichment.status == "failed"
-    assert "Quota limit exceeded" in enrichment.limitations
+    assert "Quota limit exceeded" in (enrichment.limitations or "")
     # Ingestion continues unimpeded!
 
 

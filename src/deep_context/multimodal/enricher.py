@@ -63,20 +63,49 @@ class MultimodalEnricher:
             try:
                 if self._vision_fn:
                     res = self._vision_fn(fig, node.text)
+                    fig.enrichment = MultimodalEnrichment(
+                        status="completed",
+                        model_name=res.get("model_name", model_name),
+                        description=res.get("description"),
+                        extracted_labels=res.get("extracted_labels", []),
+                        extracted_values=res.get("extracted_values", []),
+                        confidence=res.get("confidence", 0.9),
+                        limitations=res.get("limitations"),
+                        processed_at=now,
+                    )
                 else:
-                    # Default offline fallback or rule-based chart metadata extraction
-                    res = self._extract_figure_interpretation(fig, node.text, model_name)
+                    from deep_context.core.llm_client import llm_client
+                    from deep_context.storage.asset_store import asset_store
 
-                fig.enrichment = MultimodalEnrichment(
-                    status="completed",
-                    model_name=res.get("model_name", model_name),
-                    description=res.get("description"),
-                    extracted_labels=res.get("extracted_labels", []),
-                    extracted_values=res.get("extracted_values", []),
-                    confidence=res.get("confidence", 0.9),
-                    limitations=res.get("limitations"),
-                    processed_at=now,
-                )
+                    desc = None
+                    aid = fig.asset_id or node.asset_id
+                    if aid:
+                        p = asset_store.get_asset_path(aid)
+                        if p and p.exists():
+                            try:
+                                desc = await llm_client.describe_image(
+                                    p,
+                                    prompt=f"Inspect this figure: {fig.caption or node.text or ''}",
+                                )
+                            except Exception as e_desc:
+                                logger.debug("Vision description notice for %s: %s", aid, e_desc)
+
+                    if desc:
+                        fig.enrichment = MultimodalEnrichment(
+                            status="completed",
+                            model_name="gemini-2.5-flash",
+                            description=desc,
+                            confidence=0.95,
+                            processed_at=now,
+                        )
+                    else:
+                        fig.enrichment = MultimodalEnrichment(
+                            status="unavailable",
+                            model_name=model_name,
+                            description=None,
+                            limitations="Visual interpretation model not attached or image crop unavailable.",
+                            processed_at=now,
+                        )
             except Exception as e:
                 logger.warning(
                     "Multimodal enrichment failed for node %s (%s): %s",

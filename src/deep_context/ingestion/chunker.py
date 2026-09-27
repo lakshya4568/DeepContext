@@ -19,6 +19,12 @@ from deep_context.core.types import (
 from deep_context.ingestion.parser import count_approx_tokens
 
 
+def generate_stable_chunk_id(parent_or_doc_id: str, prefix: str, index: int | str) -> str:
+    """Generate deterministic UUIDv5 for chunk based on document/parent ID and sequence index."""
+    seed = f"{parent_or_doc_id}:{prefix}:{index}"
+    return str(uuid.uuid5(uuid.NAMESPACE_DNS, seed))
+
+
 class ParentChildChunker:
     """Structure-aware parent-child chunker preserving sections, tables, captions, and figures."""
 
@@ -53,7 +59,7 @@ class ParentChildChunker:
         ]
         if not content_nodes:
             # Fallback for empty document
-            parent_id = str(uuid.uuid4())
+            parent_id = generate_stable_chunk_id(tree.document_id, "parent", 0)
             p = Chunk(
                 id=parent_id,
                 document_id=tree.document_id,
@@ -64,7 +70,7 @@ class ParentChildChunker:
                 created_at=now,
             )
             c = Chunk(
-                id=str(uuid.uuid4()),
+                id=generate_stable_chunk_id(parent_id, "child", 0),
                 document_id=tree.document_id,
                 parent_chunk_id=parent_id,
                 level=ChunkLevel.CHILD,
@@ -105,8 +111,8 @@ class ParentChildChunker:
             parent_node_groups.append(current_group)
 
         # 2. For each parent group, generate parent chunk and child chunks
-        for group in parent_node_groups:
-            parent_id = str(uuid.uuid4())
+        for p_idx, group in enumerate(parent_node_groups):
+            parent_id = generate_stable_chunk_id(tree.document_id, "parent", p_idx)
             pages = [
                 n.provenance.page_number for n in group if n.provenance.page_number is not None
             ]
@@ -153,17 +159,26 @@ class ParentChildChunker:
                     if n.figure_data.enrichment and n.figure_data.enrichment.description:
                         fig_desc += f"\nDescription: {n.figure_data.enrichment.description}"
                     parent_text_parts.append(fig_desc)
+                elif n.node_type == DocumentElementType.EQUATION and n.equation_data:
+                    parent_text_parts.append(n.text)
                 elif n.text:
                     parent_text_parts.append(n.text)
 
             parent_content = "\n\n".join(parent_text_parts).strip()
             parent_tokens = count_approx_tokens(parent_content)
 
+            group_asset_ids = [
+                n.asset_id or (n.figure_data.asset_id if n.figure_data else None)
+                for n in group
+                if (n.asset_id or (n.figure_data and n.figure_data.asset_id))
+            ]
+
             parent_meta: dict[str, Any] = {
                 "document_id": tree.document_id,
                 "node_ids": [n.id for n in group],
                 "element_types": list({n.node_type.value for n in group}),
                 "page_range": [start_page, end_page] if start_page else None,
+                "asset_ids": [aid for aid in group_asset_ids if aid],
             }
 
             parent_chunk = Chunk(
@@ -239,7 +254,7 @@ class ParentChildChunker:
             }
 
             chunk = Chunk(
-                id=str(uuid.uuid4()),
+                id=generate_stable_chunk_id(parent_id, "child", len(children)),
                 document_id=tree.document_id,
                 parent_chunk_id=parent_id,
                 level=ChunkLevel.CHILD,
@@ -321,7 +336,7 @@ class ParentChildChunker:
 
                         children.append(
                             Chunk(
-                                id=str(uuid.uuid4()),
+                                id=generate_stable_chunk_id(parent_id, "child", len(children)),
                                 document_id=tree.document_id,
                                 parent_chunk_id=parent_id,
                                 level=ChunkLevel.CHILD,
@@ -337,7 +352,7 @@ class ParentChildChunker:
                 else:
                     children.append(
                         Chunk(
-                            id=str(uuid.uuid4()),
+                            id=generate_stable_chunk_id(parent_id, "child", len(children)),
                             document_id=tree.document_id,
                             parent_chunk_id=parent_id,
                             level=ChunkLevel.CHILD,
@@ -368,6 +383,11 @@ class ParentChildChunker:
                     parts.append(f"Extracted Text: {f_data.ocr_text}")
 
                 fig_content = "\n\n".join(parts)
+                a_ids = (
+                    [f_data.asset_id]
+                    if f_data.asset_id
+                    else ([node.asset_id] if node.asset_id else [])
+                )
                 f_meta: dict[str, Any] = {
                     "document_id": tree.document_id,
                     "node_ids": [node.id],
@@ -375,7 +395,8 @@ class ParentChildChunker:
                     "has_figure": True,
                     "has_chart": is_chart,
                     "figure_type": f_data.figure_type,
-                    "asset_id": f_data.asset_id,
+                    "asset_id": f_data.asset_id or node.asset_id,
+                    "asset_ids": a_ids,
                     "caption": f_data.caption,
                     "enrichment_status": f_data.enrichment.status
                     if f_data.enrichment
@@ -385,7 +406,7 @@ class ParentChildChunker:
 
                 children.append(
                     Chunk(
-                        id=str(uuid.uuid4()),
+                        id=generate_stable_chunk_id(parent_id, "child", len(children)),
                         document_id=tree.document_id,
                         parent_chunk_id=parent_id,
                         level=ChunkLevel.CHILD,
@@ -394,6 +415,50 @@ class ParentChildChunker:
                         section_path=node_sec,
                         page_number=page,
                         metadata=f_meta,
+                        created_at=created_at,
+                    )
+                )
+                continue
+
+            # 2.5. EQUATION: Keep equation, LaTeX, symbols, and readable text together
+            if n_type == DocumentElementType.EQUATION and node.equation_data:
+                flush_buffer()
+                eq_data = node.equation_data
+                eq_parts = [node.text]
+                if eq_data.variables:
+                    eq_parts.append(f"Symbols/Variables: {', '.join(eq_data.variables)}")
+                if eq_data.symbolic_repr:
+                    eq_parts.append(f"Symbolic Form: {eq_data.symbolic_repr}")
+                eq_content = "\n\n".join(eq_parts)
+
+                eq_a_ids = (
+                    [eq_data.asset_id]
+                    if eq_data.asset_id
+                    else ([node.asset_id] if node.asset_id else [])
+                )
+                eq_meta: dict[str, Any] = {
+                    "document_id": tree.document_id,
+                    "node_ids": [node.id],
+                    "element_types": ["equation"],
+                    "has_equation": True,
+                    "latex": eq_data.latex,
+                    "equation_number": eq_data.equation_number,
+                    "variables": eq_data.variables,
+                    "asset_id": eq_data.asset_id or node.asset_id,
+                    "asset_ids": eq_a_ids,
+                    "page_range": [page, page] if page else None,
+                }
+                children.append(
+                    Chunk(
+                        id=generate_stable_chunk_id(parent_id, "child", len(children)),
+                        document_id=tree.document_id,
+                        parent_chunk_id=parent_id,
+                        level=ChunkLevel.CHILD,
+                        content=eq_content,
+                        token_count=count_approx_tokens(eq_content),
+                        section_path=node_sec,
+                        page_number=page,
+                        metadata=eq_meta,
                         created_at=created_at,
                     )
                 )
@@ -425,7 +490,7 @@ class ParentChildChunker:
                         p_txt = " ".join(sub_buf).strip()
                         children.append(
                             Chunk(
-                                id=str(uuid.uuid4()),
+                                id=generate_stable_chunk_id(parent_id, "child", len(children)),
                                 document_id=tree.document_id,
                                 parent_chunk_id=parent_id,
                                 level=ChunkLevel.CHILD,
@@ -454,7 +519,7 @@ class ParentChildChunker:
                     p_txt = " ".join(sub_buf).strip()
                     children.append(
                         Chunk(
-                            id=str(uuid.uuid4()),
+                            id=generate_stable_chunk_id(parent_id, "child", len(children)),
                             document_id=tree.document_id,
                             parent_chunk_id=parent_id,
                             level=ChunkLevel.CHILD,
@@ -518,8 +583,8 @@ class ParentChildChunker:
         if current_group:
             parent_groups.append(current_group)
 
-        for group in parent_groups:
-            parent_id = str(uuid.uuid4())
+        for p_idx, group in enumerate(parent_groups):
+            parent_id = generate_stable_chunk_id(document_id, "parent", p_idx)
             parent_text = "\n\n".join(s.content for s in group)
             parent_tokens = count_approx_tokens(parent_text)
 
@@ -607,7 +672,7 @@ class ParentChildChunker:
                 has_fig = "figure:" in child_content.lower() or "fig." in child_content.lower()
 
                 child_chunk = Chunk(
-                    id=str(uuid.uuid4()),
+                    id=generate_stable_chunk_id(parent_id, "child", len(children)),
                     document_id=document_id,
                     parent_chunk_id=parent_id,
                     level=ChunkLevel.CHILD,
@@ -647,7 +712,7 @@ class ParentChildChunker:
             has_fig = "figure:" in child_content.lower() or "fig." in child_content.lower()
 
             child_chunk = Chunk(
-                id=str(uuid.uuid4()),
+                id=generate_stable_chunk_id(parent_id, "child", len(children)),
                 document_id=document_id,
                 parent_chunk_id=parent_id,
                 level=ChunkLevel.CHILD,

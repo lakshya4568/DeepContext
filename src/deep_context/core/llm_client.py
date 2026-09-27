@@ -671,6 +671,308 @@ class LLMClient:
         )
         return res[0]
 
+    async def embed_text(
+        self,
+        text: str,
+        model: str | None = None,
+        dim: int | None = None,
+        is_query: bool = False,
+        task_type: str | None = None,
+        title: str | None = None,
+    ) -> list[float]:
+        """Generate dense embedding for text."""
+        return await self.get_embedding(
+            text, model=model, dim=dim, task_type=task_type, title=title, is_query=is_query
+        )
+
+    async def embed_texts(
+        self,
+        texts: list[str],
+        model: str | None = None,
+        dim: int | None = None,
+        is_query: bool = False,
+        task_type: str | None = None,
+        title: str | None = None,
+    ) -> list[list[float]]:
+        """Generate dense embeddings for a list of texts."""
+        return await self.get_embeddings(
+            texts, model=model, dim=dim, task_type=task_type, title=title, is_query=is_query
+        )
+
+    async def embed_image(
+        self,
+        image_data: bytes | str | Any,
+        model: str | None = None,
+        dim: int | None = None,
+        is_query: bool = False,
+    ) -> list[float]:
+        """
+        Generate multimodal embedding for image bytes or file path using Gemini Embedding 2.
+        Embeds directly into the same vector space as text (768-dim default).
+        """
+        import base64
+        import io
+        from pathlib import Path
+
+        target_model = model or self.embedding_model
+        target_dim = dim or settings.embedding_dim
+
+        raw_bytes: bytes
+        mime_type = "image/png"
+        if isinstance(image_data, bytes):
+            raw_bytes = image_data
+        elif isinstance(image_data, str) and image_data.startswith("data:"):
+            header, encoded = image_data.split(",", 1)
+            raw_bytes = base64.b64decode(encoded)
+            if "image/jpeg" in header or "image/jpg" in header:
+                mime_type = "image/jpeg"
+        elif isinstance(image_data, (str, Path)) and os.path.exists(str(image_data)):
+            p = str(image_data)
+            if p.lower().endswith((".jpg", ".jpeg")):
+                mime_type = "image/jpeg"
+            elif p.lower().endswith(".webp"):
+                mime_type = "image/webp"
+            with open(p, "rb") as f:
+                raw_bytes = f.read()
+        elif hasattr(image_data, "save"):
+            buf = io.BytesIO()
+            image_data.save(buf, format="PNG")
+            raw_bytes = buf.getvalue()
+        else:
+            raise ValueError(f"Unsupported image_data type: {type(image_data)}")
+
+        if (
+            settings.allow_mock_fallback
+            and os.environ.get("PYTEST_CURRENT_TEST")
+            and not self._has_live_client()
+        ):
+            h = hashlib.sha256(raw_bytes).hexdigest()
+            return self._mock_embedding(f"image_{h[:16]}", dim=target_dim)
+
+        embed_client = None
+        if "embedding-2" in target_model.lower():
+            env_vertex = os.environ.get("VERTEX_AI_ENABLED")
+            use_vertex = (
+                env_vertex.lower() in ("true", "1", "yes")
+                if env_vertex is not None
+                else (settings.vertex_ai_enabled or bool(settings.google_cloud_project))
+            )
+            if use_vertex:
+                user_loc = (
+                    os.environ.get("GOOGLE_CLOUD_LOCATION")
+                    or settings.google_cloud_location
+                    or "us-central1"
+                )
+                if user_loc not in ("global", "us", "eu"):
+                    try:
+                        embed_client = self._refresh_gemini_client(location="global")
+                    except TypeError:
+                        embed_client = self._refresh_gemini_client()
+
+        gemini_client = embed_client or self._refresh_gemini_client()
+        if not gemini_client:
+            raise RuntimeError(
+                f"Gemini client is required for multimodal image embedding with model '{target_model}'. "
+                "Ensure GEMINI_API_KEY or Google Cloud Vertex AI credentials are configured."
+            )
+
+        part = genai_types.Part.from_bytes(data=raw_bytes, mime_type=mime_type)
+        content = genai_types.Content(parts=[part])
+        config = genai_types.EmbedContentConfig(output_dimensionality=target_dim)
+
+        async def _do_embed():
+            return await asyncio.wait_for(
+                gemini_client.aio.models.embed_content(
+                    model=target_model,
+                    contents=content,
+                    config=config,
+                ),
+                timeout=30.0,
+            )
+
+        resp = await self._call_gemini_with_backoff(_do_embed, f"embed_image ({target_model})")
+        if resp.embeddings and len(resp.embeddings) > 0 and resp.embeddings[0].values is not None:
+            return list(resp.embeddings[0].values)
+
+        raise RuntimeError(
+            f"Gemini embed_image returned no vector values for model '{target_model}'."
+        )
+
+    async def embed_text_image(
+        self,
+        text: str,
+        image_data: bytes | str | Any,
+        model: str | None = None,
+        dim: int | None = None,
+        is_query: bool = False,
+    ) -> list[float]:
+        """
+        Generate joint multimodal embedding for text + image using Gemini Embedding 2.
+        """
+        import base64
+        import io
+        from pathlib import Path
+
+        target_model = model or self.embedding_model
+        target_dim = dim or settings.embedding_dim
+
+        raw_bytes: bytes
+        mime_type = "image/png"
+        if isinstance(image_data, bytes):
+            raw_bytes = image_data
+        elif isinstance(image_data, str) and image_data.startswith("data:"):
+            header, encoded = image_data.split(",", 1)
+            raw_bytes = base64.b64decode(encoded)
+            if "image/jpeg" in header or "image/jpg" in header:
+                mime_type = "image/jpeg"
+        elif isinstance(image_data, (str, Path)) and os.path.exists(str(image_data)):
+            p = str(image_data)
+            if p.lower().endswith((".jpg", ".jpeg")):
+                mime_type = "image/jpeg"
+            elif p.lower().endswith(".webp"):
+                mime_type = "image/webp"
+            with open(p, "rb") as f:
+                raw_bytes = f.read()
+        elif hasattr(image_data, "save"):
+            buf = io.BytesIO()
+            image_data.save(buf, format="PNG")
+            raw_bytes = buf.getvalue()
+        else:
+            raise ValueError(f"Unsupported image_data type: {type(image_data)}")
+
+        if (
+            settings.allow_mock_fallback
+            and os.environ.get("PYTEST_CURRENT_TEST")
+            and not self._has_live_client()
+        ):
+            h = hashlib.sha256(raw_bytes).hexdigest()
+            return self._mock_embedding(f"{text} image_{h[:16]}", dim=target_dim)
+
+        embed_client = None
+        if "embedding-2" in target_model.lower():
+            env_vertex = os.environ.get("VERTEX_AI_ENABLED")
+            use_vertex = (
+                env_vertex.lower() in ("true", "1", "yes")
+                if env_vertex is not None
+                else (settings.vertex_ai_enabled or bool(settings.google_cloud_project))
+            )
+            if use_vertex:
+                user_loc = (
+                    os.environ.get("GOOGLE_CLOUD_LOCATION")
+                    or settings.google_cloud_location
+                    or "us-central1"
+                )
+                if user_loc not in ("global", "us", "eu"):
+                    try:
+                        embed_client = self._refresh_gemini_client(location="global")
+                    except TypeError:
+                        embed_client = self._refresh_gemini_client()
+
+        gemini_client = embed_client or self._refresh_gemini_client()
+        if not gemini_client:
+            raise RuntimeError(
+                f"Gemini client is required for multimodal embedding with model '{target_model}'. "
+                "Ensure GEMINI_API_KEY or Google Cloud Vertex AI credentials are configured."
+            )
+
+        part_txt = genai_types.Part.from_text(text=text)
+        part_img = genai_types.Part.from_bytes(data=raw_bytes, mime_type=mime_type)
+        content = genai_types.Content(parts=[part_txt, part_img])
+        config = genai_types.EmbedContentConfig(output_dimensionality=target_dim)
+
+        async def _do_embed():
+            return await asyncio.wait_for(
+                gemini_client.aio.models.embed_content(
+                    model=target_model,
+                    contents=content,
+                    config=config,
+                ),
+                timeout=30.0,
+            )
+
+        resp = await self._call_gemini_with_backoff(_do_embed, f"embed_text_image ({target_model})")
+        if resp.embeddings and len(resp.embeddings) > 0 and resp.embeddings[0].values is not None:
+            return list(resp.embeddings[0].values)
+
+        raise RuntimeError(
+            f"Gemini embed_text_image returned no vector values for model '{target_model}'."
+        )
+
+    async def describe_image(
+        self,
+        image_data: bytes | str | Any,
+        prompt: str | None = None,
+        model: str | None = None,
+    ) -> str:
+        """
+        Use vision model (Gemini) to inspect and describe an image, diagram, or chart.
+        Returns detailed textual description.
+        """
+        import base64
+        import io
+        from pathlib import Path
+
+        target_model = model or "gemini-2.5-flash"
+        raw_bytes: bytes
+        mime_type = "image/png"
+        if isinstance(image_data, bytes):
+            raw_bytes = image_data
+        elif isinstance(image_data, str) and image_data.startswith("data:"):
+            header, encoded = image_data.split(",", 1)
+            raw_bytes = base64.b64decode(encoded)
+            if "image/jpeg" in header or "image/jpg" in header:
+                mime_type = "image/jpeg"
+        elif isinstance(image_data, (str, Path)) and os.path.exists(str(image_data)):
+            p = str(image_data)
+            if p.lower().endswith((".jpg", ".jpeg")):
+                mime_type = "image/jpeg"
+            elif p.lower().endswith(".webp"):
+                mime_type = "image/webp"
+            with open(p, "rb") as f:
+                raw_bytes = f.read()
+        elif hasattr(image_data, "save"):
+            buf = io.BytesIO()
+            image_data.save(buf, format="PNG")
+            raw_bytes = buf.getvalue()
+        else:
+            raise ValueError(f"Unsupported image_data type: {type(image_data)}")
+
+        if (
+            settings.allow_mock_fallback
+            and os.environ.get("PYTEST_CURRENT_TEST")
+            and not self._has_live_client()
+        ):
+            return "Visual description of diagram / chart"
+
+        gemini_client = self._refresh_gemini_client()
+        if not gemini_client:
+            raise RuntimeError(
+                f"Gemini client is required for vision inspection with model '{target_model}'. "
+                "Ensure GEMINI_API_KEY or Google Cloud Vertex AI credentials are configured."
+            )
+
+        part = genai_types.Part.from_bytes(data=raw_bytes, mime_type=mime_type)
+        user_prompt = (
+            prompt
+            or "Describe this image, chart, or diagram in detail, including labels, data points, axes, legends, equations, and visual relationships."
+        )
+
+        async def _do_generate():
+            return await asyncio.wait_for(
+                gemini_client.aio.models.generate_content(
+                    model=target_model,
+                    contents=[part, user_prompt],  # type: ignore[arg-type]
+                ),
+                timeout=30.0,
+            )
+
+        resp = await self._call_gemini_with_backoff(
+            _do_generate, f"describe_image ({target_model})"
+        )
+        if resp and resp.text:
+            return resp.text.strip()
+        return ""
+
     def _mock_embedding(self, text: str, dim: int = 768) -> list[float]:
         """Generate deterministic normalized pseudo-embedding based on sha256 + token hashes."""
         vec = np.zeros(dim, dtype=np.float32)

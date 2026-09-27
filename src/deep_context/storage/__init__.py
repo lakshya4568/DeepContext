@@ -3,9 +3,20 @@
 from __future__ import annotations
 
 from deep_context.core.config import settings
+from deep_context.storage.asset_store import AssetStore, asset_store
 from deep_context.storage.base import StorageInterface
 from deep_context.storage.postgres_store import PostgresStore
 from deep_context.storage.sqlite_store import SQLiteStore
+
+__all__ = [
+    "StorageInterface",
+    "PostgresStore",
+    "SQLiteStore",
+    "AssetStore",
+    "asset_store",
+    "get_storage",
+    "close_storage",
+]
 
 _active_store: StorageInterface | None = None
 

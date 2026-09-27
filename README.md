@@ -10,11 +10,11 @@
 [![Google Gemini GenAI](https://img.shields.io/badge/Google%20GenAI-Gemini%202.5%20%2F%203.7%20%2B%20Embedding--2-4285F4?logo=google&logoColor=white)](https://ai.google.dev)
 [![Groq Fast Inference](https://img.shields.io/badge/Groq-Qwen%203.6%2027B%20%2F%20Llama%203.3-F05032?logo=fastly&logoColor=white)](https://groq.com)
 [![NVIDIA NIM](https://img.shields.io/badge/NVIDIA%20NIM-BGE--M3%20%2F%20Llama%203.1-76B900?logo=nvidia&logoColor=white)](https://build.nvidia.com)
-[![Tests](https://img.shields.io/badge/Tests-126%20Passing%20(100%25)-brightgreen)](https://github.com)
+[![Tests](https://img.shields.io/badge/Tests-162%20Passing%20(100%25)-brightgreen)](https://github.com)
 [![Zero Frameworks](https://img.shields.io/badge/Frameworks-Zero%20(No%20LangChain%20%2F%20LlamaIndex)-black)](https://github.com)
 
 **A high-performance, framework-free Agentic Retrieval-Augmented Generation (RAG) platform.**  
-Built entirely from scratch with raw Python 3.12, pure asynchronous SQL (`asyncpg` + `pgvector` HNSW), multi-provider LLMs, contextual chunk summarization, 4-store typed durable memory, and a zero-dependency Vanilla web studio.
+Built entirely from scratch with raw Python 3.12, pure asynchronous SQL (`asyncpg` + `pgvector` HNSW), multi-provider LLMs, contextual chunk summarization, 4-store typed durable memory, multimodal asset storage, and a zero-dependency Vanilla web studio.
 
 [Quickstart](#-quickstart) • [System Architecture](#-system-architecture) • [Candidate Funnel](#-candidate-funnel-architecture-top-k-step-down) • [Mathematical Foundations](#-mathematical-foundations--formulas) • [Reranker & Consensus](#-reranker-architecture--consensus-protection) • [Ingestion & Storage](#-ingestion--hierarchical-storage-pipeline) • [Agentic Planner](#-agentic-router--corrective-rag-crag-state-machine) • [Two-Pass Grounding](#-two-pass-grounded-generation--verification) • [Typed Memory](#-4-store-typed-memory--8-layer-prompt-compiler) • [CLI Manual](#-cli-reference-manual) • [API & Streaming](#-api--streaming-contracts)
 
@@ -34,6 +34,8 @@ Most production RAG systems suffer from three fundamental architectural flaws:
 
 - **100% Hand-Crafted Asynchronous Core:** Zero LangChain, zero LlamaIndex, zero LangGraph. Pure, reviewable, high-speed Python 3.12, native `asyncio`, and raw parameterized SQL.
 - **IBM Docling & DocumentTree Parsing:** Primary converter for mixed-content PDFs, tables, and figures. Builds normalized `DocumentTree` preserving reading order, element classifications, table cell/header data models, captions, and visual enrichment.
+- **Multimodal Assets & Provenance:** Durable content-addressed asset storage (`AssetStore`) for figures and page crops (`data/assets/<tenant_id>/<asset_id>.png`). Generates real 768-dim `gemini-embedding-2` vectors directly from image pixels for cross-modal text↔image and image↔image retrieval.
+- **LaTeX, Math & Multi-Language Code Parsing:** Native `.tex` parsing (`pylatexenc`) preserving environments, labels, and equations with optional SymPy symbolic extraction; multi-language AST symbol extraction using Python `ast` and `tree-sitter`.
 - **Anthropic Contextual Retrieval Standard:** Ingests documents with local GPU/MPS `Qwen/Qwen3-0.6B` (FP16) contextual chunk summaries prepended to raw text (`summary_text + "\n\n" + raw_content`), reducing retrieval failure rates by up to 67%.
 - **Hierarchical Parent-Child & Context Expansion:** Indexes tight 300–600 token child chunks for ultra-precise vector & lexical search, then dynamically resolves to full 1,000–2,500 token parent sections or expands back through parse tree nodes to reconstruct full tables and figures during synthesis.
 - **Decoupled Zero-Loss Ingestion Pipeline:** Checkpoint 1 writes documents, parse tree nodes, parents, children, Qwen3 summaries, and full-text TSVectors atomically to PostgreSQL or SQLite before calling any external embedding APIs, preventing data loss on rate limits.

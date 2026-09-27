@@ -10,8 +10,8 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, UploadFile
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
+from fastapi.responses import FileResponse, HTMLResponse, Response, StreamingResponse
 
 from deep_context.agentic.planner import AgenticPlanner
 from deep_context.agentic.router import QueryRouter
@@ -76,6 +76,88 @@ async def get_document_chunks(document_id: str) -> list[dict[str, Any]]:
     """Inspect all parent and child chunks with LLM summaries for a document."""
     storage = await get_storage()
     return await storage.get_document_chunks_detail(document_id)
+
+
+@router.get("/v1/assets/{asset_id}")
+async def get_asset(
+    asset_id: str,
+    tenant_id: str = "default",
+    permission_scope: str = "default",
+) -> Response:
+    """Streams a multimodal image, chart, or diagram asset from storage with tenant and permission isolation."""
+    storage = await get_storage()
+    asset = await storage.get_asset(asset_id)
+    if not asset:
+        raise HTTPException(status_code=404, detail=f"Asset '{asset_id}' not found")
+
+    # Enforce tenant isolation
+    if asset.tenant_id != tenant_id:
+        raise HTTPException(
+            status_code=403, detail="Access denied: asset belongs to another tenant"
+        )
+
+    # Enforce permission scope
+    allowed_scopes = {"public", "default", tenant_id, permission_scope}
+    asset_scopes = set(asset.permission_scope) if asset.permission_scope else {"default"}
+    if not (allowed_scopes & asset_scopes):
+        raise HTTPException(
+            status_code=403, detail="Access denied: insufficient permissions for asset"
+        )
+
+    from deep_context.storage.asset_store import asset_store
+
+    file_path = None
+    if asset.storage_path and os.path.exists(asset.storage_path):
+        file_path = Path(asset.storage_path)
+    else:
+        file_path = asset_store.get_asset_path(asset_id, tenant_id=tenant_id)
+
+    if not file_path or not file_path.exists():
+        raise HTTPException(status_code=404, detail=f"Asset '{asset_id}' file not found")
+
+    mime = asset.mime_type or "image/png"
+    if file_path.suffix.lower() in (".jpg", ".jpeg"):
+        mime = "image/jpeg"
+    elif file_path.suffix.lower() == ".webp":
+        mime = "image/webp"
+
+    return FileResponse(file_path, media_type=mime)
+
+
+@router.get("/v1/documents/{document_id}/assets")
+async def get_document_assets(
+    document_id: str,
+    tenant_id: str = "default",
+    permission_scope: str = "default",
+) -> list[dict[str, Any]]:
+    """Inspect all multimodal assets (figures, charts, diagrams) for a document with tenant filtering."""
+    storage = await get_storage()
+    doc = await storage.get_document(document_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail=f"Document '{document_id}' not found")
+
+    if doc.tenant_id != tenant_id:
+        raise HTTPException(
+            status_code=403, detail="Access denied: document belongs to another tenant"
+        )
+
+    allowed_scopes = {"public", "default", tenant_id, permission_scope}
+    doc_scopes = set(doc.permission_scope) if doc.permission_scope else {"default"}
+    if not (allowed_scopes & doc_scopes):
+        raise HTTPException(
+            status_code=403, detail="Access denied: insufficient permissions for document"
+        )
+
+    assets = await storage.get_assets_for_document(document_id)
+    filtered = []
+    for a in assets:
+        if a.tenant_id != tenant_id:
+            continue
+        a_scopes = set(a.permission_scope) if a.permission_scope else {"default"}
+        if not (allowed_scopes & a_scopes):
+            continue
+        filtered.append(a.to_dict())
+    return filtered
 
 
 @router.post("/v1/documents/{document_id}/embed")
@@ -508,14 +590,18 @@ async def retrieve_knowledge(req: RetrieveRequest) -> RetrieveResponse:
         embedding_dim=req.embedding_dim,
         reranker=req.reranker,
         user_id=req.user_id,
+        query_image=req.query_image,
+        query_asset_id=req.query_asset_id,
     )
     response = RetrieveResponse(
         sufficient=res.sufficient,
         parent_chunks=res.parent_chunks,
         citations=[c.to_dict() for c in res.citations],
+        assets=res.assets,
         query_shape=res.query_shape or QueryShape.FACTUAL_LOOKUP,
         retry_count=res.retry_count,
         insufficiency_reason=res.insufficiency_reason,
+        expanded_contexts=res.expanded_contexts,
         cache_hit=False,
     )
     if res.sufficient:
@@ -549,6 +635,8 @@ async def query_platform(req: QueryRequest, background_tasks: BackgroundTasks) -
 
     answer_text = ""
     citations_list: list[dict[str, Any]] = []
+    assets_list: list[dict[str, Any]] = []
+    expanded_contexts_list: list[dict[str, Any]] = []
     reasoning_text: str | None = None
     support_passed = True
     support_confidence = 1.0
@@ -562,8 +650,12 @@ async def query_platform(req: QueryRequest, background_tasks: BackgroundTasks) -
             embedding_dim=req.embedding_dim,
             reranker=req.reranker,
             user_id=req.user_id,
+            query_image=req.query_image,
+            query_asset_id=req.query_asset_id,
         )
         citations_list = [c.to_dict() for c in retrieval_res.citations]
+        assets_list = retrieval_res.assets
+        expanded_contexts_list = retrieval_res.expanded_contexts
 
         from deep_context.generation.grounded_answer import generate_grounded_answer
 
@@ -588,6 +680,7 @@ async def query_platform(req: QueryRequest, background_tasks: BackgroundTasks) -
     response = QueryResponse(
         answer=answer_text,
         citations=citations_list,
+        assets=assets_list,
         path_taken=decision.path,
         query_shape=decision.query_shape,
         reasoning=reasoning_text,
@@ -596,6 +689,7 @@ async def query_platform(req: QueryRequest, background_tasks: BackgroundTasks) -
         latency_ms=latency_ms,
         token_cost=0,
         cache_hit=False,
+        expanded_contexts=expanded_contexts_list,
     )
 
     # Only cache grounded, support-checked answers to avoid poisoning the
@@ -656,9 +750,15 @@ async def query_platform_stream(
                     embedding_dim=req.embedding_dim,
                     reranker=req.reranker,
                     user_id=req.user_id,
+                    query_image=req.query_image,
+                    query_asset_id=req.query_asset_id,
                 )
                 citations_list = [c.to_dict() for c in retrieval_res.citations]
                 yield f"data: {json.dumps({'type': 'citations', 'citations': citations_list})}\n\n"
+                if retrieval_res.assets:
+                    yield f"data: {json.dumps({'type': 'assets', 'assets': retrieval_res.assets})}\n\n"
+                if retrieval_res.expanded_contexts:
+                    yield f"data: {json.dumps({'type': 'expanded_contexts', 'expanded_contexts': retrieval_res.expanded_contexts})}\n\n"
 
                 # 3. Prompt Assembly Phase
                 assembler = PromptAssembler(storage)
