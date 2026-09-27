@@ -32,11 +32,26 @@ class IngestionPipeline:
         storage = await get_storage()
         doc_id = str(uuid.uuid4())
 
-        # 1. Parse document into structure-aware sections
-        sections = self.parser.parse(request.content, doc_type=request.doc_type)
+        # 1. Parse document into structure-aware parse tree
+        tree = self.parser.parse_tree(
+            request.content,
+            doc_type=request.doc_type,
+            source_uri=request.source_uri,
+            title=request.title,
+        )
+        tree.document_id = doc_id
+        for n in tree.nodes:
+            n.document_id = doc_id
 
-        # 2. Parent-child chunking
-        parent_chunks, child_chunks = self.chunker.chunk_sections(doc_id, sections)
+        # Multimodal enrichment for figures and charts if requested
+        if getattr(request, "enrich_multimodal", False):
+            from deep_context.multimodal.enricher import MultimodalEnricher
+
+            enricher = MultimodalEnricher()
+            await enricher.enrich_tree(tree)
+
+        # 2. Parent-child structure-aware chunking preserving natural boundaries
+        parent_chunks, child_chunks = self.chunker.chunk_tree(tree)
 
         # 3. Generate Qwen3 contextual summaries for child chunks if enabled
         should_summarize = (
@@ -94,8 +109,10 @@ class IngestionPipeline:
             metadata=doc_metadata,
         )
 
-        # 5. Persist to storage (document -> chunks)
+        # 5. Persist to storage (document -> tree nodes -> chunks)
         await storage.insert_document(doc)
+        if tree.nodes:
+            await storage.insert_tree_nodes(tree.nodes)
         all_chunks = parent_chunks + child_chunks
         await storage.insert_chunks(all_chunks)
 
@@ -109,6 +126,7 @@ class IngestionPipeline:
                 "title": request.title,
                 "parent_chunks": len(parent_chunks),
                 "child_chunks": len(child_chunks),
+                "tree_nodes": len(tree.nodes),
                 "retrieval_mode": request.retrieval_mode.value,
                 "embedding_model": emb_model,
                 "embedding_dim": emb_dim,
@@ -117,9 +135,10 @@ class IngestionPipeline:
         )
 
         logger.info(
-            "Successfully ingested document %s (%s) with %d parents and %d children using %s (%d-dim) in %d ms",
+            "Successfully ingested document %s (%s) with %d nodes, %d parents and %d children using %s (%d-dim) in %d ms",
             doc_id,
             request.title,
+            len(tree.nodes),
             len(parent_chunks),
             len(child_chunks),
             emb_model,
@@ -136,6 +155,7 @@ class IngestionPipeline:
             summaries_generated_count=summaries_count,
             embedding_model=emb_model,
             embedding_dim=emb_dim,
+            tree_nodes_count=len(tree.nodes),
         )
 
 

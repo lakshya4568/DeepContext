@@ -59,6 +59,7 @@ CREATE TABLE chunks (
     generated_at    TIMESTAMPTZ,
     summary_tsv     TSVECTOR,
     search_tsv      TSVECTOR,                     -- Weighted combined (B: content, C: summary_text)
+    metadata        JSONB NOT NULL DEFAULT '{}',  -- node_ids, element_types, table/figure provenance
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -85,19 +86,29 @@ CREATE TRIGGER trigger_update_chunks_tsv
 BEFORE INSERT OR UPDATE ON chunks
 FOR EACH ROW EXECUTE FUNCTION update_chunks_tsv();
 
--- Optional vectorless/tree index (FR6) for PageIndex-style structured
--- navigation. One row per (document, tree node); leaves reference chunks.
+-- Document parse tree nodes for faithful representation of structured & unstructured documents.
+-- Preserves hierarchy, reading order, provenance, table cell structures, and multimodal metadata.
 CREATE TABLE document_tree_nodes (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     document_id     UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
     parent_node_id  UUID REFERENCES document_tree_nodes(id) ON DELETE CASCADE,
-    title           TEXT NOT NULL,                -- section/heading title
-    summary         TEXT,                         -- LLM-generated node summary used for navigation
-    chunk_id        UUID REFERENCES chunks(id),    -- set on leaf nodes
-    node_order      INTEGER NOT NULL DEFAULT 0
+    node_type       TEXT NOT NULL,                -- 'document' | 'section' | 'heading' | 'paragraph' | 'table' | 'figure' | 'chart' | 'caption' | 'list_item' | 'code' | ...
+    reading_order   INTEGER NOT NULL DEFAULT 0,
+    title           TEXT,
+    text            TEXT,
+    raw_text        TEXT,
+    section_path    TEXT,
+    page_number     INTEGER,
+    page_end        INTEGER,
+    bbox            JSONB,                        -- bounding box coordinates [l, b, r, t]
+    table_data      JSONB,                        -- cell grid, row/col counts, headers, markdown
+    figure_data     JSONB,                        -- captions, OCR text, multimodal enrichment
+    metadata        JSONB NOT NULL DEFAULT '{}',
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX idx_tree_nodes_document ON document_tree_nodes (document_id);
+CREATE INDEX idx_tree_nodes_parent ON document_tree_nodes (parent_node_id);
 CREATE INDEX idx_tree_nodes_parent ON document_tree_nodes (parent_node_id);
 
 -- ----------------------------------------------------------------------------

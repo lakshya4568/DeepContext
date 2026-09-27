@@ -33,9 +33,10 @@ Most production RAG systems suffer from three fundamental architectural flaws:
 **Deep Context Platform solves these challenges from first principles:**
 
 - **100% Hand-Crafted Asynchronous Core:** Zero LangChain, zero LlamaIndex, zero LangGraph. Pure, reviewable, high-speed Python 3.12, native `asyncio`, and raw parameterized SQL.
+- **IBM Docling & DocumentTree Parsing:** Primary converter for mixed-content PDFs, tables, and figures. Builds normalized `DocumentTree` preserving reading order, element classifications, table cell/header data models, captions, and visual enrichment.
 - **Anthropic Contextual Retrieval Standard:** Ingests documents with local GPU/MPS `Qwen/Qwen3-0.6B` (FP16) contextual chunk summaries prepended to raw text (`summary_text + "\n\n" + raw_content`), reducing retrieval failure rates by up to 67%.
-- **Hierarchical Parent-Child Resolution:** Indexes tight 300–600 token child chunks for ultra-precise vector & lexical search, then dynamically resolves to full 1,000–2,500 token parent sections during synthesis so the LLM receives complete context.
-- **Decoupled Zero-Loss Ingestion Pipeline:** Checkpoint 1 writes documents, parents, children, Qwen3 summaries, and full-text TSVectors atomically to PostgreSQL before calling any external embedding APIs, preventing data loss on rate limits.
+- **Hierarchical Parent-Child & Context Expansion:** Indexes tight 300–600 token child chunks for ultra-precise vector & lexical search, then dynamically resolves to full 1,000–2,500 token parent sections or expands back through parse tree nodes to reconstruct full tables and figures during synthesis.
+- **Decoupled Zero-Loss Ingestion Pipeline:** Checkpoint 1 writes documents, parse tree nodes, parents, children, Qwen3 summaries, and full-text TSVectors atomically to PostgreSQL or SQLite before calling any external embedding APIs, preventing data loss on rate limits.
 - **Dual-Channel Hybrid Retrieval:** Combines PostgreSQL `pg_search` (ParadeDB BM25) or native weighted `tsvector` with `pgvector` HNSW dense cosine search via Reciprocal Rank Fusion ($k=60$).
 - **Multi-Strategy Neural Reranking & Consensus Protection:** Cross-encoder reranking blended with normalized RRF scores ($60/40$ blend) plus algorithmic consensus guards ensuring dual-channel top hits are never displaced.
 - **Corrective Agentic RAG (CRAG) State Machine:** Self-correcting state machine that grades retrieved document relevance, dynamically rewrites ambiguous queries, and retries retrieval before falling back gracefully.

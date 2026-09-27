@@ -240,6 +240,10 @@ class RetrievalEngine:
                 p = parent_chunk_map[pid]
                 sec = p.section_path or c.get("section_path")
                 page = p.page_number or c.get("page_number")
+                p_meta = p.metadata or {}
+                c_meta = c.get("metadata") or {}
+                node_ids = p_meta.get("node_ids") or c_meta.get("node_ids", [])
+                elem_types = p_meta.get("element_types") or c_meta.get("element_types", [])
                 resolved.append(
                     {
                         "chunk_id": p.id,
@@ -247,6 +251,8 @@ class RetrievalEngine:
                         "content": p.content,
                         "section_path": sec,
                         "page_number": page,
+                        "node_ids": node_ids,
+                        "element_types": elem_types,
                         "summary_text": c.get("summary_text") or p.summary_text,
                         "document_title": c.get("document_title", ""),
                         "source_uri": c.get("source_uri"),
@@ -258,6 +264,7 @@ class RetrievalEngine:
                 if c["id"] in seen_parent_ids:
                     continue
                 seen_parent_ids.add(c["id"])
+                c_meta = c.get("metadata") or {}
                 resolved.append(
                     {
                         "chunk_id": c["id"],
@@ -265,6 +272,8 @@ class RetrievalEngine:
                         "content": c["content"],
                         "section_path": c.get("section_path"),
                         "page_number": c.get("page_number"),
+                        "node_ids": c_meta.get("node_ids", []),
+                        "element_types": c_meta.get("element_types", []),
                         "summary_text": c.get("summary_text"),
                         "document_title": c.get("document_title", ""),
                         "source_uri": c.get("source_uri"),
@@ -292,6 +301,88 @@ class RetrievalEngine:
                         cur["section_path"] = f"Pages {min(p1, p2)}–{max(p1, p2)}"
 
         return resolved
+
+    async def expand_chunk_context(
+        self,
+        chunk_id: str,
+        *,
+        include_ancestors: bool = True,
+        include_table_structure: bool = True,
+        include_figure_enrichment: bool = True,
+    ) -> dict[str, Any]:
+        """
+        Retrieval context expansion:
+        Resolves the parse tree nodes associated with a chunk, expanding context to:
+        - The underlying parse tree elements (DocumentNode)
+        - Surrounding sections and parent structural nodes (headings, chapters)
+        - Complete table data (cell grid, row/column counts, markdown, captions)
+        - Figure and chart metadata (captions, multimodal descriptions, chart fields)
+        """
+        storage = await get_storage()
+        chunk = await storage.get_chunk(chunk_id)
+        if not chunk:
+            return {"error": f"Chunk '{chunk_id}' not found"}
+
+        node_ids = chunk.node_ids or chunk.metadata.get("node_ids", [])
+        nodes = []
+        for nid in node_ids:
+            n = await storage.get_tree_node(nid)
+            if n:
+                nodes.append(n)
+
+        # If chunk didn't directly have node_ids, or it's a child chunk, check parent chunk
+        if not nodes and chunk.parent_chunk_id:
+            parent = await storage.get_chunk(chunk.parent_chunk_id)
+            if parent:
+                p_nids = parent.node_ids or parent.metadata.get("node_ids", [])
+                for nid in p_nids:
+                    n = await storage.get_tree_node(nid)
+                    if n:
+                        nodes.append(n)
+
+        # If still no nodes by ID, try retrieving document tree nodes for this document and matching by page or section
+        if not nodes and chunk.document_id:
+            all_doc_nodes = await storage.get_tree_nodes(chunk.document_id)
+            if all_doc_nodes:
+                if chunk.page_number is not None:
+                    nodes = [
+                        n for n in all_doc_nodes if n.provenance.page_number == chunk.page_number
+                    ]
+                elif chunk.section_path:
+                    nodes = [n for n in all_doc_nodes if n.section_path == chunk.section_path]
+
+        tables = []
+        figures = []
+        ancestors = []
+        seen_ancestor_ids = set()
+
+        for n in nodes:
+            if include_table_structure and n.table_data:
+                tables.append(n.table_data.to_dict())
+            if include_figure_enrichment and n.figure_data:
+                figures.append(n.figure_data.to_dict())
+            if include_ancestors and n.parent_id:
+                p_node = await storage.get_tree_node(n.parent_id)
+                while p_node and p_node.id not in seen_ancestor_ids:
+                    seen_ancestor_ids.add(p_node.id)
+                    ancestors.append(p_node.to_dict())
+                    p_node = (
+                        await storage.get_tree_node(p_node.parent_id) if p_node.parent_id else None
+                    )
+
+        return {
+            "chunk_id": chunk.id,
+            "document_id": chunk.document_id,
+            "content": chunk.content,
+            "section_path": chunk.section_path,
+            "page_number": chunk.page_number,
+            "node_ids": [n.id for n in nodes],
+            "nodes": [n.to_dict() for n in nodes],
+            "tables": tables,
+            "figures": figures,
+            "ancestors": ancestors,
+            "element_types": list({n.node_type.value for n in nodes}),
+        }
 
     def _check_evidence_sufficiency(
         self, parents: list[dict[str, Any]], shape: QueryShape

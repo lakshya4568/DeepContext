@@ -16,9 +16,14 @@ from deep_context.core.types import (
     Chunk,
     ChunkLevel,
     Document,
+    DocumentElementType,
+    DocumentNode,
     ExistingMemory,
+    FigureDataModel,
+    Provenance,
     RetrievalFilters,
     RetrievalMode,
+    TableDataModel,
 )
 from deep_context.storage.base import StorageInterface
 
@@ -153,6 +158,27 @@ class SQLiteStore(StorageInterface):
                 last_run_at TEXT
             );
             CREATE INDEX IF NOT EXISTS idx_events_trace_session ON events_trace (session_id);
+
+            CREATE TABLE IF NOT EXISTS document_tree_nodes (
+                id TEXT PRIMARY KEY,
+                document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+                parent_node_id TEXT REFERENCES document_tree_nodes(id) ON DELETE CASCADE,
+                node_type TEXT NOT NULL,
+                reading_order INTEGER NOT NULL DEFAULT 0,
+                title TEXT,
+                text TEXT,
+                raw_text TEXT,
+                section_path TEXT,
+                page_number INTEGER,
+                page_end INTEGER,
+                bbox TEXT,
+                table_data TEXT,
+                figure_data TEXT,
+                metadata TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_tree_nodes_document ON document_tree_nodes (document_id);
+            CREATE INDEX IF NOT EXISTS idx_tree_nodes_parent ON document_tree_nodes (parent_node_id);
             """)
 
         # Dynamic schema auto-migration for existing SQLite databases
@@ -174,6 +200,10 @@ class SQLiteStore(StorageInterface):
                 await self._conn.execute("ALTER TABLE chunks ADD COLUMN summary_model TEXT;")
             if "generated_at" not in chunk_cols:
                 await self._conn.execute("ALTER TABLE chunks ADD COLUMN generated_at TEXT;")
+            if "metadata" not in chunk_cols:
+                await self._conn.execute(
+                    "ALTER TABLE chunks ADD COLUMN metadata TEXT NOT NULL DEFAULT '{}';"
+                )
 
         async with self._conn.execute("PRAGMA table_info(documents)") as cursor:
             doc_cols = {row[1] for row in await cursor.fetchall()}
@@ -394,6 +424,7 @@ class SQLiteStore(StorageInterface):
 
     async def delete_document(self, document_id: str) -> bool:
         conn = self._get_conn()
+        await conn.execute("DELETE FROM document_tree_nodes WHERE document_id = ?", (document_id,))
         await conn.execute("DELETE FROM chunks_fts WHERE document_id = ?", (document_id,))
         await conn.execute(
             "DELETE FROM chunks WHERE document_id = ? AND level = 'child'",
@@ -406,6 +437,7 @@ class SQLiteStore(StorageInterface):
 
     async def delete_all_documents(self) -> bool:
         conn = self._get_conn()
+        await conn.execute("DELETE FROM document_tree_nodes")
         await conn.execute("DELETE FROM chunks_fts")
         await conn.execute("DELETE FROM chunks WHERE level = 'child'")
         await conn.execute("DELETE FROM chunks")
@@ -506,6 +538,7 @@ class SQLiteStore(StorageInterface):
                     c.summary_tokens,
                     c.summary_model,
                     c.generated_at.isoformat() if c.generated_at else None,
+                    json.dumps(c.metadata) if c.metadata else "{}",
                     c.created_at.isoformat(),
                 )
             )
@@ -527,8 +560,8 @@ class SQLiteStore(StorageInterface):
                 id, document_id, parent_chunk_id, level, content,
                 token_count, section_path, page_number, embedding,
                 summary_text, summary_tokens, summary_model, generated_at,
-                created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                metadata, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             chunk_params,
         )
@@ -621,6 +654,9 @@ class SQLiteStore(StorageInterface):
                     if "generated_at" in row.keys() and row["generated_at"]
                     else None
                 ),
+                metadata=json.loads(row["metadata"])
+                if ("metadata" in row.keys() and row["metadata"])
+                else {},
                 created_at=datetime.fromisoformat(row["created_at"]),
             )
 
@@ -652,10 +688,110 @@ class SQLiteStore(StorageInterface):
                         if "generated_at" in r.keys() and r["generated_at"]
                         else None
                     ),
+                    metadata=json.loads(r["metadata"])
+                    if ("metadata" in r.keys() and r["metadata"])
+                    else {},
                     created_at=datetime.fromisoformat(r["created_at"]),
                 )
                 for r in rows
             ]
+
+    # -----------------------------------------------------------------------
+    # Document Parse Tree Nodes
+    # -----------------------------------------------------------------------
+
+    def _row_to_tree_node(self, r: Any) -> DocumentNode:
+        bbox_data = json.loads(r["bbox"]) if r["bbox"] else None
+        bbox_tuple = tuple(bbox_data) if bbox_data else None
+        prov = Provenance(
+            page_number=r["page_number"],
+            page_end=r["page_end"] if "page_end" in r.keys() else None,
+            bbox=bbox_tuple,
+        )
+        t_data = TableDataModel.from_dict(json.loads(r["table_data"])) if r["table_data"] else None
+        f_data = (
+            FigureDataModel.from_dict(json.loads(r["figure_data"])) if r["figure_data"] else None
+        )
+        meta = json.loads(r["metadata"]) if ("metadata" in r.keys() and r["metadata"]) else {}
+
+        return DocumentNode(
+            id=r["id"],
+            document_id=r["document_id"],
+            parent_id=r["parent_node_id"],
+            node_type=DocumentElementType(r["node_type"]),
+            reading_order=r["reading_order"],
+            text=r["text"] or "",
+            raw_text=r["raw_text"] if "raw_text" in r.keys() else None,
+            section_path=r["section_path"],
+            provenance=prov,
+            table_data=t_data,
+            figure_data=f_data,
+            metadata=meta,
+        )
+
+    async def insert_tree_nodes(self, nodes: list[DocumentNode]) -> list[str]:
+        if not nodes:
+            return []
+        conn = self._get_conn()
+        now = datetime.now(timezone.utc).isoformat()
+        params = []
+        for n in nodes:
+            bbox_str = json.dumps(n.provenance.bbox) if n.provenance.bbox else None
+            t_data_str = json.dumps(n.table_data.to_dict()) if n.table_data else None
+            f_data_str = json.dumps(n.figure_data.to_dict()) if n.figure_data else None
+            meta_str = json.dumps(n.metadata) if n.metadata else "{}"
+            node_type_str = n.node_type.value if hasattr(n.node_type, "value") else str(n.node_type)
+            params.append(
+                (
+                    n.id,
+                    n.document_id,
+                    n.parent_id,
+                    node_type_str,
+                    n.reading_order,
+                    n.text[:100] if n.text else "",
+                    n.text,
+                    n.raw_text,
+                    n.section_path,
+                    n.provenance.page_number,
+                    n.provenance.page_end,
+                    bbox_str,
+                    t_data_str,
+                    f_data_str,
+                    meta_str,
+                    now,
+                )
+            )
+
+        await conn.executemany(
+            """
+            INSERT OR REPLACE INTO document_tree_nodes (
+                id, document_id, parent_node_id, node_type, reading_order,
+                title, text, raw_text, section_path, page_number, page_end,
+                bbox, table_data, figure_data, metadata, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            params,
+        )
+        await conn.commit()
+        return [n.id for n in nodes]
+
+    async def get_tree_nodes(self, document_id: str) -> list[DocumentNode]:
+        conn = self._get_conn()
+        async with conn.execute(
+            "SELECT * FROM document_tree_nodes WHERE document_id = ? ORDER BY reading_order ASC",
+            (document_id,),
+        ) as cursor:
+            rows = await cursor.fetchall()
+            return [self._row_to_tree_node(r) for r in rows]
+
+    async def get_tree_node(self, node_id: str) -> DocumentNode | None:
+        conn = self._get_conn()
+        async with conn.execute(
+            "SELECT * FROM document_tree_nodes WHERE id = ?",
+            (node_id,),
+        ) as cursor:
+            row = await cursor.fetchone()
+            return self._row_to_tree_node(row) if row else None
 
     async def search_bm25(
         self,

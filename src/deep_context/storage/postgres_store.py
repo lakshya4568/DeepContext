@@ -16,9 +16,14 @@ from deep_context.core.types import (
     Chunk,
     ChunkLevel,
     Document,
+    DocumentElementType,
+    DocumentNode,
     ExistingMemory,
+    FigureDataModel,
+    Provenance,
     RetrievalFilters,
     RetrievalMode,
+    TableDataModel,
 )
 from deep_context.storage.base import StorageInterface
 
@@ -133,7 +138,29 @@ class PostgresStore(StorageInterface):
                 ALTER TABLE chunks ADD COLUMN IF NOT EXISTS summary_model TEXT DEFAULT 'qwen3-0.6b';
                 ALTER TABLE chunks ADD COLUMN IF NOT EXISTS generated_at TIMESTAMPTZ;
                 ALTER TABLE chunks ADD COLUMN IF NOT EXISTS summary_tsv TSVECTOR;
+                ALTER TABLE chunks ADD COLUMN IF NOT EXISTS metadata JSONB NOT NULL DEFAULT '{}';
                 ALTER TABLE chunks ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now();
+
+                CREATE TABLE IF NOT EXISTS document_tree_nodes (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+                    parent_node_id UUID REFERENCES document_tree_nodes(id) ON DELETE CASCADE,
+                    node_type TEXT NOT NULL,
+                    reading_order INTEGER NOT NULL DEFAULT 0,
+                    title TEXT,
+                    text TEXT,
+                    raw_text TEXT,
+                    section_path TEXT,
+                    page_number INTEGER,
+                    page_end INTEGER,
+                    bbox JSONB,
+                    table_data JSONB,
+                    figure_data JSONB,
+                    metadata JSONB NOT NULL DEFAULT '{}',
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                );
+                CREATE INDEX IF NOT EXISTS idx_tree_nodes_document ON document_tree_nodes (document_id);
+                CREATE INDEX IF NOT EXISTS idx_tree_nodes_parent ON document_tree_nodes (parent_node_id);
 
                 CREATE OR REPLACE FUNCTION update_chunks_tsv() RETURNS trigger AS $$
                 BEGIN
@@ -362,8 +389,8 @@ class PostgresStore(StorageInterface):
                         id, document_id, parent_chunk_id, level, content,
                         token_count, section_path, page_number, embedding,
                         summary_text, summary_tokens, summary_model, generated_at,
-                        created_at
-                    ) VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                        metadata, created_at
+                    ) VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb, $15)
                     ON CONFLICT (id) DO UPDATE SET
                         content = EXCLUDED.content,
                         token_count = EXCLUDED.token_count,
@@ -373,7 +400,8 @@ class PostgresStore(StorageInterface):
                         summary_text = EXCLUDED.summary_text,
                         summary_tokens = EXCLUDED.summary_tokens,
                         summary_model = EXCLUDED.summary_model,
-                        generated_at = EXCLUDED.generated_at;
+                        generated_at = EXCLUDED.generated_at,
+                        metadata = EXCLUDED.metadata;
                     """
 
                     def _to_rec(c: Chunk) -> tuple:
@@ -383,6 +411,7 @@ class PostgresStore(StorageInterface):
                             if c.embedding is not None
                             else None
                         )
+                        meta_val = json.dumps(_clean_pg_json(c.metadata)) if c.metadata else "{}"
                         return (
                             c.id,
                             c.document_id,
@@ -397,6 +426,7 @@ class PostgresStore(StorageInterface):
                             c.summary_tokens,
                             _clean_pg_str(c.summary_model),
                             c.generated_at,
+                            meta_val,
                             c.created_at,
                         )
 
@@ -671,8 +701,8 @@ class PostgresStore(StorageInterface):
                     id, document_id, parent_chunk_id, level, content,
                     token_count, section_path, page_number, embedding,
                     summary_text, summary_tokens, summary_model, generated_at,
-                    created_at
-                ) VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                    metadata, created_at
+                ) VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb, $15)
                 ON CONFLICT (id) DO UPDATE SET
                     content = EXCLUDED.content,
                     token_count = EXCLUDED.token_count,
@@ -682,7 +712,8 @@ class PostgresStore(StorageInterface):
                     summary_text = EXCLUDED.summary_text,
                     summary_tokens = EXCLUDED.summary_tokens,
                     summary_model = EXCLUDED.summary_model,
-                    generated_at = EXCLUDED.generated_at;
+                    generated_at = EXCLUDED.generated_at,
+                    metadata = EXCLUDED.metadata;
                 """
 
                 def _to_record(c: Chunk) -> tuple:
@@ -690,6 +721,7 @@ class PostgresStore(StorageInterface):
                     emb_val = (
                         np.array(c.embedding, dtype=np.float32) if c.embedding is not None else None
                     )
+                    meta_val = json.dumps(_clean_pg_json(c.metadata)) if c.metadata else "{}"
                     return (
                         c.id,
                         c.document_id,
@@ -704,6 +736,7 @@ class PostgresStore(StorageInterface):
                         c.summary_tokens,
                         _clean_pg_str(c.summary_model),
                         c.generated_at,
+                        meta_val,
                         c.created_at,
                     )
 
@@ -800,6 +833,11 @@ class PostgresStore(StorageInterface):
                 summary_tokens=row.get("summary_tokens"),
                 summary_model=row.get("summary_model"),
                 generated_at=row.get("generated_at"),
+                metadata=(
+                    json.loads(row["metadata"])
+                    if isinstance(row.get("metadata"), str)
+                    else row.get("metadata") or {}
+                ),
                 created_at=row["created_at"],
             )
 
@@ -824,10 +862,141 @@ class PostgresStore(StorageInterface):
                     summary_tokens=r.get("summary_tokens"),
                     summary_model=r.get("summary_model"),
                     generated_at=r.get("generated_at"),
+                    metadata=(
+                        json.loads(r["metadata"])
+                        if isinstance(r.get("metadata"), str)
+                        else r.get("metadata") or {}
+                    ),
                     created_at=r["created_at"],
                 )
                 for r in rows
             ]
+
+    # -----------------------------------------------------------------------
+    # Document Parse Tree Nodes
+    # -----------------------------------------------------------------------
+
+    def _row_to_tree_node(self, r: Any) -> DocumentNode:
+        bbox_data = json.loads(r["bbox"]) if isinstance(r["bbox"], str) else r["bbox"]
+        bbox_tuple = tuple(bbox_data) if bbox_data else None
+        prov = Provenance(
+            page_number=r["page_number"],
+            page_end=r.get("page_end"),
+            bbox=bbox_tuple,
+        )
+        t_raw = json.loads(r["table_data"]) if isinstance(r["table_data"], str) else r["table_data"]
+        t_data = TableDataModel.from_dict(t_raw) if t_raw else None
+
+        f_raw = (
+            json.loads(r["figure_data"]) if isinstance(r["figure_data"], str) else r["figure_data"]
+        )
+        f_data = FigureDataModel.from_dict(f_raw) if f_raw else None
+
+        meta = (
+            json.loads(r["metadata"])
+            if isinstance(r.get("metadata"), str)
+            else (r.get("metadata") or {})
+        )
+
+        return DocumentNode(
+            id=str(r["id"]),
+            document_id=str(r["document_id"]),
+            parent_id=str(r["parent_node_id"]) if r["parent_node_id"] else None,
+            node_type=DocumentElementType(r["node_type"]),
+            reading_order=r["reading_order"],
+            text=r["text"] or "",
+            raw_text=r.get("raw_text"),
+            section_path=r.get("section_path"),
+            provenance=prov,
+            table_data=t_data,
+            figure_data=f_data,
+            metadata=meta,
+        )
+
+    async def insert_tree_nodes(self, nodes: list[DocumentNode]) -> list[str]:
+        if not nodes:
+            return []
+        pool = self._get_pool()
+        insert_sql = """
+        INSERT INTO document_tree_nodes (
+            id, document_id, parent_node_id, node_type, reading_order,
+            title, text, raw_text, section_path, page_number, page_end,
+            bbox, table_data, figure_data, metadata, created_at
+        ) VALUES (
+            $1::uuid, $2::uuid, $3::uuid, $4, $5,
+            $6, $7, $8, $9, $10, $11,
+            $12::jsonb, $13::jsonb, $14::jsonb, $15::jsonb, $16
+        )
+        ON CONFLICT (id) DO UPDATE SET
+            parent_node_id = EXCLUDED.parent_node_id,
+            node_type = EXCLUDED.node_type,
+            reading_order = EXCLUDED.reading_order,
+            title = EXCLUDED.title,
+            text = EXCLUDED.text,
+            raw_text = EXCLUDED.raw_text,
+            section_path = EXCLUDED.section_path,
+            page_number = EXCLUDED.page_number,
+            page_end = EXCLUDED.page_end,
+            bbox = EXCLUDED.bbox,
+            table_data = EXCLUDED.table_data,
+            figure_data = EXCLUDED.figure_data,
+            metadata = EXCLUDED.metadata;
+        """
+
+        now = datetime.now()
+
+        def _to_node_rec(n: DocumentNode) -> tuple:
+            bbox_json = json.dumps(n.provenance.bbox) if n.provenance.bbox else None
+            t_data_json = (
+                json.dumps(_clean_pg_json(n.table_data.to_dict())) if n.table_data else None
+            )
+            f_data_json = (
+                json.dumps(_clean_pg_json(n.figure_data.to_dict())) if n.figure_data else None
+            )
+            meta_json = json.dumps(_clean_pg_json(n.metadata)) if n.metadata else "{}"
+            node_type_str = n.node_type.value if hasattr(n.node_type, "value") else str(n.node_type)
+            title = n.text[:100] if n.text else ""
+            return (
+                n.id,
+                n.document_id,
+                n.parent_id,
+                node_type_str,
+                n.reading_order,
+                _clean_pg_str(title),
+                _clean_pg_str(n.text) or "",
+                _clean_pg_str(n.raw_text),
+                _clean_pg_str(n.section_path),
+                n.provenance.page_number,
+                n.provenance.page_end,
+                bbox_json,
+                t_data_json,
+                f_data_json,
+                meta_json,
+                now,
+            )
+
+        async with pool.acquire() as conn:
+            records = [_to_node_rec(n) for n in nodes]
+            await conn.executemany(insert_sql, records)
+        return [n.id for n in nodes]
+
+    async def get_tree_nodes(self, document_id: str) -> list[DocumentNode]:
+        pool = self._get_pool()
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT * FROM document_tree_nodes WHERE document_id = $1::uuid ORDER BY reading_order ASC",
+                document_id,
+            )
+            return [self._row_to_tree_node(r) for r in rows]
+
+    async def get_tree_node(self, node_id: str) -> DocumentNode | None:
+        pool = self._get_pool()
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT * FROM document_tree_nodes WHERE id = $1::uuid",
+                node_id,
+            )
+            return self._row_to_tree_node(row) if row else None
 
     async def search_bm25(
         self,

@@ -9,6 +9,7 @@ from typing import Any
 from deep_context.core.types import (
     Chunk,
     Document,
+    DocumentNode,
     ExistingMemory,
     RetrievalFilters,
 )
@@ -137,6 +138,22 @@ class StorageInterface(ABC):
     ) -> list[dict[str, Any]]:
         """Cosine similarity vector search against child chunks."""
         pass
+
+    # -----------------------------------------------------------------------
+    # Document Parse Tree Nodes
+    # -----------------------------------------------------------------------
+
+    async def insert_tree_nodes(self, nodes: list[DocumentNode]) -> list[str]:
+        """Insert parse tree nodes for a document."""
+        return []
+
+    async def get_tree_nodes(self, document_id: str) -> list[DocumentNode]:
+        """Fetch all parse tree nodes for a document in reading order."""
+        return []
+
+    async def get_tree_node(self, node_id: str) -> DocumentNode | None:
+        """Fetch a specific parse tree node by ID."""
+        return None
 
     # -----------------------------------------------------------------------
     # Typed Memory (Policy, Preference, Fact, Episode)

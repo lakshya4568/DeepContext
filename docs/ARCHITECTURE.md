@@ -137,6 +137,59 @@ When a user query retrieves multiple disparate chunks (e.g. Chunk #3 in Section 
    - **Pass 2 (Grounded Synthesis)**: The LLM drafts a coherent answer synthesizing facts across all retrieved sections.
    - **Pass 3 (Grounding Verification)**: The Evidence Verifier verifies each claim against the citations and generates traceable citation markers.
 
+---
+
+## 2.2 Docling Structured Parsing, DocumentTree & Multimodal Provenance
+
+Deep Context integrates **IBM Docling** as the primary parser for structured and unstructured mixed-content documents (PDF, DOCX, PPTX, HTML):
+
+```text
+       RAW MIXED-CONTENT INPUT (PDF, Tables, Figures, Scans)
+                                 │
+                                 ▼
+                    [IBM Docling Document Converter]
+            (Extracts reading order, hierarchy, table cells,
+             bounding boxes, figure bounding boxes, captions)
+                                 │
+                 ┌───────────────┴───────────────┐
+                 ▼                               ▼
+       [STRUCTURED PARSE TREE]         [CANONICAL TEXT LAYER]
+    (DocumentTree / DocumentNode)      (Deterministic TextCleaner:
+     - Stable UUIDs                     - broken line joins & dehyphenation
+     - Element types (H, P, TBL, FIG)   - Unicode control character scrubbing
+     - TableDataModel (cells, headers)  - Cross-page header/footer suppression)
+     - FigureDataModel (captions)
+                 │                               │
+                 └───────────────┬───────────────┘
+                                 │
+                                 ▼
+                  [OPTIONAL MULTIMODAL ENRICHMENT]
+              (Extracts chart values & figure descriptions;
+               error-isolated so ingestion never fails on quota)
+                                 │
+                                 ▼
+                 [STRUCTURE-AWARE TREE CHUNKER]
+          - Respects natural element boundaries
+          - Preserves tables with headers & captions intact
+          - Splits oversized tables across rows repeating headers
+          - Splits oversized paragraphs at sentence boundaries
+          - Emits node_ids & element_types metadata on every chunk
+                                 │
+                 ┌───────────────┴───────────────┐
+                 ▼                               ▼
+      [document_tree_nodes TABLE]        [chunks TABLE]
+      (Full parse tree persisted)       (Searchable child chunks +
+                                         rich parent context chunks)
+```
+
+### Retrieval Context Expansion
+When retrieval returns a matching child or parent chunk, callers can invoke `retrieval_engine.expand_chunk_context(chunk_id)` to walk the parse tree via `node_ids`:
+1. **Parent Hierarchy**: Expands to the enclosing section, heading, and document ancestors.
+2. **Table Reconstruction**: Yields full row/column data grids, header alignments, cell coordinates, and markdown.
+3. **Figure Association**: Exposes underlying captions, OCR text, and multimodal visual descriptions.
+
+---
+
 ```text
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ Presentation                                                              │

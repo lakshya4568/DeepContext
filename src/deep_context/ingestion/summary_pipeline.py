@@ -55,11 +55,26 @@ class SummaryIngestionPipeline:
         storage = self.storage or await get_storage()
         doc_id = str(uuid.uuid4())
 
-        # 1. Parse document into structure-aware sections
-        sections = self.parser.parse(request.content, doc_type=request.doc_type)
+        # 1. Parse document into structure-aware parse tree
+        tree = self.parser.parse_tree(
+            request.content,
+            doc_type=request.doc_type,
+            source_uri=request.source_uri,
+            title=request.title,
+        )
+        tree.document_id = doc_id
+        for n in tree.nodes:
+            n.document_id = doc_id
 
-        # 2. Parent-child hierarchical chunking
-        parent_chunks, child_chunks = self.chunker.chunk_sections(doc_id, sections)
+        # Multimodal enrichment for figures and charts if requested
+        if getattr(request, "enrich_multimodal", False):
+            from deep_context.multimodal.enricher import MultimodalEnricher
+
+            enricher = MultimodalEnricher()
+            await enricher.enrich_tree(tree)
+
+        # 2. Parent-child structure-aware hierarchical chunking
+        parent_chunks, child_chunks = self.chunker.chunk_tree(tree)
 
         # 3. Create and persist document & parent/child chunks immediately (Checkpoint 1)
         emb_model = request.embedding_model or settings.embedding_model
@@ -91,6 +106,8 @@ class SummaryIngestionPipeline:
         )
 
         await storage.insert_document_and_chunks(doc, parent_chunks + child_chunks)
+        if tree.nodes:
+            await storage.insert_tree_nodes(tree.nodes)
 
         # 4. Generate Qwen3 contextual summaries for child chunks if enabled
         summaries_count = 0
@@ -169,6 +186,7 @@ class SummaryIngestionPipeline:
                 "title": request.title,
                 "parent_chunks": len(parent_chunks),
                 "child_chunks": len(child_chunks),
+                "tree_nodes": len(tree.nodes),
                 "summaries_generated": summaries_count,
                 "retrieval_mode": request.retrieval_mode.value,
                 "embedding_model": emb_model,
@@ -186,6 +204,7 @@ class SummaryIngestionPipeline:
             summaries_generated_count=summaries_count,
             embedding_model=emb_model,
             embedding_dim=emb_dim,
+            tree_nodes_count=len(tree.nodes),
         )
 
     async def ingest_batch(
@@ -255,15 +274,24 @@ class SummaryIngestionPipeline:
         doc_id = str(uuid.uuid4())
 
         # 1. Parse
-        sections = self.parser.parse(request.content, doc_type=request.doc_type)
+        tree = self.parser.parse_tree(
+            request.content,
+            doc_type=request.doc_type,
+            source_uri=request.source_uri,
+            title=request.title,
+        )
+        tree.document_id = doc_id
+        for n in tree.nodes:
+            n.document_id = doc_id
+
         yield {
             "stage": "chunking",
             "percent": 10,
-            "message": f"Extracted {len(sections)} sections. Creating parent & child chunks...",
+            "message": f"Extracted {len(tree.nodes)} structural nodes. Creating parent & child chunks...",
         }
 
         # 2. Chunk
-        parent_chunks, child_chunks = self.chunker.chunk_sections(doc_id, sections)
+        parent_chunks, child_chunks = self.chunker.chunk_tree(tree)
         yield {
             "stage": "chunked",
             "percent": 15,
@@ -307,6 +335,8 @@ class SummaryIngestionPipeline:
         )
 
         await storage.insert_document_and_chunks(doc, parent_chunks + child_chunks)
+        if tree.nodes:
+            await storage.insert_tree_nodes(tree.nodes)
 
         # 4. Summarize child chunks in contextual vectorized batches
         summaries_count = 0
@@ -464,6 +494,7 @@ class SummaryIngestionPipeline:
             "title": request.title,
             "parent_chunks_count": len(parent_chunks),
             "child_chunks_count": len(child_chunks),
+            "tree_nodes_count": len(tree.nodes),
             "summaries_generated_count": summaries_count,
             "embeddings_generated_count": embeddings_count,
             "embedding_model": emb_model,
