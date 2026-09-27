@@ -313,6 +313,7 @@ async def upload_stream(
     embedding_model: str = Form(""),
     embedding_dim: int = Form(0),
     generate_summaries: bool | None = Form(None),
+    enrich_multimodal: bool = Form(True),
 ) -> StreamingResponse:
     """Stream live real-time ingestion progress and Qwen3 summaries (SSE events)."""
     filename = file.filename or "uploaded_doc"
@@ -359,6 +360,7 @@ async def upload_stream(
                 embedding_model=target_model,
                 embedding_dim=target_dim,
                 generate_summaries=generate_summaries,
+                enrich_multimodal=enrich_multimodal,
                 metadata={"filename": filename, "file_size": len(file_bytes)},
             )
 
@@ -392,6 +394,7 @@ async def upload_batch_files(
     embedding_model: str = Form(""),
     embedding_dim: int = Form(0),
     generate_summaries: bool | None = Form(None),
+    enrich_multimodal: bool = Form(True),
 ) -> list[IngestResponse]:
     """Upload and ingest multiple files at once (PDFs, TXT, MD, Code)."""
     results: list[IngestResponse] = []
@@ -432,6 +435,7 @@ async def upload_batch_files(
                     embedding_model=target_model,
                     embedding_dim=target_dim,
                     generate_summaries=generate_summaries,
+                    enrich_multimodal=enrich_multimodal,
                     metadata={"filename": filename, "file_size": len(file_bytes)},
                 )
                 res = await ingestion_pipeline.ingest(req)
@@ -450,6 +454,7 @@ async def upload_batch_files(
                 embedding_model=target_model,
                 embedding_dim=target_dim,
                 generate_summaries=generate_summaries,
+                enrich_multimodal=enrich_multimodal,
                 metadata={"filename": filename, "file_size": len(file_bytes)},
             )
             res = await ingestion_pipeline.ingest(req)

@@ -16,6 +16,11 @@
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
 
+    <!-- KaTeX for LaTeX Math Rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
     <style>
       :root {
         /* Clean Light & White Palette */
@@ -975,6 +980,86 @@
       .hidden {
         display: none !important;
       }
+
+      /* Modern Dialog and Image Viewer Modal */
+      dialog.modal-dialog {
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        background: var(--bg-card);
+        color: var(--text);
+        padding: 0;
+        max-width: 90vw;
+        max-height: 88vh;
+        width: 840px;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      }
+      dialog.modal-dialog::backdrop {
+        background: rgba(15, 23, 42, 0.65);
+        backdrop-filter: blur(4px);
+      }
+      .modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg-surface);
+      }
+      .modal-body {
+        padding: 20px;
+        overflow-y: auto;
+        max-height: calc(88vh - 72px);
+      }
+      .asset-gallery-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 16px;
+      }
+      .asset-card {
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        background: var(--bg-surface);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+      }
+      .asset-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
+      }
+      .asset-card img {
+        width: 100%;
+        height: 150px;
+        object-fit: contain;
+        background: var(--bg-subtle);
+        cursor: pointer;
+        padding: 4px;
+      }
+      .asset-card-info {
+        padding: 10px 12px;
+        font-size: 11px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        border-top: 1px solid var(--border-subtle);
+      }
+      .citation-asset-preview {
+        margin-top: 8px;
+        border-radius: 6px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        background: var(--bg-subtle);
+      }
+      .citation-asset-preview img {
+        max-height: 160px;
+        width: 100%;
+        object-fit: contain;
+        cursor: pointer;
+        display: block;
+        padding: 4px;
+        background: #ffffff;
+      }
     </style>
   </head>
   <body>
@@ -1169,6 +1254,29 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
                   "
                   >Multi-Hop Analysis</span
                 >
+              </div>
+
+              <!-- Visual Query Attachment -->
+              <div id="query-image-attachment-wrap" style="margin-top: 10px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                  <span style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 5px;">
+                    <i data-lucide="image" style="width: 12px; height: 12px; color: var(--purple);"></i> Visual / Image Search (Optional)
+                  </span>
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('query-image-file').click()" style="padding: 3px 8px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;">
+                    <i data-lucide="paperclip" style="width: 11px; height: 11px;"></i> Attach Query Image
+                  </button>
+                </div>
+                <input type="file" id="query-image-file" accept="image/*" style="display: none;" onchange="handleQueryImageSelected(event)" />
+                <div id="query-image-preview-bar" style="display: none; align-items: center; gap: 10px; background: var(--purple-bg); border: 1px solid var(--purple-border); border-radius: var(--radius-md); padding: 8px 12px;">
+                  <img id="query-image-thumb" src="" alt="Query Image Preview" style="width: 44px; height: 44px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border);" />
+                  <div style="flex: 1; min-width: 0;">
+                    <div id="query-image-name" style="font-size: 12px; font-weight: 700; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">image.png</div>
+                    <div id="query-image-size" style="font-size: 11px; color: var(--purple); font-weight: 600;">Cross-Modal Visual Query Ready</div>
+                  </div>
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="clearQueryImage()" style="color: var(--rose); padding: 4px 8px;" title="Remove image">
+                    <i data-lucide="x" style="width: 12px; height: 12px;"></i>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1573,6 +1681,20 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
                   </div>
                 </label>
               </div>
+            </div>
+
+            <!-- Multimodal & Visual Asset Toggle -->
+            <div style="margin-top: 12px; margin-bottom: 12px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 10px 14px; display: flex; align-items: center; justify-content: space-between;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="background: var(--purple-bg); color: var(--purple); padding: 6px; border-radius: 6px;">
+                  <i data-lucide="camera" style="width: 16px; height: 16px;"></i>
+                </div>
+                <div>
+                  <div style="font-weight: 700; font-size: 12px; color: var(--text);">Multimodal & Visual Asset Extraction</div>
+                  <div style="font-size: 11px; color: var(--text-muted);">Extracts figures, diagrams, and charts via Docling with durable 768d vector indexing</div>
+                </div>
+              </div>
+              <input type="checkbox" id="upload-multimodal-checkbox" checked style="accent-color: var(--purple); width: 18px; height: 18px; cursor: pointer;" />
             </div>
 
             <div style="display: flex; gap: 10px; margin-top: 10px">
@@ -2606,6 +2728,7 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
               embedding_model: embModel || null,
               embedding_dim: embDim || null,
               reranker: reranker || null,
+              query_image: attachedQueryImageBase64 || null,
             }),
             signal: queryAbortController.signal,
           });
@@ -2647,10 +2770,20 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
                     citations.forEach((c, i) => {
                       const card = document.createElement("div");
                       card.className = "citation-card";
+                      let assetHtml = "";
+                      if (c.asset_id) {
+                        assetHtml = `
+                          <div class="citation-asset-preview">
+                            <img src="/v1/assets/${c.asset_id}" alt="${c.caption || 'Extracted Figure'}" onclick="openImageModal('/v1/assets/${c.asset_id}', '${(c.caption || 'Figure from ' + (c.title || 'document')).replace(/'/g, "\\'")}')" title="Click to enlarge" />
+                            ${c.caption ? `<div style="font-size: 11px; color: var(--text-muted); padding: 4px 8px; border-top: 1px solid var(--border-subtle);">${c.caption}</div>` : ''}
+                          </div>
+                        `;
+                      }
                       card.innerHTML = `
                       <div class="citation-title"><i data-lucide="file-text" style="width: 14px; height: 14px;"></i> [${i + 1}] ${c.title || "Document"}</div>
                       <div class="citation-badge">Section: ${c.section_path || "Main"} ${c.page_number ? " | Page " + c.page_number : ""}</div>
                       <div class="citation-snippet">${c.source_uri || c.chunk_id || "Retrieved Context"}</div>
+                      ${assetHtml}
                     `;
                       citBox.appendChild(card);
                     });
@@ -2659,6 +2792,15 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
                       '<div style="color: var(--text-dim); font-size: 13px;">No citations active.</div>';
                   }
                   refreshIcons();
+                } else if (event.type === "assets") {
+                  const assets = event.assets || [];
+                  if (assets.length > 0) {
+                    const assetSection = document.createElement("div");
+                    assetSection.style.cssText = "margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--border);";
+                    assetSection.innerHTML = `<div style="font-size: 11px; font-weight: 800; color: var(--purple); margin-bottom: 8px; display: flex; align-items: center; gap: 5px;"><i data-lucide='image' style='width: 13px; height: 13px;'></i> Retrieved Visual Assets (${assets.length})</div><div style='display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px;'>${assets.map(a => `<div class='citation-asset-preview' style='margin: 0;'><img src='/v1/assets/${a.id || a}' alt='Visual Evidence' onclick="openImageModal('/v1/assets/${a.id || a}', 'Retrieved Visual Evidence')" title='Click to enlarge' /></div>`).join('')}</div>`;
+                    citBox.appendChild(assetSection);
+                    refreshIcons();
+                  }
                 } else if (event.type === "reasoning") {
                   rawReasoning += event.delta;
                   thinkDrawer.style.display = "block";
@@ -2717,6 +2859,21 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
                   }
 
                   answerBox.innerHTML = formatMarkdown(rawContent);
+                  if (window.renderMathInElement) {
+                    try {
+                      renderMathInElement(answerBox, {
+                        delimiters: [
+                          { left: "$$", right: "$$", display: true },
+                          { left: "$", right: "$", display: false },
+                          { left: "\\[", right: "\\]", display: true },
+                          { left: "\\(", right: "\\)", display: false }
+                        ],
+                        throwOnError: false
+                      });
+                    } catch (kErr) {
+                      console.debug("KaTeX error:", kErr);
+                    }
+                  }
                   if (thinkBadge) thinkBadge.style.display = "none";
                   thinkDrawer.classList.remove("is-streaming");
                 } else if (event.type === "error") {
@@ -2877,6 +3034,8 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
             formData.append("embedding_model", embModel);
             formData.append("embedding_dim", String(embDim));
             formData.append("generate_summaries", genSummaries ? "true" : "false");
+            const enrichMultimodal = document.getElementById("upload-multimodal-checkbox")?.checked ?? true;
+            formData.append("enrich_multimodal", enrichMultimodal ? "true" : "false");
 
             const response = await fetch("/v1/upload-stream", {
               method: "POST",
@@ -3039,9 +3198,14 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
             <td>${summariesBadge}</td>
             <td>${embBadge}</td>
             <td>
-              <button class="btn btn-secondary btn-sm" onclick="inspectDocumentChunks('${d.id}', '${d.title.replace(/'/g, "\\'")}')" style="display: inline-flex; align-items: center; gap: 4px;">
-                <i data-lucide="layers" style="width: 12px; height: 12px;"></i> Inspect
-              </button>
+              <div style="display: flex; gap: 4px; align-items: center;">
+                <button class="btn btn-secondary btn-sm" onclick="inspectDocumentChunks('${d.id}', '${d.title.replace(/'/g, "\\'")}')" style="display: inline-flex; align-items: center; gap: 4px;">
+                  <i data-lucide="layers" style="width: 12px; height: 12px;"></i> Inspect
+                </button>
+                <button class="btn btn-secondary btn-sm" onclick="viewDocumentAssets('${d.id}', '${d.title.replace(/'/g, "\\'")}')" style="display: inline-flex; align-items: center; gap: 4px; color: var(--purple);" title="View extracted figures, charts, and diagrams">
+                  <i data-lucide="image" style="width: 12px; height: 12px;"></i> Assets
+                </button>
+              </div>
             </td>
             <td>
               <div style="display: flex; gap: 4px; align-items: center;">
@@ -3755,6 +3919,136 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
           "none";
       }
 
+      // -----------------------------------------------------------------------
+      // Multimodal Query & Asset Gallery Handlers
+      // -----------------------------------------------------------------------
+      let attachedQueryImageBase64 = null;
+
+      function handleQueryImageSelected(e) {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function (evt) {
+          attachedQueryImageBase64 = evt.target.result;
+          document.getElementById("query-image-thumb").src = attachedQueryImageBase64;
+          document.getElementById("query-image-name").textContent = file.name;
+          const sizeKb = (file.size / 1024).toFixed(1);
+          document.getElementById("query-image-size").textContent = `${sizeKb} KB • Visual Search Ready`;
+          document.getElementById("query-image-preview-bar").style.display = "flex";
+        };
+        reader.readAsDataURL(file);
+      }
+
+      function clearQueryImage() {
+        attachedQueryImageBase64 = null;
+        const fileInput = document.getElementById("query-image-file");
+        if (fileInput) fileInput.value = "";
+        document.getElementById("query-image-preview-bar").style.display = "none";
+      }
+
+      function useAssetAsQuery(assetId, assetSrc) {
+        attachedQueryImageBase64 = assetSrc;
+        document.getElementById("query-image-thumb").src = assetSrc;
+        document.getElementById("query-image-name").textContent = `Asset: ${assetId}`;
+        document.getElementById("query-image-size").textContent = "Selected from Ingested Assets";
+        document.getElementById("query-image-preview-bar").style.display = "flex";
+        closeAssetGallery();
+        switchTab("query-tab");
+        document.getElementById("query-input").focus();
+      }
+
+      async function viewDocumentAssets(docId, docTitle) {
+        const modal = document.getElementById("asset-gallery-modal");
+        const titleEl = document.getElementById("asset-gallery-title");
+        const subEl = document.getElementById("asset-gallery-subtitle");
+        const bodyEl = document.getElementById("asset-gallery-body");
+
+        modal.style.display = "flex";
+        titleEl.innerHTML = `<i data-lucide="image" style="width: 18px; height: 18px; color: var(--purple);"></i> Figures & Assets: ${docTitle}`;
+        subEl.textContent = "Loading extracted diagrams, charts, and image crops...";
+        bodyEl.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 40px;"><span class="spinner"></span> Fetching document assets...</div>';
+        refreshIcons();
+
+        try {
+          const res = await fetch(`/v1/documents/${docId}/assets`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+          const assets = await res.json();
+
+          if (!assets || assets.length === 0) {
+            bodyEl.innerHTML = `
+              <div style="text-align: center; padding: 48px 24px; color: var(--text-muted);">
+                <i data-lucide="image-off" style="width: 40px; height: 40px; color: var(--text-dim); margin-bottom: 12px;"></i>
+                <div style="font-weight: 700; font-size: 15px; color: var(--text); margin-bottom: 4px;">No Visual Assets Found</div>
+                <div style="font-size: 13px;">This document either has no images/charts or was ingested without visual extraction.</div>
+              </div>`;
+            subEl.textContent = "0 assets extracted";
+            refreshIcons();
+            return;
+          }
+
+          subEl.innerHTML = `<strong style="color: var(--purple);">${assets.length}</strong> Visual Assets Extracted with 768d Gemini Embeddings`;
+          bodyEl.innerHTML = '<div class="asset-gallery-grid" id="asset-gallery-grid"></div>';
+          const grid = document.getElementById("asset-gallery-grid");
+
+          assets.forEach((a) => {
+            const card = document.createElement("div");
+            card.className = "asset-card";
+            const assetUrl = `/v1/assets/${a.id}`;
+            const cap = a.caption || "Extracted visual element";
+            const dims = a.width && a.height ? `${a.width}×${a.height}px` : "Image Asset";
+            const pageTxt = a.page_number ? `Page ${a.page_number}` : "Document";
+
+            card.innerHTML = `
+              <img src="${assetUrl}" alt="${cap}" onclick="openImageModal('${assetUrl}', '${cap.replace(/'/g, "\\'")}')" title="Click to view full image" loading="lazy" />
+              <div class="asset-card-info">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span class="version-tag">${(a.asset_type || "FIGURE").toUpperCase()}</span>
+                  <span style="color: var(--text-muted); font-size: 10px;">${pageTxt} • ${dims}</span>
+                </div>
+                <div style="font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;" title="${cap}">
+                  ${cap}
+                </div>
+                ${a.ocr_text ? `<div style="font-size: 10px; color: var(--text-secondary); background: var(--bg-subtle); padding: 4px 6px; border-radius: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><strong>OCR:</strong> ${a.ocr_text}</div>` : ''}
+                <div style="display: flex; gap: 6px; margin-top: 6px;">
+                  <button class="btn btn-secondary btn-sm" onclick="openImageModal('${assetUrl}', '${cap.replace(/'/g, "\\'")}')" style="flex: 1; padding: 3px 6px; font-size: 11px;">
+                    <i data-lucide="zoom-in" style="width: 11px; height: 11px;"></i> View
+                  </button>
+                  <button class="btn btn-secondary btn-sm" onclick="useAssetAsQuery('${a.id}', '${assetUrl}')" style="padding: 3px 6px; font-size: 11px; color: var(--purple);" title="Query with this image">
+                    <i data-lucide="sparkles" style="width: 11px; height: 11px;"></i> Search
+                  </button>
+                </div>
+              </div>
+            `;
+            grid.appendChild(card);
+          });
+          refreshIcons();
+        } catch (err) {
+          bodyEl.innerHTML = `<div style="color: var(--rose); padding: 24px; text-align: center;">Error loading assets: ${err.message}</div>`;
+        }
+      }
+
+      function closeAssetGallery() {
+        const modal = document.getElementById("asset-gallery-modal");
+        if (modal) modal.style.display = "none";
+      }
+
+      function openImageModal(src, caption) {
+        const modal = document.getElementById("image-viewer-modal");
+        const img = document.getElementById("viewer-modal-image");
+        const cap = document.getElementById("viewer-modal-caption");
+        if (modal && img) {
+          img.src = src;
+          if (cap) cap.textContent = caption || "";
+          modal.style.display = "flex";
+        }
+      }
+
+      function closeImageModal() {
+        const modal = document.getElementById("image-viewer-modal");
+        if (modal) modal.style.display = "none";
+      }
+
       // Auto-init on page load
       window.addEventListener("DOMContentLoaded", () => {
         loadDocuments();
@@ -3837,6 +4131,121 @@ What is the role of Recursive Language Models vs Hybrid RAG in this architecture
           "
         >
           <!-- Chunk cards rendered dynamically -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Multimodal Asset Gallery Modal -->
+    <div
+      id="asset-gallery-modal"
+      style="
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.65);
+        backdrop-filter: blur(4px);
+        z-index: 9999;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      "
+    >
+      <div
+        style="
+          background: var(--bg-surface);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-lg);
+          width: 100%;
+          max-width: 980px;
+          max-height: 85vh;
+          display: flex;
+          flex-direction: column;
+          box-shadow: var(--shadow-lg);
+          overflow: hidden;
+        "
+      >
+        <div
+          style="
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          "
+        >
+          <div>
+            <div
+              id="asset-gallery-title"
+              style="font-size: 17px; font-weight: 800; color: var(--text); display: flex; align-items: center; gap: 8px;"
+            >
+              <i data-lucide="image" style="width: 18px; height: 18px; color: var(--purple);"></i> Figures & Assets
+            </div>
+            <div
+              id="asset-gallery-subtitle"
+              style="font-size: 13px; color: var(--text-muted)"
+            >
+              Loading visual assets...
+            </div>
+          </div>
+          <button
+            class="btn btn-secondary btn-sm"
+            onclick="closeAssetGallery()"
+            style="padding: 6px 10px"
+          >
+            <i data-lucide="x" style="width: 16px; height: 16px"></i> Close
+          </button>
+        </div>
+        <div
+          id="asset-gallery-body"
+          style="
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+          "
+        >
+          <!-- Asset gallery cards rendered dynamically -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Image Full Viewer Modal -->
+    <div
+      id="image-viewer-modal"
+      style="
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.85);
+        backdrop-filter: blur(8px);
+        z-index: 10000;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      "
+      onclick="closeImageModal()"
+    >
+      <div
+        style="
+          background: var(--bg-card);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-lg);
+          max-width: 90vw;
+          max-height: 90vh;
+          display: flex;
+          flex-direction: column;
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+          overflow: hidden;
+        "
+        onclick="event.stopPropagation()"
+      >
+        <div style="padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); background: var(--bg-surface);">
+          <div id="viewer-modal-caption" style="font-size: 13px; font-weight: 700; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 80%;">Visual Element</div>
+          <button class="btn btn-secondary btn-sm" onclick="closeImageModal()" style="padding: 4px 8px;">
+            <i data-lucide="x" style="width: 14px; height: 14px;"></i>
+          </button>
+        </div>
+        <div style="padding: 16px; display: flex; align-items: center; justify-content: center; background: #0b0f17; overflow: auto; max-height: calc(90vh - 60px);">
+          <img id="viewer-modal-image" src="" alt="Full view" style="max-width: 100%; max-height: 75vh; object-fit: contain; border-radius: 4px;" />
         </div>
       </div>
     </div>
