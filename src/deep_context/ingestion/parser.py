@@ -257,14 +257,21 @@ class DocumentParser:
 
             pipeline_options = PdfPipelineOptions()
             pipeline_options.generate_picture_images = True
-            pipeline_options.generate_page_images = True
+            pipeline_options.generate_page_images = False
 
             converter = DocumentConverter(
                 format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)}
             )
             conv_kwargs: dict[str, Any] = {}
             if page_range is not None:
-                conv_kwargs["page_range"] = page_range
+                if isinstance(page_range, str) and "-" in page_range:
+                    parts = [int(p.strip()) for p in page_range.split("-") if p.strip().isdigit()]
+                    if len(parts) == 2:
+                        conv_kwargs["page_range"] = (parts[0], parts[1])
+                    else:
+                        conv_kwargs["page_range"] = page_range
+                else:
+                    conv_kwargs["page_range"] = page_range
             result = converter.convert(file_to_convert, **conv_kwargs)
             docling_doc = result.document
 

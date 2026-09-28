@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -281,10 +282,25 @@ class SummaryIngestionPipeline:
     async def ingest_stream(self, request: IngestRequest) -> AsyncIterator[dict[str, Any]]:
         """Ingests a document while streaming real-time progress events for UI and CLI."""
         t0 = time.time()
+        page_info = ""
+        if (
+            request.doc_type == "pdf"
+            and isinstance(request.content, str)
+            and os.path.exists(request.content)
+        ):
+            try:
+                import pypdf
+
+                reader = pypdf.PdfReader(request.content)
+                num_pages = len(reader.pages)
+                page_info = f" ({num_pages} pages)"
+            except Exception:
+                pass
+
         yield {
             "stage": "parsing",
             "percent": 5,
-            "message": f"Extracting sections from '{request.title}'...",
+            "message": f"Parsing '{request.title}'{page_info} with IBM Docling neural layout & OCR models...",
         }
 
         storage = self.storage or await get_storage()
@@ -361,8 +377,6 @@ class SummaryIngestionPipeline:
             await storage.insert_tree_nodes(tree.nodes)
 
         # 3.1. Persist and embed multimodal assets
-        import os
-
         from deep_context.storage.asset_store import asset_store
 
         doc_assets = asset_store.get_assets_for_document(doc_id)
