@@ -17,3 +17,6 @@ build/
 *.sqlite
 .env
 !.env.example
+
+# Benchmark harness local artifacts (embeddings/LLM caches, downloaded datasets, indexes)
+eval/cache/
