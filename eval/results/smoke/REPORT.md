@@ -2,7 +2,7 @@
 
 **SMOKE TEST (n=20 per dataset; not for publication)** — generated from files in `eval/results/smoke`; every number below is read from them.
 
-- Branch `eval/public-benchmarks` @ `e12d3a9` (base `feat/rag-quality-generation`), working tree dirty at report time
+- Branch `eval/public-benchmarks` @ `c336002` (base `feat/rag-quality-generation`), working tree dirty at report time
 - Judge: `gemini-2.5-pro@think128` (temperature 0) — generator: `gemini-2.5-flash` (different model; both are Google models, so family bias is possible)
 - Embeddings: `gemini-embedding-2` 768-d via Vertex AI (`global` endpoint); reranker: bge-reranker-v2-m3 (hosted, EcoHash API)
 
@@ -47,8 +47,8 @@ RGB (generation-only): `en_refine` / `en_int` / `en_fact` from github.com/chen70
 | docsqa | dense_only | 35 | 0.914 [0.829, 1.000] | 0.821 [0.738, 0.900] | – | – | – | 4.62 |
 | docsqa | bm25_only | 35 | 0.914 [0.800, 1.000] | 0.820 [0.717, 0.912] | – | – | – | 1.42 |
 | docsqa | rrf | 35 | 0.886 [0.771, 0.971] | 0.827 [0.722, 0.921] | – | – | – | 2.35 |
-| docsqa | rrf_bge | 35 | 0.886 [0.771, 0.971] | 0.786 [0.676, 0.885] | – | – | – | 6.89 |
-| docsqa | rrf_bge_two_pass | 35 | 0.886 [0.771, 0.971] | 0.786 [0.676, 0.885] | – | – | – | 5.20 |
+| docsqa | rrf_bge | 35 | 0.886 [0.771, 0.971] | 0.786 [0.676, 0.885] | 0.893 [0.793, 0.971] | 0.971 [0.914, 1.000] | 0.269 [0.149, 0.396] | 6.89 |
+| docsqa | rrf_bge_two_pass | 35 | 0.886 [0.771, 0.971] | 0.786 [0.676, 0.885] | 0.937 [0.851, 1.000] | 0.971 [0.914, 1.000] | 0.278 [0.162, 0.401] | 5.20 |
 | fiqa | dense_only | 20 | 0.950 [0.850, 1.000] | 0.902 [0.783, 0.983] | – | – | – | – |
 | fiqa | bm25_only | 20 | 0.750 [0.550, 0.900] | 0.465 [0.331, 0.593] | – | – | – | – |
 | fiqa | rrf | 20 | 0.950 [0.850, 1.000] | 0.690 [0.574, 0.796] | – | – | – | – |
@@ -62,13 +62,13 @@ RGB (generation-only): `en_refine` / `en_int` / `en_fact` from github.com/chen70
 | multihoprag | dense_only | 18 | 0.944 [0.833, 1.000] | 0.774 [0.698, 0.846] | – | – | – | 5.05 |
 | multihoprag | bm25_only | 18 | 1.000 [1.000, 1.000] | 0.665 [0.566, 0.770] | – | – | – | 2.22 |
 | multihoprag | rrf | 18 | 1.000 [1.000, 1.000] | 0.752 [0.661, 0.838] | – | – | – | 2.07 |
-| multihoprag | rrf_bge | 18 | 1.000 [1.000, 1.000] | 0.768 [0.684, 0.849] | – | – | – | 5.57 |
-| multihoprag | rrf_bge_two_pass | 18 | 1.000 [1.000, 1.000] | 0.768 [0.684, 0.849] | – | – | – | 6.56 |
-| ragbench-covidqa | dense_only | 20 | 1.000 [1.000, 1.000] | 0.924 [0.847, 0.982] | 0.619 [0.357, 0.869] | 0.833 [0.583, 1.000] | 0.459 [0.251, 0.667] | – |
+| multihoprag | rrf_bge | 18 | 1.000 [1.000, 1.000] | 0.768 [0.684, 0.849] | 0.203 [0.056, 0.378] | 0.556 [0.333, 0.778] | 0.072 [0.000, 0.164] | 5.57 |
+| multihoprag | rrf_bge_two_pass | 18 | 1.000 [1.000, 1.000] | 0.768 [0.684, 0.849] | 0.569 [0.381, 0.746] | 0.444 [0.222, 0.667] | 0.046 [0.000, 0.120] | 6.56 |
+| ragbench-covidqa | dense_only | 20 | 1.000 [1.000, 1.000] | 0.924 [0.847, 0.982] | – | – | – | – |
 | ragbench-covidqa | bm25_only | 20 | 0.900 [0.750, 1.000] | 0.770 [0.629, 0.892] | – | – | – | – |
 | ragbench-covidqa | rrf | 20 | 1.000 [1.000, 1.000] | 0.805 [0.692, 0.907] | – | – | – | – |
-| ragbench-covidqa | rrf_bge | 20 | 1.000 [1.000, 1.000] | 0.829 [0.710, 0.935] | – | – | – | – |
-| ragbench-covidqa | rrf_bge_two_pass | 20 | 1.000 [1.000, 1.000] | 0.829 [0.710, 0.935] | – | – | – | – |
+| ragbench-covidqa | rrf_bge | 20 | 1.000 [1.000, 1.000] | 0.829 [0.710, 0.935] | 0.539 [0.328, 0.750] | 0.717 [0.517, 0.900] | 0.351 [0.177, 0.535] | – |
+| ragbench-covidqa | rrf_bge_two_pass | 20 | 1.000 [1.000, 1.000] | 0.829 [0.710, 0.935] | 0.576 [0.375, 0.764] | 0.717 [0.517, 0.900] | 0.373 [0.207, 0.549] | – |
 | scifact | dense_only | 20 | 0.900 [0.750, 1.000] | 0.838 [0.720, 0.945] | – | – | – | – |
 | scifact | bm25_only | 20 | 0.750 [0.550, 0.900] | 0.671 [0.496, 0.840] | – | – | – | – |
 | scifact | rrf | 20 | 0.850 [0.700, 1.000] | 0.699 [0.529, 0.852] | – | – | – | – |
@@ -147,37 +147,37 @@ RAGAS `retrieved_contexts` = the slice of each retrieved parent that fits the pr
 
 ### docsqa — `docsqa|qall|dfull`
 
-| config | answerable | judged |
-|---|---|---|
-| dense_only | 35 | 0 |
-| bm25_only | 35 | 0 |
-| rrf | 35 | 0 |
-| rrf_bge | 35 | 0 |
-| rrf_bge_two_pass | 35 | 0 |
-| engine_as_shipped | 35 | 0 |
+| config | answerable | judged | Faithfulness | ResponseRelevancy | CtxPrecision(ref) | CtxRecall | FactualCorr F1 |
+|---|---|---|---|---|---|---|---|
+| dense_only | 35 | 0 |  |  |  |  |  |
+| bm25_only | 35 | 0 |  |  |  |  |  |
+| rrf | 35 | 0 |  |  |  |  |  |
+| rrf_bge | 35 | 35 | 0.893 [0.793, 0.971] | 0.871 [0.789, 0.934] | 0.860 [0.779, 0.931] | 0.971 [0.914, 1.000] | 0.269 [0.149, 0.396] |
+| rrf_bge_two_pass | 35 | 35 | 0.937 [0.851, 1.000] | 0.836 [0.741, 0.915] | 0.860 [0.779, 0.931] | 0.971 [0.914, 1.000] | 0.278 [0.162, 0.401] |
+| engine_as_shipped | 35 | 0 |  |  |  |  |  |
 
 
 ### multihoprag — `multihoprag|q20|dfull`
 
-| config | answerable | judged | EM | token F1 | contains-answer |
-|---|---|---|---|---|---|
-| dense_only | 18 | 0 | 0.000 [0.000, 0.000] | 0.016 [0.002, 0.031] | 0.278 [0.111, 0.500] |
-| bm25_only | 18 | 0 | 0.000 [0.000, 0.000] | 0.012 [0.004, 0.021] | 0.333 [0.111, 0.556] |
-| rrf | 18 | 0 | 0.000 [0.000, 0.000] | 0.018 [0.005, 0.033] | 0.389 [0.167, 0.611] |
-| rrf_bge | 18 | 0 | 0.000 [0.000, 0.000] | 0.016 [0.002, 0.031] | 0.278 [0.111, 0.500] |
-| rrf_bge_two_pass | 18 | 0 | 0.000 [0.000, 0.000] | 0.022 [0.010, 0.036] | 0.500 [0.278, 0.722] |
-| engine_as_shipped | 18 | 0 | 0.000 [0.000, 0.000] | 0.021 [0.010, 0.034] | 0.500 [0.278, 0.722] |
+| config | answerable | judged | EM | token F1 | contains-answer | Faithfulness | ResponseRelevancy | CtxPrecision(ref) | CtxRecall | FactualCorr F1 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| dense_only | 18 | 0 | 0.000 [0.000, 0.000] | 0.016 [0.002, 0.031] | 0.278 [0.111, 0.500] |  |  |  |  |  |
+| bm25_only | 18 | 0 | 0.000 [0.000, 0.000] | 0.012 [0.004, 0.021] | 0.333 [0.111, 0.556] |  |  |  |  |  |
+| rrf | 18 | 0 | 0.000 [0.000, 0.000] | 0.018 [0.005, 0.033] | 0.389 [0.167, 0.611] |  |  |  |  |  |
+| rrf_bge | 18 | 18 | 0.000 [0.000, 0.000] | 0.016 [0.002, 0.031] | 0.278 [0.111, 0.500] | 0.203 [0.056, 0.378] | 0.147 [0.000, 0.311] | 0.611 [0.389, 0.833] | 0.556 [0.333, 0.778] | 0.072 [0.000, 0.164] |
+| rrf_bge_two_pass | 18 | 18 | 0.000 [0.000, 0.000] | 0.022 [0.010, 0.036] | 0.500 [0.278, 0.722] | 0.569 [0.381, 0.746] | 0.426 [0.228, 0.625] | 0.611 [0.389, 0.833] | 0.444 [0.222, 0.667] | 0.046 [0.000, 0.120] |
+| engine_as_shipped | 18 | 0 | 0.000 [0.000, 0.000] | 0.021 [0.010, 0.034] | 0.500 [0.278, 0.722] |  |  |  |  |  |
 
 
 ### ragbench-covidqa — `ragbench-covidqa|q20|dfull`
 
 | config | answerable | judged | Faithfulness | ResponseRelevancy | CtxPrecision(ref) | CtxRecall | FactualCorr F1 |
 |---|---|---|---|---|---|---|---|
-| dense_only | 20 | 12 | 0.619 [0.357, 0.869] | 0.612 [0.368, 0.844] | 0.715 [0.500, 0.917] | 0.833 [0.583, 1.000] | 0.459 [0.251, 0.667] |
+| dense_only | 20 | 0 |  |  |  |  |  |
 | bm25_only | 20 | 0 |  |  |  |  |  |
 | rrf | 20 | 0 |  |  |  |  |  |
-| rrf_bge | 20 | 0 |  |  |  |  |  |
-| rrf_bge_two_pass | 20 | 0 |  |  |  |  |  |
+| rrf_bge | 20 | 20 | 0.539 [0.328, 0.750] | 0.543 [0.348, 0.735] | 0.639 [0.462, 0.801] | 0.717 [0.517, 0.900] | 0.351 [0.177, 0.535] |
+| rrf_bge_two_pass | 20 | 20 | 0.576 [0.375, 0.764] | 0.627 [0.436, 0.804] | 0.639 [0.462, 0.801] | 0.717 [0.517, 0.900] | 0.373 [0.207, 0.549] |
 | engine_as_shipped | 20 | 0 |  |  |  |  |  |
 
 
@@ -315,8 +315,23 @@ Paired tests on identical queries (baseline → variant; positive = variant bett
 | hotpotqa | rrf vs rrf+bge | ndcg@10 | 20 | 0.9762 | 0.9916 | 0.0154 | -0.0009 | 0.0347 | 0.0822 | 0.1408 | 0.3727 |
 | hotpotqa | rrf vs rrf+bge | recall@100 | 20 | 1.0 | 1.0 | 0.0 | 0.0 | 0.0 | 1.0000 | 1.0000 | 0.0 |
 | hotpotqa | rrf vs rrf+bge | map | 20 | 0.9517 | 0.9833 | 0.0317 | -0.0017 | 0.0708 | 0.0812 | 0.1408 | 0.3773 |
+| multihoprag | one-pass vs two-pass | faithfulness | 18 | 0.2028 | 0.5689 | 0.3661 | 0.1818 | 0.5593 | 0.0000 | 0.0046 | 0.8689 |
+| multihoprag | one-pass vs two-pass | answer_relevancy | 18 | 0.1471 | 0.426 | 0.2789 | 0.0897 | 0.4842 | 0.0020 | 0.0357 | 0.6386 |
+| multihoprag | one-pass vs two-pass | context_precision | 18 | 0.6111 | 0.6111 | 0.0 | 0.0 | 0.0 | 1.0000 | 1.0000 | 0.0 |
+| multihoprag | one-pass vs two-pass | context_recall | 18 | 0.5556 | 0.4444 | -0.1111 | -0.2778 | 0.0 | 0.2372 | 0.1573 | -0.3436 |
+| multihoprag | one-pass vs two-pass | factual_correctness_f1 | 18 | 0.0717 | 0.0461 | -0.0256 | -0.1372 | 0.0828 | 0.6752 | 0.7865 | -0.106 |
 | multihoprag | one-pass vs two-pass | false_abstention | 18 | 0.7778 | 0.2778 | -0.5 | -0.7222 | -0.2778 | 0.0002 | 0.0027 | -0.9718 |
+| ragbench-covidqa | one-pass vs two-pass | faithfulness | 20 | 0.5389 | 0.5764 | 0.0375 | -0.1028 | 0.2111 | 0.6974 | 0.9323 | 0.1007 |
+| ragbench-covidqa | one-pass vs two-pass | answer_relevancy | 20 | 0.543 | 0.6274 | 0.0844 | 0.0046 | 0.1959 | 0.0106 | 0.0506 | 0.3696 |
+| ragbench-covidqa | one-pass vs two-pass | context_precision | 20 | 0.6389 | 0.6389 | 0.0 | 0.0 | 0.0 | 1.0000 | 1.0000 | 0.0 |
+| ragbench-covidqa | one-pass vs two-pass | context_recall | 20 | 0.7167 | 0.7167 | 0.0 | 0.0 | 0.0 | 1.0000 | 1.0000 | 0.0 |
+| ragbench-covidqa | one-pass vs two-pass | factual_correctness_f1 | 20 | 0.351 | 0.3735 | 0.0225 | -0.042 | 0.09 | 0.5170 | 0.5281 | 0.1469 |
 | ragbench-covidqa | one-pass vs two-pass | false_abstention | 20 | 0.4 | 0.3 | -0.1 | -0.25 | 0.0 | 0.2382 | 0.1573 | -0.3249 |
+| docsqa | one-pass vs two-pass | faithfulness | 35 | 0.8929 | 0.9371 | 0.0443 | -0.0057 | 0.1157 | 0.1330 | 0.1441 | 0.2279 |
+| docsqa | one-pass vs two-pass | answer_relevancy | 35 | 0.8706 | 0.8361 | -0.0344 | -0.1019 | 0.0106 | 0.2170 | 0.3533 | -0.1923 |
+| docsqa | one-pass vs two-pass | context_precision | 35 | 0.8599 | 0.8599 | 0.0 | 0.0 | 0.0 | 1.0000 | 1.0000 | 0.0 |
+| docsqa | one-pass vs two-pass | context_recall | 35 | 0.9714 | 0.9714 | 0.0 | 0.0 | 0.0 | 1.0000 | 1.0000 | 0.0 |
+| docsqa | one-pass vs two-pass | factual_correctness_f1 | 35 | 0.2689 | 0.2777 | 0.0089 | -0.0706 | 0.0826 | 0.8138 | 0.8236 | 0.0383 |
 | docsqa | one-pass vs two-pass | false_abstention | 35 | 0.0571 | 0.0857 | 0.0286 | 0.0 | 0.0857 | 0.7416 | 0.3173 | 0.169 |
 | docsqa | one-pass vs two-pass | abstention_on_unanswerable | 9 | 1.0 | 1.0 | 0.0 | 0.0 | 0.0 | 1.0000 | 1.0000 | 0.0 |
 
