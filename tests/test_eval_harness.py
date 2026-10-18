@@ -151,3 +151,20 @@ def test_embedding_text_format_matches_stock_client() -> None:
     )
     assert fmt("body", is_query=False, title="T", task=None) == "title: T | text: body"
     assert fmt("body", is_query=False, title=None, task=None) == "title: none | text: body"
+
+
+def test_runtime_semaphores_are_per_event_loop() -> None:
+    """Regression: RAGAS creates a fresh loop per evaluate(); a reused semaphore broke every batch."""
+    import asyncio
+
+    from eval.strict_clients import VertexRuntime
+
+    rt = VertexRuntime.__new__(VertexRuntime)
+    rt._sems = {}  # type: ignore[attr-defined]
+
+    async def use() -> None:
+        async with rt._sem("llm"):  # type: ignore[attr-defined]
+            await asyncio.sleep(0)
+
+    asyncio.run(use())
+    asyncio.run(use())  # second loop must not reuse the first loop's semaphore

@@ -245,14 +245,20 @@ class VertexRuntime:
         return self._clients[loc]
 
     def _sem(self, kind: str) -> asyncio.Semaphore:
-        if kind not in self._sems:
+        """Semaphore for ``kind``, one per running event loop.
+
+        RAGAS runs each ``evaluate()`` call in its own event loop; a semaphore created in an
+        earlier loop raises "bound to a different event loop" (which RAGAS then reports as NaN).
+        """
+        key = f"{kind}:{id(asyncio.get_running_loop())}"
+        if key not in self._sems:
             limit = {
                 "llm": C.LLM_CONCURRENCY,
                 "embed": C.EMBED_CONCURRENCY,
                 "rerank": C.RERANK_CONCURRENCY,
             }[kind]
-            self._sems[kind] = asyncio.Semaphore(limit)
-        return self._sems[kind]
+            self._sems[key] = asyncio.Semaphore(limit)
+        return self._sems[key]
 
     async def _with_retries(self, kind: str, call: Any) -> tuple[Any, float, int]:
         """Run ``call()``; retry transient failures. Returns (value, ok_attempt_seconds, retries)."""
