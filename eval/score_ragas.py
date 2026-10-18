@@ -32,6 +32,7 @@ def main() -> None:
     ap.add_argument("--thinking-budget", type=int, default=None, help="judge thinking-token budget")
     ap.add_argument("--limit", type=int, default=None, help="score at most N pending rows")
     ap.add_argument("--datasets", nargs="*", default=None)
+    ap.add_argument("--configs", nargs="*", default=None, help="only score these configs")
     args = ap.parse_args()
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(name)s %(message)s", stream=sys.stderr
@@ -56,6 +57,7 @@ def main() -> None:
         if not r.get("error") and not r["unanswerable"] and r["reference"].strip()
         and (r["run_tag"], r["config"], r["qid"]) not in done
         and (args.datasets is None or r["dataset"] in args.datasets)
+        and (args.configs is None or r["config"] in args.configs)
     ]  # fmt: skip
     if args.limit:
         todo = todo[: args.limit]
