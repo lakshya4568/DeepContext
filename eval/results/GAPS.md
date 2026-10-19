@@ -23,9 +23,9 @@ nDCG@10 on the test questions, merged search before → after all three fixes (B
 | Quantum PDF | 0.481 | 0.537 | +0.056 [+0.019, +0.097] | 0.518 |
 
 What each fix did on its own:
-- **P1 (real BM25)** alone: the word-search half rose from 0.13 to 0.24 on FiQA, 0.49 to 0.69 on SciFact, 0.40 to 0.75 on MultiHop-RAG; merged search rose +0.01 to +0.17 (not significant on RAGBench and the quantum PDF).
+- **P1 (real BM25)** alone: the word-search half rose from 0.13 to 0.24 on FiQA, 0.49 to 0.69 on SciFact, 0.40 to 0.75 on MultiHop-RAG; merged search rose +0.012 to +0.174 (not significant on RAGBench and the quantum PDF).
 - **P3 (duplicate removal)** alone: only matters where passages share an opening line: RAGBench +0.073 (0.725 → 0.798), recall@100 0.855 → 0.996. No effect elsewhere.
-- **P2 (lexical vote)**: chosen on separate dev questions (SciFact train, FiQA dev; grid 1, 0.5, 0.25, 0.1 — the best was the edge of the grid, 0.1). It adds +0.01 to +0.17 over BM25+dedup on 6 of 8 datasets.
+- **P2 (lexical vote)**: chosen on separate dev questions (SciFact train, FiQA dev; grid 1, 0.5, 0.25, 0.1 — the best was the edge of the grid, 0.1). It adds +0.003 to +0.171 over BM25+dedup on 7 of 8 datasets (docs set −0.004).
 
 Honest reading (paired test, merged-after minus dense-only, nDCG@10): significantly **below** dense-only on FiQA (−0.022), SciFact (−0.033) and the GoT PDF (−0.057); significantly **above** on MultiHop-RAG (+0.010) and the quantum PDF (+0.019); no difference on the docs set, HotpotQA and RAGBench. So the merge is now roughly as good as meaning-only search, with tiny gains on two sets and losses on three: **not a clear win**. The weight search shows the same pattern: the less the word channel votes, the better, down to the edge of the grid. With this embedding model the word search adds little on these datasets; it may still matter for exact-term queries (names, codes), which these sets contain few of.
 
