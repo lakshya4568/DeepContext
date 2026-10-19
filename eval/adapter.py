@@ -235,14 +235,16 @@ class DeepContextAdapter:
             )
 
         chunker = ParentChildChunker()
-        staged: list[tuple[Document, list[Any], list[Any]]] = []
-        for ext_doc_id, d in corpus.items():
+
+        def stage(
+            ext_doc_id: str, d: dict[str, str]
+        ) -> tuple[Document, list[Any], list[Any]] | None:
             doc_id = self.store_doc_id(ext_doc_id)
             title = (d.get("title") or "").strip()
             text = (d.get("text") or "").strip()
             content = f"{title}\n\n{text}" if title else text
             if not content:
-                continue
+                return None
             sections = DocumentParser.parse(content, doc_type="text")
             parents, children = chunker.chunk_sections(doc_id, sections)
             id_map: dict[str, str] = {}
@@ -259,52 +261,66 @@ class DeepContextAdapter:
                 doc_type="text",
                 metadata={"eval": True, "external_id": ext_doc_id},
             )
-            staged.append((doc, parents, children))
+            return doc, parents, children
 
-        # One embedding request per child chunk (gemini-embedding-2 accepts one content per call),
-        # run concurrently and cached on disk by formatted text.
-        texts: list[str] = []
-        owners: list[Any] = []
-        for doc, _p, children in staged:
-            for ch in children:
-                assert ch.level == ChunkLevel.CHILD
-                texts.append(
-                    self.runtime.format_embedding_text(
-                        ch.content,
-                        is_query=False,
-                        title=doc.title if doc.title != doc.metadata["external_id"] else None,
-                        task=None,
+        # Stream the corpus in doc windows (chunk -> embed -> store -> free) so memory stays flat
+        # on 200k-doc corpora. Every insert is idempotent (deterministic uuid5 ids; documents upsert,
+        # chunks ON CONFLICT DO NOTHING) and embeddings are cached by text, so an interrupted
+        # build resumes cheaply by re-running the same call.
+        n_docs = n_parents = n_children = approx_tokens = 0
+        items = list(corpus.items())
+        window_docs = 1500
+        log.info("Indexing %d docs in windows of %d ...", len(items), window_docs)
+        for w0 in range(0, len(items), window_docs):
+            staged = [
+                st
+                for ext_doc_id, d in items[w0 : w0 + window_docs]
+                if (st := stage(ext_doc_id, d)) is not None
+            ]
+            # One embedding request per child chunk (gemini-embedding-2 accepts one content per
+            # call), run concurrently and cached on disk by formatted text.
+            texts: list[str] = []
+            owners: list[Any] = []
+            for doc, _p, children in staged:
+                for ch in children:
+                    assert ch.level == ChunkLevel.CHILD
+                    texts.append(
+                        self.runtime.format_embedding_text(
+                            ch.content,
+                            is_query=False,
+                            title=doc.title if doc.title != doc.metadata["external_id"] else None,
+                            task=None,
+                        )
                     )
-                )
-                owners.append(ch)
-        log.info("Embedding %d child chunks for %d docs ...", len(texts), len(staged))
-        window = 2000
-        with stage_scope("index"):
-            for start in range(0, len(texts), window):
+                    owners.append(ch)
+            with stage_scope("index"):
                 vecs = await self.runtime.embed_many(
-                    texts[start : start + window], model=C.EMBEDDING_MODEL, dim=C.EMBEDDING_DIM
+                    texts, model=C.EMBEDDING_MODEL, dim=C.EMBEDDING_DIM
                 )
-                for ch, v in zip(owners[start : start + window], vecs, strict=True):
-                    ch.embedding = v.tolist()
-                self.runtime.cache.flush()
-                log.info("  embedded %d/%d", min(start + window, len(texts)), len(texts))
-        approx_tokens = sum(max(len(t.split()), len(t) // 4) for t in texts)
+            for ch, v in zip(owners, vecs, strict=True):
+                ch.embedding = v.tolist()
+            self.runtime.cache.flush()
+            approx_tokens += sum(max(len(t.split()), len(t) // 4) for t in texts)
 
-        n_parents = n_children = 0
-        batch: list[Any] = []
-        for i, (doc, parents, children) in enumerate(staged, start=1):
-            await self.store.insert_document(doc)
-            batch.extend(parents)
-            batch.extend(children)
-            n_parents += len(parents)
-            n_children += len(children)
-            if len(batch) >= 2000:
+            batch: list[Any] = []
+            for doc, parents, children in staged:
+                await self.store.insert_document(doc)
+                batch.extend(parents)
+                batch.extend(children)
+                n_parents += len(parents)
+                n_children += len(children)
+                if len(batch) >= 2000:
+                    await self.store.insert_chunks(batch)
+                    batch = []
+            if batch:
                 await self.store.insert_chunks(batch)
-                batch = []
-            if i % 20000 == 0:
-                log.info("  stored %d/%d docs", i, len(staged))
-        if batch:
-            await self.store.insert_chunks(batch)
+            n_docs += len(staged)
+            del staged, texts, owners, vecs, batch
+            log.info(
+                "  indexed %d/%d docs (%d child chunks, %.0fs)",
+                min(w0 + window_docs, len(items)), len(items), n_children, time.perf_counter() - t0,
+            )  # fmt: skip
+
         if self.backend == "postgres":
             async with self.store._get_pool().acquire() as c:
                 await c.execute("ANALYZE documents")
@@ -316,17 +332,17 @@ class DeepContextAdapter:
             {
                 "fingerprint": fp,
                 "backend": self.backend,
-                "n_docs": len(staged),
+                "n_docs": n_docs,
                 "n_parents": n_parents,
                 "n_children": n_children,
-                "n_skipped_empty_docs": len(corpus) - len(staged),
+                "n_skipped_empty_docs": len(corpus) - n_docs,
                 "embedding_model": C.EMBEDDING_MODEL,
                 "embedding_dim": C.EMBEDDING_DIM,
                 "approx_embed_tokens": approx_tokens,
             }
         )
         return IndexStats(
-            len(staged), n_parents, n_children, False, time.perf_counter() - t0, approx_tokens
+            n_docs, n_parents, n_children, False, time.perf_counter() - t0, approx_tokens
         )
 
     # ------------------------------------------------------------------ retrieval
@@ -402,6 +418,33 @@ class DeepContextAdapter:
         """Top-``k`` *documents* (best chunk per document, rank order preserved)."""
         children = await self.retrieve_children(query, depth=max(k, C.RETRIEVAL_DEPTH))
         return self.rank_documents(children)[:k]
+
+    async def engine_retrieve(self, query: str) -> tuple[list[tuple[str, float]], dict[str, Any]]:
+        """Retrieval stage of the shipped engine (rewriter, classifier, gates, retry, rerank).
+
+        The engine returns at most ``GENERATION_TOP_K`` parent chunks, so the ranked document list
+        is at most that long (rank metrics at k > 6 are lower bounds, flagged in the tables).
+        """
+        from deep_context.core.types import RetrievalFilters
+        from deep_context.retrieval.engine import retrieval_engine
+
+        with stage_scope("retrieval"):
+            res = await retrieval_engine.retrieve(
+                query=query,
+                filters=RetrievalFilters(tenant_id="default"),
+                top_k=C.GENERATION_TOP_K,
+                embedding_model=C.EMBEDDING_MODEL,
+                embedding_dim=C.EMBEDDING_DIM,
+                reranker="ecohash",
+            )
+        ranked = self.rank_documents(res.parent_chunks)
+        extra = {
+            "engine_sufficient": res.sufficient,
+            "engine_insufficiency_reason": res.insufficiency_reason,
+            "engine_query_shape": res.query_shape.value if res.query_shape else None,
+            "engine_retry_count": res.retry_count,
+        }
+        return ranked, extra
 
     # ------------------------------------------------------------------ generation
     async def answer(self, query: str, config: str | None = None) -> dict[str, Any]:

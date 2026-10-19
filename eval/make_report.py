@@ -18,6 +18,20 @@ from eval import config as C
 from eval.make_tables import CONFIG_ORDER, fmt_ci
 
 HEADLINE = [("hit@5", "Hit@5"), ("ndcg@10", "nDCG@10")]
+CUSTOM_PREFIXES = ("docsqa", "pdf-")
+CUSTOM_HEADING = (
+    "\n#### Custom corpora (not public benchmarks: the project's own documentation and the two "
+    "project PDFs; queries and labels were written for this project, not human-audited)\n"
+)
+
+
+def is_custom(dataset: str) -> bool:
+    return dataset.startswith(CUSTOM_PREFIXES)
+
+
+def public_first(groups: list) -> list:
+    """Order ((dataset, tag), frame) groups: public benchmarks first, custom corpora after."""
+    return sorted(groups, key=lambda g: (is_custom(g[0][0]), 0))
 
 
 def git(*args: str) -> str:
@@ -58,17 +72,17 @@ def read_csv(p: Path) -> pd.DataFrame:
     return pd.read_csv(p) if p.exists() else pd.DataFrame()
 
 
-def headline(rt: pd.DataFrame, rg: pd.DataFrame, sy: pd.DataFrame) -> pd.DataFrame:
+def headline(rt: pd.DataFrame, rg: pd.DataFrame, sy: pd.DataFrame) -> pd.DataFrame:  # noqa: C901
     rows = []
     for (ds, tag), g in rt.groupby(["dataset", "run_tag"], sort=False):
-        for cfg in [c for c in CONFIG_ORDER if c != C.ENGINE_CONFIG]:
+        for cfg in CONFIG_ORDER:
             src = g[g["config"] == (cfg if cfg != "rrf_bge_two_pass" else "rrf_bge")]
             if src.empty:
                 continue
             r = src.iloc[0]
             rec = {
                 "dataset": ds,
-                "config": cfg,
+                "config": cfg + (" †" if cfg == C.ENGINE_CONFIG else ""),
                 "n": int(r["n_queries"]),
                 "Hit@5": ci_cell(r, "hit@5"),
                 "nDCG@10": ci_cell(r, "ndcg@10"),
@@ -85,10 +99,14 @@ def headline(rt: pd.DataFrame, rg: pd.DataFrame, sy: pd.DataFrame) -> pd.DataFra
                         "Faithfulness": ci_cell(q, "faithfulness"),
                         "Context Recall": ci_cell(q, "context_recall"),
                         "Factual F1": ci_cell(q, "factual_correctness_f1"),
+                        "Rubric correctness": ci_cell(q, "rubric_correctness"),
                     }
                 )
             else:
-                rec.update({"Faithfulness": "–", "Context Recall": "–", "Factual F1": "–"})
+                rec.update(
+                    {"Faithfulness": "–", "Context Recall": "–", "Factual F1": "–",
+                     "Rubric correctness": "–"}
+                )  # fmt: skip
             s = (
                 sy[(sy["dataset"] == ds) & (sy["config"] == cfg)]
                 if not sy.empty
@@ -229,15 +247,48 @@ def main() -> None:
                 }
             )
         out.append(md_table(pd.DataFrame(rows)))
+    la = rd / "pdf_label_audit.json"
+    if la.exists():
+        d = json.loads(la.read_text())
+        out.append(
+            "\n**Custom-PDF label quality (heuristic, `pdf_label_audit.json`).** The two 36-query PDF sets (`tests/eval_dataset.json`, `tests/eval_quantum_dataset.json`) pre-date this benchmark and their `expected_pages` were not audited by a human. "
+            "Heuristic: the share of an expected fact's content words (length > 3) that occur on the union of the item's expected pages; a fact counts as supported at ≥ 0.8. It under-counts paraphrases and is only a rough signal. "
+            "Because page labels are imprecise, retrieval is also reported with relevance widened to ±1 page.\n"
+        )
+        out.append(
+            md_table(
+                pd.DataFrame(
+                    [
+                        {
+                            "set": k,
+                            "answerable items": v["answerable_items"],
+                            "expected facts": v["facts_total"],
+                            "mean word coverage": v["mean_fact_word_coverage_on_expected_pages"],
+                            "facts supported (≥0.8)": v["share_facts_supported_ge_0.8"],
+                            "items with all facts supported": v["items_with_all_facts_supported"],
+                        }
+                        for k, v in d.items()
+                    ]
+                )
+            )
+        )
     out.append(
         "RGB (generation-only): `en_refine` / `en_int` / `en_fact` from github.com/chen700564/RGB (CC BY-NC-SA 4.0, non-commercial research use).\n"
     )
 
     out.append("## 3. Headline table (mean [95% bootstrap CI, 10k resamples, seed 0])\n")
     out.append(
-        "`rrf_bge_two_pass` shares the retrieval of `rrf_bge`. Generation metrics are blank where no generation run exists for that dataset/config. p95 latency is end-to-end from the live pass.\n"
+        "`rrf_bge_two_pass` shares the retrieval of `rrf_bge` (same ranking by construction). "
+        "† `engine_as_shipped` returns at most 6 parent chunks, so its Hit@5 / nDCG@10 come from a ranking of ≤ 6 documents and are not directly comparable with the depth-100 rankings of the other rows. "
+        "RAGAS metrics (Faithfulness, Context Recall, Factual F1) were run only on `rrf_bge`, `rrf_bge_two_pass` and `engine_as_shipped` (cost); the rubric-correctness metric (§5b) covers all six configurations. "
+        "Generation metrics are blank where no generation run exists for that dataset/config. p95 latency is end-to-end from the live pass.\n"
     )
-    out.append(md_table(hl))
+    out.append("**Public benchmarks**\n")
+    out.append(md_table(hl[~hl["dataset"].map(is_custom)]) if not hl.empty else "_no data_\n")
+    out.append(
+        "\n**Custom corpora** (project documentation and the two project PDFs; separate table because the queries and page/section labels were written for this project and are not human-audited)\n"
+    )
+    out.append(md_table(hl[hl["dataset"].map(is_custom)]) if not hl.empty else "_no data_\n")
 
     out.append("## 4. Retrieval (document level)\n")
     cols = [
@@ -256,7 +307,11 @@ def main() -> None:
         ("evidence_all@5", "AllEvid@5"),
         ("evidence_all@10", "AllEvid@10"),
     ]
-    for (ds, tag), g in rt.groupby(["dataset", "run_tag"], sort=False):
+    shown_custom = False
+    for (ds, tag), g in public_first(list(rt.groupby(["dataset", "run_tag"], sort=False))):
+        if is_custom(ds) and not shown_custom:
+            out.append(CUSTOM_HEADING)
+            shown_custom = True
         out.append(f"\n### {ds} — `{tag}`\n")
         out.append(
             md_table(
@@ -273,6 +328,7 @@ def main() -> None:
             )
         )
     out.append(
+        "\n`rrf_bge_two_pass` rows repeat `rrf_bge` retrieval (they differ only in generation). `engine_as_shipped` is the full shipped retrieval path (query rewriter/classifier, gates, hop retry, rerank) and returns ≤ 6 parent chunks: its R@10, R@100, MAP and nDCG@10 are therefore computed on a list of at most 6 documents (lower bounds, not comparable with depth-100 rows); Hit@k and R@5 are the comparable cells.\n"
         "\nSee `ablation.md` for per-dataset tables with the best value per column in bold.\n"
     )
 
@@ -282,7 +338,13 @@ def main() -> None:
     out.append(
         "RAGAS `retrieved_contexts` = the slice of each retrieved parent that fits the prompt's 12,000-character evidence budget (`table_visibility.csv`). Reference-based metrics inherit the quality of the references (RAGBench references are model-generated; MultiHop-RAG references are 1–5 word answers).\n"
     )
-    for (ds, tag), g in rg.groupby(["dataset", "run_tag"], sort=False) if not rg.empty else []:
+    shown_custom = False
+    for (ds, tag), g in (
+        public_first(list(rg.groupby(["dataset", "run_tag"], sort=False))) if not rg.empty else []
+    ):
+        if is_custom(ds) and not shown_custom:
+            out.append(CUSTOM_HEADING)
+            shown_custom = True
         out.append(f"\n### {ds} — `{tag}`\n")
         cols2 = [
             ("faithfulness", "Faithfulness"),
@@ -290,6 +352,7 @@ def main() -> None:
             ("context_precision", "CtxPrecision(ref)"),
             ("context_recall", "CtxRecall"),
             ("factual_correctness_f1", "FactualCorr F1"),
+            ("rubric_correctness", "Rubric correctness"),
             ("exact_match", "EM"),
             ("token_f1", "token F1"),
             ("contains_answer", "contains-answer"),
@@ -308,6 +371,92 @@ def main() -> None:
                     ]
                 )
             )
+        )
+
+    rc = read_csv(rd / "table_correctness.csv")
+    out.append("\n## 5b. LLM-rubric answer correctness (all six configurations)\n")
+    out.append(
+        "RAGAS `FactualCorrectness` (F1 over decomposed claims) penalises a correct answer for every extra true claim it makes, "
+        "and disagreed with an independent reading of the answers (§5c). The rubric metric asks the judge one question per answer — does it convey what the reference says? — "
+        "and scores correct = 1, partial = 0.5, incorrect = 0, abstained = 0 (for answerable questions). The judge sees only question, reference and answer (not the evidence), at temperature 0, with `thinking_budget=0` and the reason generated before the verdict (`eval/judge_correctness.py`). "
+        "For questions the corpus cannot answer, declining or pointing out the false premise scores 1 and a confident made-up answer scores 0 (last column).\n"
+    )
+    if not rc.empty:
+        shown_custom = False
+        for (ds, tag), g in public_first(list(rc.groupby(["dataset", "run_tag"], sort=False))):
+            if is_custom(ds) and not shown_custom:
+                out.append(CUSTOM_HEADING)
+                shown_custom = True
+            out.append(f"\n### {ds} — `{tag}`\n")
+            out.append(
+                md_table(
+                    pd.DataFrame(
+                        [
+                            {
+                                "config": r["config"],
+                                "answerable (scored)": f"{int(r['n_answerable'])} ({int(r['n_scored_answerable'])})",
+                                "rubric correctness": ci_cell(r, "rubric_correctness"),
+                                "correct": ci_cell(r, "share_correct"),
+                                "partial": ci_cell(r, "share_partial"),
+                                "incorrect": ci_cell(r, "share_incorrect"),
+                                "abstained": ci_cell(r, "share_abstained"),
+                                "unanswerable handled correctly": (
+                                    f"{ci_cell(r, 'unanswerable_handled_correctly')} (n={int(r['n_scored_unanswerable'])})"
+                                    if r["n_scored_unanswerable"]
+                                    else "–"
+                                ),
+                            }
+                            for _, r in g.iterrows()
+                        ]
+                    )
+                )
+            )
+    rv = rd / "rubric_validation" / "rubric_validation.json"
+    if rv.exists():
+        d = json.loads(rv.read_text())
+        fc = d["ragas_factual_correctness_f1_for_comparison"]
+        out.append(
+            "\n## 5c. Validation of the rubric metric against Claude's labels (model labels, not human)\n"
+        )
+        out.append(
+            f"Claude (an Anthropic model) labelled correctness (0 / 0.5 / 1) for {d['n_items']} answers sampled in the smoke run "
+            "(`rubric_validation/claude_audit_items.jsonl`, `claude_labels.jsonl`). The rubric prompt was written once and run once on these items — "
+            "it was **not** tuned on them. The items are from the n=20-per-dataset smoke run, configs `rrf_bge` and `rrf_bge_two_pass` only; "
+            "they contain no unanswerable questions, so the abstention rule of the rubric is not covered by this validation.\n"
+        )
+        rows = [
+            {
+                "metric": f"rubric correctness ({d['judge']})",
+                "n": d["n_scored"],
+                "Claude mean": round(d["claude_mean"], 3),
+                "metric mean": round(d["rubric_mean"], 3),
+                "mean abs. diff": round(d["mean_abs_diff"], 3),
+                "exact agreement": round(d["exact_agreement"], 3),
+                "binary agreement @0.5": round(d["binary_agreement_at_0.5"], 3),
+                "Pearson r": round(d.get("pearson_r", float("nan")), 3),
+                "Spearman ρ": round(d.get("spearman_rho", float("nan")), 3),
+                "weighted κ (linear)": round(d.get("weighted_kappa_linear", float("nan")), 3),
+            },
+            {
+                "metric": "RAGAS FactualCorrectness F1 (for comparison)",
+                "n": d["n_scored"],
+                "Claude mean": round(d["claude_mean"], 3),
+                "metric mean": round(fc["mean"], 3),
+                "mean abs. diff": round(fc["mean_abs_diff_vs_claude"], 3),
+                "Pearson r": round(fc["pearson_r"], 3) if fc["pearson_r"] is not None else "–",
+            },
+        ]
+        out.append(md_table(pd.DataFrame(rows)))
+        cm = d["confusion_claude_rows_x_rubric_cols"]
+        out.append(
+            "\nConfusion (rows = Claude label, columns = rubric score): "
+            + "; ".join(
+                f"Claude {k.split('=')[1]} → "
+                + ", ".join(f"{kk.split('=')[1]}: {vv}" for kk, vv in v.items())
+                for k, v in cm.items()
+            )
+            + f". The rubric is more lenient than Claude on {d['rubric_more_lenient_share']:.0%} of items and stricter on {d['rubric_stricter_share']:.0%}; "
+            "every disagreement is listed in `rubric_validation/rubric_validation.json`.\n"
         )
 
     out.append("\n## 6. Robustness\n")
@@ -405,9 +554,11 @@ def main() -> None:
             show[c] = show[c].round(4)
         show["p_bootstrap"] = show["p_bootstrap"].map(lambda x: f"{x:.4f}")
         show["p_wilcoxon"] = show["p_wilcoxon"].map(lambda x: f"{x:.4f}")
+        if "p_bootstrap_holm" in show:
+            show["p_bootstrap_holm"] = show["p_bootstrap_holm"].map(lambda x: f"{x:.4f}")
         out.append(md_table(show.drop(columns=["run_tag"])))
     out.append(
-        "\nNo multiple-comparison correction is applied; with this many comparisons treat p-values as descriptive.\n"
+        "\n`p_bootstrap_holm` is the Holm step-down adjustment of `p_bootstrap` over every contrast in this table (a conservative family); raw p-values are descriptive.\n"
     )
 
     ca = rd / "claude_audit_summary.json"
@@ -420,17 +571,22 @@ def main() -> None:
             "`human_label` is still blank.\n"
         )
         rows = []
-        for m in ("faithfulness", "correctness"):
+        names = {
+            "faithfulness": "faithfulness vs RAGAS Faithfulness",
+            "correctness": "correctness vs RAGAS FactualCorrectness F1",
+            "correctness_rubric": "correctness vs LLM-rubric correctness (out-of-sample)",
+        }
+        for m in ("faithfulness", "correctness", "correctness_rubric"):
+            if m not in d:
+                continue
             v = d[m]
             rows.append(
                 {
-                    "metric (Claude label vs Gemini judge score)": m
-                    if m == "faithfulness"
-                    else "correctness vs RAGAS FactualCorrectness F1",
+                    "metric (Claude label vs Gemini judge score)": names[m],
                     "n": v["n"],
                     "Claude mean": round(v["claude_mean"], 3),
                     "judge mean": round(v["gemini_judge_mean"], 3),
-                    "mean |diff|": round(v["mean_abs_diff"], 3),
+                    "mean abs. diff": round(v["mean_abs_diff"], 3),
                     "Pearson r": round(v.get("pearson_r", float("nan")), 3),
                     "Spearman ρ": round(v.get("spearman_rho", float("nan")), 3),
                     "binary agreement @0.5": round(v["binary_agreement_at_0.5"], 3),
@@ -442,13 +598,13 @@ def main() -> None:
         out.append("\n")
 
     out.append("## 9. Limitations, leakage and comparability (read before citing)\n")
-    out.append("""- **Judge validity.** The primary judge (`gemini-3.7-flash`) is a different model from the generator (`gemini-3.8-flash`) but from the same vendor/family, so family and self-preference bias are possible. An independent cross-check by Claude (Anthropic) on a sample is reported in `claude_audit_summary.json` / `judge_audit.csv` (`claude_label` column) when present. These are **model labels, not human labels**: the `human_label` column is intentionally blank and no human agreement figure is claimed.
+    out.append("""- **Judge validity.** The primary judge (`gemini-3.7-flash`) is a different model from the generator (`gemini-3.8-flash`) but from the same vendor/family, so family and self-preference bias are possible. The rubric-correctness metric was validated on 50 items against Claude labels (§5c) — agreement is reported there, and the rubric is more lenient than Claude on partially correct answers. An independent cross-check by Claude (Anthropic) on a sample is reported in `claude_audit_summary.json` / `judge_audit.csv` (`claude_label` column) when present. These are **model labels, not human labels**: the `human_label` column is intentionally blank and no human agreement figure is claimed.
 - **Data leakage.** BEIR (SciFact/FiQA/HotpotQA), HotpotQA's Wikipedia text, MultiHop-RAG news articles (2023) and RGB are public and may be in the training data of both the generator and the judge; the embedding model and reranker may also have seen them. The documentation-QA set is derived from this repository's own docs and cannot be leaked into any model trained before it existed, but it was authored by an AI assistant (quotes machine-verified; answers not human-reviewed).
 - **Comparability with published numbers.** Corpus subsampling (HotpotQA, FiQA/others where capped) makes the task easier than the BEIR leaderboard task; BM25 here is SQLite FTS5 (no stemming/stopwords) not Lucene/Pyserini; chunking splits long documents and scores are max-chunk-per-document; query counts differ from published protocols. Do **not** put these next to leaderboard numbers without these qualifiers.
 - **RAGBench** questions are written against their own source passages; pooling passages from many questions makes some questions under-specified, which inflates false abstention and depresses retrieval metrics. References are LLM-generated.
 - **MultiHop-RAG / long documents.** Both generators cap the evidence sent to the model at 12,000 characters, so on long articles most retrieved context never reaches the LLM (see §6). This is a property of the shipped system and is measured, not tuned.
 - **Hard-coded anachronism gate** (`quality_gates.is_anachronism`) is specific to the GoT corpus; it is only exercised by the `engine_as_shipped` rows (fire rate in §6).
-- **Small samples.** Smoke runs (n=20 per dataset) are pipeline checks, not evidence of differences between configs.
+- **Small samples.** `docsqa` has 44 items (9 unanswerable) and RAGBench-covidqa 242; per-category breakdowns would be too thin to interpret. The `smoke/` directory (n=20 per dataset) is a pipeline check, not evidence of differences between configs.
 - The SLM contextual-summary ingestion variant (Qwen3-0.6B) was **not run** (not on the base branch; deferred by request). No numbers are reported for it.
 """)
     out.append(

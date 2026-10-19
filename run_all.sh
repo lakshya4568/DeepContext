@@ -34,33 +34,57 @@ echo "== 0. sanity: gold-quote verification + offline unit tests (relevant file 
 $PY -m eval.docs_qa
 $PY -m pytest tests/test_eval_harness.py -q -p no:cacheprovider
 
-echo "== 1. retrieval ablation (dense / bm25 / rrf / rrf+bge) - raw_retrieval.jsonl"
-$PY -m eval.run_retrieval --dataset scifact                                     --results-dir "$RESULTS"
-$PY -m eval.run_retrieval --dataset fiqa                                        --results-dir "$RESULTS"
-$PY -m eval.run_retrieval --dataset hotpotqa --n-queries "$HOTPOT_QUERIES" --max-docs "$HOTPOT_DOCS" --results-dir "$RESULTS"
-$PY -m eval.run_retrieval --dataset multihoprag --n-queries "$N_GEN"            --results-dir "$RESULTS"
-$PY -m eval.run_retrieval --dataset ragbench-covidqa                            --results-dir "$RESULTS"
-$PY -m eval.run_retrieval --dataset docsqa                                      --results-dir "$RESULTS"
+LOGS="$RESULTS/logs"; mkdir -p "$LOGS"
+CFGS="dense_only bm25_only rrf rrf_bge rrf_bge_two_pass engine_as_shipped"   # all six configurations
+RAGAS_CFGS="rrf_bge rrf_bge_two_pass engine_as_shipped"                       # RAGAS-judged subset (cost)
+GEN_CONC="${GEN_CONC:-24}"                                                    # concurrent model calls in the generation/judging lane
+RET_CONC="${RET_CONC:-12}"                                                    # concurrent queries in the retrieval lane (engine config calls the LLM)
 
-echo "== 2. generation (one-pass / two-pass / engine-as-shipped) - raw_generation.jsonl"
-CFGS="dense_only bm25_only rrf rrf_bge rrf_bge_two_pass engine_as_shipped"
-$PY -m eval.run_generation --dataset multihoprag --n-queries "$N_GEN" --configs $CFGS --results-dir "$RESULTS"
-$PY -m eval.run_generation --dataset ragbench-covidqa                 --configs $CFGS --results-dir "$RESULTS"
-$PY -m eval.run_generation --dataset docsqa                           --configs $CFGS --results-dir "$RESULTS"
+# Two independent lanes (separate processes; every model call is cached and every raw row is skipped
+# once written, so either lane can be interrupted and re-run):
+#   lane R: retrieval ablation, all six configurations, small corpora first, then FiQA (57k docs) and
+#           HotpotQA ($HOTPOT_DOCS docs / $HOTPOT_QUERIES queries). rrf_bge_two_pass shares rrf_bge retrieval.
+#   lane G: generation -> RGB -> thinking-flag check -> rubric correctness -> RAGAS.
+# The generation datasets (docsqa, ragbench-covidqa, multihoprag) are full-corpus indexes. On a fresh
+# database both lanes may build the same index at once; that is safe (deterministic ids, idempotent
+# inserts, cached embeddings) but wasteful, so run lane R's small datasets first if you care.
+lane_retrieval() {
+  export EVAL_LLM_CONCURRENCY="$RET_CONC"
+  for ds in docsqa pdf-quantum pdf-got ragbench-covidqa scifact; do
+    $PY -m eval.run_retrieval --dataset "$ds" --configs $CFGS --concurrency "$RET_CONC" --results-dir "$RESULTS"
+  done
+  $PY -m eval.run_retrieval --dataset multihoprag --n-queries "$N_GEN" --configs $CFGS --concurrency "$RET_CONC" --results-dir "$RESULTS"
+  $PY -m eval.run_retrieval --dataset fiqa --configs $CFGS --concurrency "$RET_CONC" --results-dir "$RESULTS"
+  $PY -m eval.run_retrieval --dataset hotpotqa --n-queries "$HOTPOT_QUERIES" --max-docs "$HOTPOT_DOCS" \
+      --configs $CFGS --concurrency "$RET_CONC" --results-dir "$RESULTS"
+}
+lane_generation() {
+  export EVAL_LLM_CONCURRENCY="$GEN_CONC"
+  echo "== 2. generation (six configs) - raw_generation.jsonl"
+  $PY -m eval.run_generation --dataset multihoprag --n-queries "$N_GEN" --configs $CFGS --concurrency 12 --results-dir "$RESULTS"
+  $PY -m eval.run_generation --dataset ragbench-covidqa                 --configs $CFGS --concurrency 12 --results-dir "$RESULTS"
+  $PY -m eval.run_generation --dataset docsqa                           --configs $CFGS --concurrency 12 --results-dir "$RESULTS"
+  # custom long-document case study: the project's two PDFs with their existing 36-query sets
+  $PY -m eval.run_generation --dataset pdf-quantum                      --configs $CFGS --concurrency 12 --results-dir "$RESULTS"
+  $PY -m eval.run_generation --dataset pdf-got                          --configs $CFGS --concurrency 12 --results-dir "$RESULTS"
+  echo "== 3. RGB robustness (generation only) - raw_rgb.jsonl"
+  for kind in en_refine en_int en_fact; do $PY -m eval.run_rgb --kind "$kind" --results-dir "$RESULTS"; done
+  echo "== 3b. stock enable_thinking bug check on the generator model - thinking_flag_check.json"
+  $PY -m eval.check_thinking_flag --results-dir "$RESULTS"
+  echo "== 3c. LLM-rubric correctness (all six configs, judge=$JUDGE) - rubric_scores.jsonl"
+  $PY -m eval.judge_correctness --results-dir "$RESULTS" --model "$JUDGE" --concurrency "$GEN_CONC"
+  echo "== 4. RAGAS judging of $RAGAS_CFGS (judge=$JUDGE, thinking budget=${JUDGE_THINK:-default}) - ragas_scores.jsonl"
+  TB_ARGS=(); [ -n "$JUDGE_THINK" ] && TB_ARGS=(--thinking-budget "$JUDGE_THINK")
+  $PY -m eval.score_ragas --results-dir "$RESULTS" --model "$JUDGE" --configs $RAGAS_CFGS --batch 48 "${TB_ARGS[@]}"
+}
+lane_retrieval >> "$LOGS/lane_retrieval.log" 2>&1 & PID_R=$!
+lane_generation >> "$LOGS/lane_generation.log" 2>&1 & PID_G=$!
+FAIL=0
+wait "$PID_R" || { echo "lane R (retrieval) FAILED - see $LOGS/lane_retrieval.log"; FAIL=1; }
+wait "$PID_G" || { echo "lane G (generation/judging) FAILED - see $LOGS/lane_generation.log"; FAIL=1; }
+[ "$FAIL" = 0 ] || exit 1
 
-echo "== 3. RGB robustness (generation only) - raw_rgb.jsonl"
-$PY -m eval.run_rgb --kind en_refine --results-dir "$RESULTS"
-$PY -m eval.run_rgb --kind en_int    --results-dir "$RESULTS"
-$PY -m eval.run_rgb --kind en_fact   --results-dir "$RESULTS"
-
-echo "== 3b. stock enable_thinking bug check on the generator model - thinking_flag_check.json"
-$PY -m eval.check_thinking_flag --results-dir "$RESULTS"
-
-echo "== 4. RAGAS judging (judge=$JUDGE, thinking budget=${JUDGE_THINK:-default}) - ragas_scores.jsonl"
-TB_ARGS=(); [ -n "$JUDGE_THINK" ] && TB_ARGS=(--thinking-budget "$JUDGE_THINK")
-$PY -m eval.score_ragas --results-dir "$RESULTS" --model "$JUDGE" "${TB_ARGS[@]}"
-
-echo "== 5. live latency pass (uncached, sequential) - raw_latency.jsonl"
+echo "== 5. live latency pass (uncached, sequential, machine otherwise idle) - raw_latency.jsonl"
 $PY -m eval.run_latency --dataset multihoprag --n-queries "$N_GEN" --n "$N_LAT" --results-dir "$RESULTS"
 $PY -m eval.run_latency --dataset ragbench-covidqa                 --n "$N_LAT" --results-dir "$RESULTS"
 $PY -m eval.run_latency --dataset docsqa                           --n "$N_LAT" --results-dir "$RESULTS"

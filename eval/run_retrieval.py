@@ -22,7 +22,9 @@ from eval.metrics import rank_metrics
 from eval.strict_clients import Trace, stage_scope, trace_scope
 
 log = logging.getLogger("eval.run_retrieval")
-RETRIEVAL_CONFIGS = ["dense_only", "bm25_only", "rrf", "rrf_bge"]
+RETRIEVAL_CONFIGS = [
+    "dense_only", "bm25_only", "rrf", "rrf_bge", "rrf_bge_two_pass", C.ENGINE_CONFIG
+]  # fmt: skip
 
 
 def run_tag(dataset: str, n_queries: int | None, max_docs: int | None) -> str:
@@ -83,12 +85,17 @@ async def run_dataset(
             try:
                 t = time.perf_counter()
                 with trace_scope(Trace()) as trace, stage_scope("retrieval"):
-                    # per-call config: retrieve_children is stateless w.r.t. self.config
-                    children = await adapter.retrieve_children(
-                        task.queries[qid], depth=C.RETRIEVAL_DEPTH, config=config
-                    )
+                    if config == C.ENGINE_CONFIG:
+                        ranked, extra = await adapter.engine_retrieve(task.queries[qid])
+                        row.update(extra)
+                    else:
+                        # per-call config: retrieve_children is stateless w.r.t. self.config;
+                        # rrf_bge_two_pass shares rrf_bge's retrieval (it differs only in generation).
+                        children = await adapter.retrieve_children(
+                            task.queries[qid], depth=C.RETRIEVAL_DEPTH, config=config
+                        )
+                        ranked = adapter.rank_documents(children)
                 row["wall_s"] = round(time.perf_counter() - t, 4)
-                ranked = adapter.rank_documents(children)
                 row["ranked"] = [d for d, _ in ranked]
                 row["top_scores"] = [round(s, 5) for _, s in ranked[:20]]
                 row["metrics"] = rank_metrics(row["ranked"], task.qrels[qid])

@@ -363,4 +363,8 @@ def build_task(name: str, n_queries: int | None = None, max_docs: int | None = N
         from eval.docs_qa import load_docs_qa
 
         return load_docs_qa()
+    if name.startswith("pdf-"):
+        from eval.pdf_sets import load_pdf_set
+
+        return load_pdf_set(name)
     raise ValueError(f"Unknown dataset '{name}'.")

@@ -1,9 +1,9 @@
 """Aggregate raw per-query results into the paper tables (CSV + markdown).
 
 Inputs  (in --results-dir): raw_retrieval.jsonl, raw_generation.jsonl, ragas_scores.jsonl,
-                            raw_latency.jsonl (optional live latency pass)
-Outputs: table_retrieval.csv, table_ragas.csv, table_robustness.csv, table_system.csv,
-         significance.csv, ablation.md
+                            rubric_scores.jsonl, raw_latency.jsonl (optional live latency pass)
+Outputs: table_retrieval.csv, table_ragas.csv, table_correctness.csv, table_robustness.csv,
+         table_system.csv, significance.csv, ablation.md
 
 Every number in REPORT.md is read from these files.
 """
@@ -20,7 +20,7 @@ import numpy as np
 import pandas as pd
 
 from eval import config as C
-from eval.metrics import RANK_METRIC_NAMES, contains_answer, exact_match, token_f1
+from eval.metrics import RANK_METRIC_NAMES, contains_answer, exact_match, rank_metrics, token_f1
 from eval.stats import bootstrap_ci, paired_test, percentile
 
 CONFIG_ORDER = ["dense_only", "bm25_only", "rrf", "rrf_bge", "rrf_bge_two_pass", C.ENGINE_CONFIG]
@@ -31,6 +31,7 @@ RAGAS_METRICS = [
     "context_recall",
     "factual_correctness_f1",
 ]
+RUBRIC_METRICS = ["rubric_correctness", "rubric_strict"]
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -54,6 +55,23 @@ def fmt_ci(mean: float, lo: float, hi: float, digits: int = 3) -> str:
 
 
 # ------------------------------------------------------------------------------ retrieval
+def tolerant_page_rows(ret: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """PDF case-study rows re-scored with relevance widened to +/-1 page (labels are imprecise)."""
+    out = []
+    for r in ret:
+        if not r["dataset"].startswith("pdf-") or not r["relevant"]:
+            continue
+        rel = {
+            f"p{m:04d}": 1
+            for d in r["relevant"]
+            for m in (int(d[1:]) - 1, int(d[1:]), int(d[1:]) + 1)
+            if m >= 1
+        }
+        out.append({**r, "dataset": f"{r['dataset']} (±1 page)", "run_tag": r["run_tag"] + "|tol1",
+                    "relevant": sorted(rel), "metrics": rank_metrics(r["ranked"], rel)})  # fmt: skip
+    return out
+
+
 def retrieval_table(rows: list[dict[str, Any]]) -> pd.DataFrame:
     recs = []
     groups: dict[tuple[str, str, str], list[dict[str, Any]]] = defaultdict(list)
@@ -93,12 +111,21 @@ def short_answer_metrics(
 
 
 def ragas_table(
-    gen: list[dict[str, Any]], scores: list[dict[str, Any]], judge: str | None
+    gen: list[dict[str, Any]],
+    scores: list[dict[str, Any]],
+    judge: str | None,
+    rubric: list[dict[str, Any]] | None = None,
+    rubric_judge: str | None = None,
 ) -> pd.DataFrame:
     sc = {
         (s["run_tag"], s["config"], s["qid"]): s
         for s in scores
         if judge is None or s["judge_model"] == judge
+    }
+    rb = {
+        (s["run_tag"], s["config"], s["qid"]): s
+        for s in (rubric or [])
+        if rubric_judge is None or s["judge_model"] == rubric_judge
     }
     short = short_answer_metrics(gen)
     groups: dict[tuple[str, str, str], list[dict[str, Any]]] = defaultdict(list)
@@ -116,11 +143,67 @@ def ragas_table(
             mean, lo, hi = bootstrap_ci(vals)
             rec[m], rec[f"{m}_lo"], rec[f"{m}_hi"] = mean, lo, hi
             rec[f"{m}_n_valid"] = int(sum(1 for v in vals if v == v))
+        rscored = [rb[(tag, cfg, r["qid"])] for r in rs if (tag, cfg, r["qid"]) in rb]
+        rec["n_rubric_scored"] = len(rscored)
+        for m, vals in (
+            ("rubric_correctness", [x["score"] for x in rscored]),
+            ("rubric_strict", [float(x["verdict"] == "correct") for x in rscored]),
+        ):
+            mean, lo, hi = bootstrap_ci(vals)
+            rec[m], rec[f"{m}_lo"], rec[f"{m}_hi"] = mean, lo, hi
         for m in ("exact_match", "token_f1", "contains_answer"):
             vals = [short[(tag, cfg, r["qid"])][m] for r in rs if (tag, cfg, r["qid"]) in short]
             if vals:
                 mean, lo, hi = bootstrap_ci(vals)
                 rec[m], rec[f"{m}_lo"], rec[f"{m}_hi"] = mean, lo, hi
+        recs.append(rec)
+    df = pd.DataFrame(recs)
+    if df.empty:
+        return df
+    df["_o"] = df["config"].map({c: i for i, c in enumerate(CONFIG_ORDER)})
+    return df.sort_values(["dataset", "run_tag", "_o"]).drop(columns="_o").reset_index(drop=True)
+
+
+def rubric_table(
+    gen: list[dict[str, Any]], rubric: list[dict[str, Any]], rubric_judge: str | None
+) -> pd.DataFrame:
+    """LLM-rubric correctness per (dataset, config): answerable questions and unanswerable ones."""
+    rb = {
+        (s["run_tag"], s["config"], s["qid"]): s
+        for s in rubric
+        if rubric_judge is None or s["judge_model"] == rubric_judge
+    }
+    groups: dict[tuple[str, str, str], list[dict[str, Any]]] = defaultdict(list)
+    for r in gen:
+        groups[(r["dataset"], r["run_tag"], r["config"])].append(r)
+    recs = []
+    for (ds, tag, cfg), rs in groups.items():
+        rec: dict[str, Any] = {"dataset": ds, "run_tag": tag, "config": cfg,
+                               "judge_model": rubric_judge or "any", "rubric_version": "v1"}  # fmt: skip
+        ans = [
+            rb[(tag, cfg, r["qid"])]
+            for r in rs
+            if not r["unanswerable"] and (tag, cfg, r["qid"]) in rb
+        ]
+        una = [
+            rb[(tag, cfg, r["qid"])] for r in rs if r["unanswerable"] and (tag, cfg, r["qid"]) in rb
+        ]
+        rec["n_answerable"] = sum(1 for r in rs if not r["unanswerable"])
+        rec["n_scored_answerable"] = len(ans)
+        for m, vals in (
+            ("rubric_correctness", [x["score"] for x in ans]),
+            ("share_correct", [float(x["verdict"] == "correct") for x in ans]),
+            ("share_partial", [float(x["verdict"] == "partial") for x in ans]),
+            ("share_incorrect", [float(x["verdict"] == "incorrect") for x in ans]),
+            ("share_abstained", [float(x["verdict"] == "abstained") for x in ans]),
+        ):
+            mean, lo, hi = bootstrap_ci(vals)
+            rec[m], rec[f"{m}_lo"], rec[f"{m}_hi"] = mean, lo, hi
+        rec["n_unanswerable"] = sum(1 for r in rs if r["unanswerable"])
+        rec["n_scored_unanswerable"] = len(una)
+        mean, lo, hi = bootstrap_ci([x["score"] for x in una])
+        rec["unanswerable_handled_correctly"], rec["unanswerable_handled_correctly_lo"] = mean, lo
+        rec["unanswerable_handled_correctly_hi"] = hi
         recs.append(rec)
     df = pd.DataFrame(recs)
     if df.empty:
@@ -251,7 +334,13 @@ def visibility_table(gen: list[dict[str, Any]]) -> pd.DataFrame:
 
 # ------------------------------------------------------------------------------ judge audit
 def write_judge_audit(
-    gen: list[dict[str, Any]], scores: list[dict[str, Any]], judge: str, path: Path, n: int = 50
+    gen: list[dict[str, Any]],
+    scores: list[dict[str, Any]],
+    judge: str,
+    path: Path,
+    n: int = 50,
+    rubric: list[dict[str, Any]] | None = None,
+    rubric_judge: str | None = None,
 ) -> int:
     """50 sampled judgments for validation.
 
@@ -266,6 +355,11 @@ def write_judge_audit(
         (s["run_tag"], s["config"], s["qid"]): s
         for s in scores
         if s["judge_model"] == judge and s["faithfulness"] == s["faithfulness"]
+    }
+    rb = {
+        (x["run_tag"], x["config"], x["qid"]): x
+        for x in (rubric or [])
+        if rubric_judge is None or x["judge_model"] == rubric_judge
     }
     cands = [r for r in gen if (r["run_tag"], r["config"], r["qid"]) in sc and not r["abstained"]]
     cands.sort(key=lambda r: (r["dataset"], r["config"], r["qid"]))
@@ -282,18 +376,26 @@ def write_judge_audit(
     ):
         w = csv.writer(f)
         w.writerow(["dataset", "config", "qid", "query", "answer", "context_snippet", "metric", "judge_model",
-                    "judge_score", "claude_faithfulness", "claude_correctness", "human_label"])  # fmt: skip
+                    "judge_score", "rubric_verdict", "rubric_score", "claude_faithfulness", "claude_correctness",
+                    "human_label"])  # fmt: skip
         for r in picked:
             s_ = sc[(r["run_tag"], r["config"], r["qid"])]
             ctx_full = r.get("contexts_seen") or r.get("contexts", [])
             lab = labels.get((r["dataset"], r["config"], r["qid"]), {})
+            rbr = rb.get((r["run_tag"], r["config"], r["qid"]), {})
             w.writerow([r["dataset"], r["config"], r["qid"], r["query"], r["answer"],
                         " ||| ".join(ctx_full)[:900], "faithfulness", judge, round(s_["faithfulness"], 4),
+                        rbr.get("verdict", ""), rbr.get("score", ""),
                         lab.get("faithfulness", ""), lab.get("correctness", ""), ""])  # fmt: skip
             items.write(json.dumps({
                 "dataset": r["dataset"], "config": r["config"], "qid": r["qid"], "query": r["query"],
                 "answer": r["answer"], "reference": r["reference"], "contexts_seen": ctx_full,
-                "judge_scores": {k: s_[k] for k in RAGAS_METRICS},
+                "judge_scores": {
+                    **{k: s_[k] for k in RAGAS_METRICS},
+                    "rubric_correctness": rbr.get("score"),
+                },
+                "rubric_verdict": rbr.get("verdict"),
+                "rubric_reason": rbr.get("reason"),
             }) + "\n")  # fmt: skip
     return len(picked)
 
@@ -363,6 +465,8 @@ def significance_table(
     gen: list[dict[str, Any]],
     scores: list[dict[str, Any]],
     judge: str | None,
+    rubric: list[dict[str, Any]] | None = None,
+    rubric_judge: str | None = None,
 ) -> pd.DataFrame:
     recs = []
 
@@ -382,21 +486,22 @@ def significance_table(
     for r in ret:
         if r["relevant"]:
             by[(r["dataset"], r["run_tag"], r["config"])][r["qid"]] = r["metrics"]
-    for (ds, tag, cfg), _ in list(by.items()):
-        if cfg != "rrf":
-            continue
-        other = by.get((ds, tag, "rrf_bge"))
-        if other is None:
-            continue
-        for m in ("hit@5", "mrr", "ndcg@10", "recall@100", "map"):
-            add(
-                ds,
-                tag,
-                "rrf vs rrf+bge",
-                m,
-                {q: v[m] for q, v in by[(ds, tag, cfg)].items()},
-                {q: v[m] for q, v in other.items()},
-            )
+    # Pre-specified retrieval contrasts (baseline -> variant); the engine row is depth-6 limited,
+    # so it is compared only on metrics defined at k <= 6.
+    retrieval_pairs = (
+        ("dense_only", "rrf", "dense vs rrf", ("hit@5", "mrr", "ndcg@10", "recall@100", "map")),
+        ("dense_only", "rrf_bge", "dense vs rrf+bge", ("hit@5", "mrr", "ndcg@10", "recall@100", "map")),
+        ("rrf", "rrf_bge", "rrf vs rrf+bge", ("hit@5", "mrr", "ndcg@10", "recall@100", "map")),
+        ("rrf_bge", C.ENGINE_CONFIG, "rrf+bge vs engine_as_shipped", ("hit@5", "recall@5")),
+    )  # fmt: skip
+    for ds, tag in sorted({(d, t) for d, t, _ in by}):
+        for base, var, name, metrics in retrieval_pairs:
+            a_rows, b_rows = by.get((ds, tag, base)), by.get((ds, tag, var))
+            if a_rows is None or b_rows is None:
+                continue
+            for m in metrics:
+                add(ds, tag, name, m, {q: v[m] for q, v in a_rows.items()},
+                    {q: v[m] for q, v in b_rows.items()})  # fmt: skip
 
     sc = {
         (s["run_tag"], s["config"], s["qid"]): s
@@ -434,7 +539,50 @@ def significance_table(
             a = {q: fn(r) for q, r in rows.items() if r["unanswerable"]}
             b = {q: fn(r) for q, r in two.items() if r["unanswerable"]}
             add(ds, tag, "one-pass vs two-pass", "abstention_on_unanswerable", a, b)
-    return pd.DataFrame(recs)
+
+    rb = {
+        (s["run_tag"], s["config"], s["qid"]): s
+        for s in (rubric or [])
+        if rubric_judge is None or s["judge_model"] == rubric_judge
+    }
+    answerable = {
+        (r["dataset"], r["run_tag"], r["config"], r["qid"]) for r in gen if not r["unanswerable"]
+    }
+
+    def rubric_scores(ds: str, tag: str, cfg: str) -> dict[str, float]:
+        return {
+            q: rb[(tag, c, q)]["score"]
+            for (d, t, c, q) in answerable
+            if d == ds and t == tag and c == cfg and (tag, c, q) in rb
+        }
+
+    rubric_pairs = (
+        ("dense_only", "rrf", "dense vs rrf"),
+        ("rrf", "rrf_bge", "rrf vs rrf+bge"),
+        ("rrf_bge", "rrf_bge_two_pass", "one-pass vs two-pass"),
+        ("rrf_bge_two_pass", C.ENGINE_CONFIG, "two-pass vs engine_as_shipped"),
+    )
+    for ds, tag in sorted({(d, t) for d, t, _ in gby}):
+        for base, var, name in rubric_pairs:
+            add(
+                ds,
+                tag,
+                name,
+                "rubric_correctness",
+                rubric_scores(ds, tag, base),
+                rubric_scores(ds, tag, var),
+            )
+    df = pd.DataFrame(recs)
+    if not df.empty:  # Holm step-down adjustment over every contrast in this table
+        order = np.argsort(df["p_bootstrap"].to_numpy())
+        m = len(df)
+        adj = np.empty(m)
+        running = 0.0
+        for rank, i in enumerate(order):
+            running = max(running, (m - rank) * float(df["p_bootstrap"].iloc[i]))
+            adj[i] = min(1.0, running)
+        df["p_bootstrap_holm"] = adj
+    return df
 
 
 # ------------------------------------------------------------------------------ markdown
@@ -460,7 +608,7 @@ def ablation_markdown(ret_df: pd.DataFrame, ragas_df: pd.DataFrame, robust_df: p
         cols = list(ABLATION_METRICS)
         extra = []
         if not rg.empty:
-            extra = [m for m in RAGAS_METRICS if m in rg and rg[m].notna().any()]
+            extra = [m for m in RAGAS_METRICS + RUBRIC_METRICS if m in rg and rg[m].notna().any()]
         header = ["config"] + cols + extra
         out.append("| " + " | ".join(header) + " |")
         out.append("|" + "|".join(["---"] * len(header)) + "|")
@@ -534,25 +682,35 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--results-dir", default=str(C.RESULTS_DIR))
     ap.add_argument("--judge", default=C.JUDGE_MODEL)
+    ap.add_argument("--rubric-judge", default=None, help="default: <judge>@think0")
     args = ap.parse_args()
+    rubric_judge = args.rubric_judge or f"{args.judge.split('@')[0]}@think0"
     rdir = Path(args.results_dir)
     ret = latest_per_key(read_jsonl(rdir / "raw_retrieval.jsonl"))
     gen = latest_per_key(read_jsonl(rdir / "raw_generation.jsonl"))
     scores = read_jsonl(rdir / "ragas_scores.jsonl")
+    rubric = read_jsonl(rdir / "rubric_scores.jsonl")
     lat = read_jsonl(rdir / "raw_latency.jsonl")
     rgb = read_jsonl(rdir / "raw_rgb.jsonl")
 
-    rt = retrieval_table(ret)
-    rg = ragas_table(gen, scores, args.judge)
+    rt = retrieval_table(ret + tolerant_page_rows(ret))
+    rg = ragas_table(gen, scores, args.judge, rubric, rubric_judge)
+    rc = rubric_table(gen, rubric, rubric_judge)
     rb = robustness_table(gen)
     sy = system_table(ret, gen, lat)
-    sg = significance_table(ret, gen, scores, args.judge)
+    sg = significance_table(ret, gen, scores, args.judge, rubric, rubric_judge)
     vis = visibility_table(gen)
     if not vis.empty:
         vis.to_csv(rdir / "table_visibility.csv", index=False)
         print(f"table_visibility.csv: {len(vis)} rows")
-    n_audit = write_judge_audit(gen, scores, args.judge, rdir / "judge_audit.csv")
+    n_audit = write_judge_audit(
+        gen, scores, args.judge, rdir / "judge_audit.csv", rubric=rubric, rubric_judge=rubric_judge
+    )
     print(f"judge_audit.csv: {n_audit} rows (human_label blank)")
+    if any(r["dataset"].startswith("pdf-") for r in ret):
+        from eval.pdf_sets import write_label_audits
+
+        write_label_audits(rdir)
     rgbt = rgb_table(rgb)
     if not rgbt.empty:
         rgbt.to_csv(rdir / "table_rgb.csv", index=False)
@@ -560,6 +718,7 @@ def main() -> None:
     for name, df in (
         ("table_retrieval", rt),
         ("table_ragas", rg),
+        ("table_correctness", rc),
         ("table_robustness", rb),
         ("table_system", sy),
         ("significance", sg),

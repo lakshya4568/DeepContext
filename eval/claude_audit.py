@@ -44,9 +44,14 @@ def main() -> None:
     for metric, jkey in (
         ("faithfulness", "faithfulness"),
         ("correctness", "factual_correctness_f1"),
+        ("correctness_rubric", "rubric_correctness"),
     ):
-        c = np.array([labels[k][metric] for k in keys], dtype=float)
-        g = np.array([items[k]["judge_scores"][jkey] for k in keys], dtype=float)
+        lab_metric = "correctness" if metric.startswith("correctness") else metric
+        sub = [k for k in keys if items[k]["judge_scores"].get(jkey) is not None]
+        if not sub:
+            continue
+        c = np.array([labels[k][lab_metric] for k in sub], dtype=float)
+        g = np.array([items[k]["judge_scores"][jkey] for k in sub], dtype=float)
         ok = ~np.isnan(g)
         res = {"n": int(ok.sum()), "claude_mean": float(c[ok].mean()), "gemini_judge_mean": float(g[ok].mean()),
                "mean_abs_diff": float(np.mean(np.abs(c[ok] - g[ok])))}  # fmt: skip

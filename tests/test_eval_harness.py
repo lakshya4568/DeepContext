@@ -226,3 +226,76 @@ async def test_postgres_store_schema_hnsw_and_search_depth() -> None:
     finally:
         await store.close()
         await pg.drop_schema(schema)
+
+
+# --- LLM-rubric correctness (parsing and prompt only; no API calls) ---------------------------------
+def test_rubric_parse_verdict() -> None:
+    from eval.judge_correctness import parse_verdict
+
+    assert parse_verdict('{"reason": "same", "verdict": "correct"}') == ("correct", "same")
+    assert parse_verdict('{"verdict": "Partial"}')[0] == "partial"
+    assert parse_verdict('{"verdict": "maybe"}')[0] is None
+    assert parse_verdict("not json at all")[0] is None
+    # truncated JSON still yields the verdict when it was emitted
+    assert parse_verdict('{"reason": "cut off", "verdict": "incorrect"')[0] == "incorrect"
+
+
+def test_rubric_prompt_flags_unanswerable() -> None:
+    from eval.judge_correctness import build_prompt
+
+    answerable = build_prompt("q?", "ref", "ans", answerable=True)
+    unanswerable = build_prompt("q?", "ref", "ans", answerable=False)
+    assert "does NOT contain the answer" not in answerable
+    assert "does NOT contain the answer" in unanswerable
+    assert "(empty answer)" in build_prompt("q?", "ref", "  ")
+
+
+def test_weighted_kappa_perfect_and_chance() -> None:
+    import numpy as np
+    from eval.judge_correctness import _weighted_kappa
+
+    a = np.array([0.0, 0.5, 1.0, 1.0, 0.5, 0.0])
+    assert _weighted_kappa(a, a) == 1.0
+    assert _weighted_kappa(a, np.roll(a, 1)) < 1.0
+
+
+# --- custom PDF sets ---------------------------------------------------------------------------------
+def test_pdf_page_ids_roundtrip_and_tolerant_rows() -> None:
+    from eval.make_tables import tolerant_page_rows
+    from eval.pdf_sets import page_id, page_number
+
+    assert page_id(17) == "p0017" and page_number("p0017") == 17
+    row = {
+        "dataset": "pdf-got",
+        "run_tag": "t",
+        "config": "rrf",
+        "qid": "q",
+        "relevant": ["p0017"],
+        "ranked": ["p0018", "p0099"],
+    }
+    (tol,) = tolerant_page_rows([row, {**row, "dataset": "scifact"}])
+    assert tol["dataset"] == "pdf-got (±1 page)"
+    assert tol["relevant"] == ["p0016", "p0017", "p0018"]
+    assert tol["metrics"]["hit@1"] == 1.0  # strict labels would score 0 for this ranking
+
+
+def test_pdf_label_audit_graded_coverage() -> None:
+    from eval.pdf_sets import label_audit
+
+    items = [
+        {
+            "is_unanswerable": False,
+            "expected_pages": [1],
+            "expected_facts": ["Valyrian steel sword"],
+        },
+        {
+            "is_unanswerable": False,
+            "expected_pages": [2],
+            "expected_facts": ["Valyrian steel sword"],
+        },
+        {"is_unanswerable": True, "expected_pages": [], "expected_facts": []},
+    ]
+    pages = ["a Valyrian steel sword was forged", "nothing relevant here"]
+    a = label_audit("x", items, pages)
+    assert a["answerable_items"] == 2 and a["facts_total"] == 2
+    assert a["share_facts_supported_ge_0.8"] == 0.5
