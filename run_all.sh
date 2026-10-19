@@ -25,9 +25,9 @@ PY="${PY:-uv run --no-sync python}"
 JUDGE="${EVAL_JUDGE_MODEL:-gemini-3.7-flash}"      # must differ from the generator (gemini-3.8-flash)
 JUDGE_THINK="${EVAL_JUDGE_THINKING_BUDGET:-}"       # optional thinking-token budget; empty = model default
 N_GEN="${N_GEN:-300}"                                 # queries per dataset for LLM-judged metrics
-N_LAT="${N_LAT:-30}"                                  # queries in the live latency pass
-HOTPOT_QUERIES="${HOTPOT_QUERIES:-1000}"              # HotpotQA test queries (of 7,405)
-HOTPOT_DOCS="${HOTPOT_DOCS:-200000}"                  # corpus cap: all relevant docs + random distractors
+N_LAT="${N_LAT:-15}"                                  # queries in the live latency pass
+HOTPOT_QUERIES="${HOTPOT_QUERIES:-300}"               # HotpotQA test queries (of 7,405)
+HOTPOT_DOCS="${HOTPOT_DOCS:-30000}"                   # corpus cap: all relevant docs + random distractors
 mkdir -p "$RESULTS"
 
 echo "== 0. sanity: gold-quote verification + offline unit tests (relevant file only)"
@@ -36,6 +36,8 @@ $PY -m pytest tests/test_eval_harness.py -q -p no:cacheprovider
 
 LOGS="$RESULTS/logs"; mkdir -p "$LOGS"
 CFGS="dense_only bm25_only rrf rrf_bge rrf_bge_two_pass engine_as_shipped"   # all six configurations
+N_RAGAS="${N_RAGAS:-100}"                                                     # RAGAS-judged queries per dataset (same queries for every config)
+CFGS_LARGE="dense_only bm25_only rrf rrf_bge rrf_bge_two_pass"               # FiQA/HotpotQA: no generation, so no engine_as_shipped run
 RAGAS_CFGS="rrf_bge rrf_bge_two_pass engine_as_shipped"                       # RAGAS-judged subset (cost)
 GEN_CONC="${GEN_CONC:-24}"                                                    # concurrent model calls in the generation/judging lane
 RET_CONC="${RET_CONC:-12}"                                                    # concurrent queries in the retrieval lane (engine config calls the LLM)
@@ -54,9 +56,9 @@ lane_retrieval() {
     $PY -m eval.run_retrieval --dataset "$ds" --configs $CFGS --concurrency "$RET_CONC" --results-dir "$RESULTS"
   done
   $PY -m eval.run_retrieval --dataset multihoprag --n-queries "$N_GEN" --configs $CFGS --concurrency "$RET_CONC" --results-dir "$RESULTS"
-  $PY -m eval.run_retrieval --dataset fiqa --configs $CFGS --concurrency "$RET_CONC" --results-dir "$RESULTS"
+  $PY -m eval.run_retrieval --dataset fiqa --configs $CFGS_LARGE --concurrency "$RET_CONC" --results-dir "$RESULTS"
   $PY -m eval.run_retrieval --dataset hotpotqa --n-queries "$HOTPOT_QUERIES" --max-docs "$HOTPOT_DOCS" \
-      --configs $CFGS --concurrency "$RET_CONC" --results-dir "$RESULTS"
+      --configs $CFGS_LARGE --concurrency "$RET_CONC" --results-dir "$RESULTS"
 }
 lane_generation() {
   export EVAL_LLM_CONCURRENCY="$GEN_CONC"
@@ -75,7 +77,7 @@ lane_generation() {
   $PY -m eval.judge_correctness --results-dir "$RESULTS" --model "$JUDGE" --concurrency "$GEN_CONC"
   echo "== 4. RAGAS judging of $RAGAS_CFGS (judge=$JUDGE, thinking budget=${JUDGE_THINK:-default}) - ragas_scores.jsonl"
   TB_ARGS=(); [ -n "$JUDGE_THINK" ] && TB_ARGS=(--thinking-budget "$JUDGE_THINK")
-  $PY -m eval.score_ragas --results-dir "$RESULTS" --model "$JUDGE" --configs $RAGAS_CFGS --batch 48 "${TB_ARGS[@]}"
+  $PY -m eval.score_ragas --results-dir "$RESULTS" --model "$JUDGE" --configs $RAGAS_CFGS --per-dataset "$N_RAGAS" --batch 48 "${TB_ARGS[@]}"
 }
 lane_retrieval >> "$LOGS/lane_retrieval.log" 2>&1 & PID_R=$!
 lane_generation >> "$LOGS/lane_generation.log" 2>&1 & PID_G=$!

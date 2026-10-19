@@ -64,9 +64,15 @@ async def ensure_database() -> None:
         await admin.close()
     conn = await asyncpg.connect(dsn_for(EVAL_DB))
     try:
-        await conn.execute("CREATE EXTENSION IF NOT EXISTS vector;")
-        await conn.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto;")
-        await conn.execute(f'ALTER DATABASE "{EVAL_DB}" SET hnsw.ef_search = {HNSW_EF_SEARCH}')
+        # Several runner processes start at once; serialise the catalog changes (otherwise Postgres
+        # raises "tuple concurrently updated" on ALTER DATABASE / CREATE EXTENSION).
+        await conn.execute("SELECT pg_advisory_lock(7270017)")
+        try:
+            await conn.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+            await conn.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto;")
+            await conn.execute(f'ALTER DATABASE "{EVAL_DB}" SET hnsw.ef_search = {HNSW_EF_SEARCH}')
+        finally:
+            await conn.execute("SELECT pg_advisory_unlock(7270017)")
     finally:
         await conn.close()
 

@@ -33,6 +33,13 @@ def main() -> None:
     ap.add_argument("--limit", type=int, default=None, help="score at most N pending rows")
     ap.add_argument("--datasets", nargs="*", default=None)
     ap.add_argument("--configs", nargs="*", default=None, help="only score these configs")
+    ap.add_argument(
+        "--per-dataset",
+        type=int,
+        default=None,
+        help="judge only N queries per dataset (same queries for every config; chosen by a "
+        "deterministic hash of the query id, so the subset does not depend on run order)",
+    )
     args = ap.parse_args()
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(name)s %(message)s", stream=sys.stderr
@@ -59,6 +66,15 @@ def main() -> None:
         and (args.datasets is None or r["dataset"] in args.datasets)
         and (args.configs is None or r["config"] in args.configs)
     ]  # fmt: skip
+    if args.per_dataset:
+        import hashlib
+
+        keep: dict[str, set[str]] = {}
+        for ds in {r["dataset"] for r in raw if not r.get("error")}:
+            qids = sorted({r["qid"] for r in raw if r["dataset"] == ds and not r["unanswerable"]},
+                          key=lambda q: hashlib.md5(f"{ds}|{q}".encode()).hexdigest())  # fmt: skip
+            keep[ds] = set(qids[: args.per_dataset])
+        todo = [r for r in todo if r["qid"] in keep[r["dataset"]]]
     if args.limit:
         todo = todo[: args.limit]
     log.info("%d rows to score with judge=%s (generator=%s)", len(todo), label, C.GENERATOR_MODEL)

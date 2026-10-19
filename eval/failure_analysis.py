@@ -28,6 +28,13 @@ def first_rel_rank(ranked: list[str], relevant: set[str]) -> int | None:
 def diagnose_retrieval(r: dict[str, Any]) -> str:
     rel = set(r["relevant"])
     rank = first_rel_rank(r["ranked"], rel)
+    if r.get("config") == C.ENGINE_CONFIG:
+        if r.get("engine_sufficient") is False:
+            return (
+                f"engine declined: insufficient evidence ({r.get('engine_insufficiency_reason')})"
+            )
+        if rank is None:
+            return "retrieval miss (no relevant doc among the engine's ≤6 returned documents)"
     if rank is None:
         return "retrieval miss (no relevant doc in top-100)"
     if rank > 5:
