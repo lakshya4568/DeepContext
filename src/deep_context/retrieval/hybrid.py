@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 from typing import Any
 
 from deep_context.core.config import settings
@@ -14,16 +15,21 @@ from deep_context.storage.base import StorageInterface
 def reciprocal_rank_fusion(
     ranked_lists: list[list[dict[str, Any]]],
     k: int = 60,
+    weights: list[float] | None = None,
 ) -> list[tuple[str, float]]:
     """
     Combines multiple ranked lists into a single ranking using Reciprocal Rank Fusion.
-    Score = sum(1.0 / (k + rank)) across all lists where the item appears.
+    Score = sum(weight / (k + rank)) across all lists where the item appears
+    (weights default to 1.0, which is classic RRF).
     """
+    if weights is not None and len(weights) != len(ranked_lists):
+        raise ValueError("weights must have one entry per ranked list")
     scores: dict[str, float] = {}
-    for ranked_list in ranked_lists:
+    for i, ranked_list in enumerate(ranked_lists):
+        w = 1.0 if weights is None else weights[i]
         for rank, item in enumerate(ranked_list, start=1):
             cid = item["id"]
-            scores[cid] = scores.get(cid, 0.0) + 1.0 / (k + rank)
+            scores[cid] = scores.get(cid, 0.0) + w / (k + rank)
 
     return sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
 
@@ -31,10 +37,17 @@ def reciprocal_rank_fusion(
 def deduplicate_candidates(
     candidates: list[dict[str, Any]], max_candidates: int = 100
 ) -> list[dict[str, Any]]:
-    """Deduplicate candidates with identical chunk id or near-identical content prefixes."""
+    """Drop candidates with the same chunk id or the same text.
+
+    ``DEDUP_MODE=content_hash`` (default) removes only chunks whose whole normalised text repeats.
+    ``DEDUP_MODE=prefix120`` is the original rule that also dropped any chunk sharing its first 120
+    characters with an earlier one; it removed distinct passages that open with the same header
+    (for example RAGBench passages that all start with ``Title: ...``).
+    """
     seen_ids: set[str] = set()
     seen_prefixes: set[str] = set()
     deduped: list[dict[str, Any]] = []
+    prefix_mode = settings.dedup_mode == "prefix120"
 
     for c in candidates:
         cid = c["id"]
@@ -42,7 +55,10 @@ def deduplicate_candidates(
             continue
         seen_ids.add(cid)
 
-        prefix = c["content"][:120].strip().lower()
+        if prefix_mode:
+            prefix = c["content"][:120].strip().lower()
+        else:
+            prefix = hashlib.sha1(" ".join(c["content"].split()).lower().encode()).hexdigest()
         if prefix in seen_prefixes:
             continue
         seen_prefixes.add(prefix)
@@ -103,7 +119,12 @@ class HybridRetriever:
         bm25_lists = ranked_lists[:n_queries]
         vector_lists = ranked_lists[n_queries:]
 
-        fused = reciprocal_rank_fusion(ranked_lists, k=settings.rrf_k)
+        fused = reciprocal_rank_fusion(
+            ranked_lists,
+            k=settings.rrf_k,
+            weights=[settings.rrf_weight_lexical] * n_queries
+            + [settings.rrf_weight_dense] * n_queries,
+        )
         fused_score_map = {cid: score for cid, score in fused}
         fused_ids = [cid for cid, _ in fused[:limit]]
 

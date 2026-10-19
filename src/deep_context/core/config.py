@@ -126,6 +126,17 @@ class Settings(BaseSettings):
 
     # Retrieval parameters
     rrf_k: int = Field(default=60, alias="RRF_K")
+    # Lexical channel: "bm25" (Okapi BM25 over the Postgres tsvector, IDF-weighted, length-normalised)
+    # or "ts_rank" (the original Postgres full-text ranking, kept for reproducing earlier results).
+    lexical_ranking: str = Field(default="bm25", alias="LEXICAL_RANKING")
+    bm25_k1: float = Field(default=1.2, alias="BM25_K1")
+    bm25_b: float = Field(default=0.75, alias="BM25_B")
+    # Relative vote of each channel in Reciprocal Rank Fusion (1.0 / 1.0 = classic unweighted RRF).
+    rrf_weight_dense: float = Field(default=1.0, alias="RRF_WEIGHT_DENSE")
+    rrf_weight_lexical: float = Field(default=1.0, alias="RRF_WEIGHT_LEXICAL")
+    # Near-duplicate filter on fused candidates: "content_hash" (exact duplicate text only) or
+    # "prefix120" (original rule: drop any chunk whose first 120 characters repeat).
+    dedup_mode: str = Field(default="content_hash", alias="DEDUP_MODE")
     default_top_k: int = Field(default=8, alias="DEFAULT_TOP_K")
     first_stage_limit: int = Field(default=100, alias="FIRST_STAGE_LIMIT")
     max_retrieval_retries: int = Field(default=1, alias="MAX_RETRIEVAL_RETRIES")

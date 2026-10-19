@@ -560,6 +560,182 @@ class PostgresStore(StorageInterface):
         filters: RetrievalFilters,
         limit: int = 100,
     ) -> list[dict[str, Any]]:
+        if settings.lexical_ranking == "bm25":
+            return await self._search_okapi_bm25(query, filters, limit)
+        return await self._search_ts_rank(query, filters, limit)
+
+    # --- Okapi BM25 over the stored tsvector -------------------------------------------------
+    _BM25_CACHE_TTL_S = 120.0
+
+    def _bm25_cache(self) -> dict[Any, Any]:
+        cache: dict[Any, Any] | None = getattr(self, "_bm25_stats_cache", None)
+        if cache is None:
+            cache = {}
+            self._bm25_stats_cache = cache
+        return cache
+
+    async def _bm25_corpus_stats(
+        self, conn: asyncpg.Connection, filters: RetrievalFilters
+    ) -> tuple[float, float]:
+        """(number of child chunks, mean chunk length in tokens) for this tenant/scope (cached)."""
+        import time
+
+        key = ("stats", filters.tenant_id, tuple(filters.permission_scope))
+        hit = self._bm25_cache().get(key)
+        if hit and time.monotonic() - hit[0] < self._BM25_CACHE_TTL_S:
+            return hit[1]
+        row = await conn.fetchrow(
+            """
+            SELECT COUNT(*)::float8 AS n, COALESCE(AVG(GREATEST(c.token_count, 1)), 1)::float8 AS avgdl
+            FROM chunks c JOIN documents d ON d.id = c.document_id
+            WHERE c.level = 'child' AND d.tenant_id = $1 AND d.permission_scope && $2
+            """,
+            filters.tenant_id,
+            filters.permission_scope,
+        )
+        value = (float(row["n"]), max(float(row["avgdl"]), 1.0))
+        self._bm25_cache()[key] = (time.monotonic(), value)
+        return value
+
+    async def _bm25_doc_freq(
+        self, conn: asyncpg.Connection, filters: RetrievalFilters, lexemes: list[str]
+    ) -> dict[str, int]:
+        """Number of child chunks containing each lexeme (cached per lexeme)."""
+        import time
+
+        out: dict[str, int] = {}
+        now = time.monotonic()
+        for lex in lexemes:
+            hit = self._bm25_cache().get(
+                ("df", filters.tenant_id, tuple(filters.permission_scope), lex)
+            )
+            if hit and now - hit[0] < self._BM25_CACHE_TTL_S:
+                out[lex] = hit[1]
+                continue
+            df = await conn.fetchval(
+                """
+                SELECT COUNT(*) FROM chunks c JOIN documents d ON d.id = c.document_id
+                WHERE c.level = 'child' AND d.tenant_id = $1 AND d.permission_scope && $2
+                  AND c.tsv @@ $3::tsquery
+                """,
+                filters.tenant_id,
+                filters.permission_scope,
+                self._quote_lexemes([lex]),
+            )
+            out[lex] = int(df)
+            self._bm25_cache()[("df", filters.tenant_id, tuple(filters.permission_scope), lex)] = (
+                now,
+                int(df),
+            )
+        return out
+
+    @staticmethod
+    def _quote_lexemes(lexemes: list[str], op: str = " | ") -> str:
+        """tsquery text over already-stemmed lexemes (quoted, so they are matched verbatim)."""
+        return op.join("'" + lex.replace("\\", "\\\\").replace("'", "''") + "'" for lex in lexemes)
+
+    async def _search_okapi_bm25(
+        self, query: str, filters: RetrievalFilters, limit: int
+    ) -> list[dict[str, Any]]:
+        """Okapi BM25 (Lucene IDF) computed from the chunk tsvector.
+
+        term frequency = number of positions of the lexeme in the chunk's tsvector, chunk length =
+        ``token_count``, IDF from a per-lexeme document-frequency count (GIN index). The candidate
+        set is every chunk containing at least one rare query lexeme (lexemes present in more than
+        half of all chunks add almost nothing and are only used for scoring, not for matching).
+        Quoted phrases keep the original +10 boost.
+        """
+        import re
+
+        k1, b = settings.bm25_k1, settings.bm25_b
+        clean_query = (
+            query.replace("“", '"').replace("”", '"').replace("‘", '"').replace("’", '"')
+            .replace("'", '"')
+        )  # fmt: skip
+        phrases = re.findall(r'"([^"]{3,})"', clean_query)
+        phrase_term = phrases[0] if phrases else ""
+
+        pool = self._get_pool()
+        async with pool.acquire() as conn:
+            lexemes = [
+                r["lexeme"]
+                for r in await conn.fetch(
+                    "SELECT DISTINCT lexeme FROM unnest(to_tsvector('english', $1)) LIMIT 40",
+                    clean_query,
+                )
+            ]
+            n_chunks, avgdl = await self._bm25_corpus_stats(conn, filters)
+            df = await self._bm25_doc_freq(conn, filters, lexemes) if lexemes else {}
+            present = [lex for lex in lexemes if df.get(lex, 0) > 0]
+            if not present and not phrase_term:
+                return []
+            idf = [
+                float(np.log(1.0 + (n_chunks - df[lex] + 0.5) / (df[lex] + 0.5))) for lex in present
+            ]
+            rare = [lex for lex in present if df[lex] <= 0.5 * n_chunks] or present
+            match_query = self._quote_lexemes(rare) if rare else ""
+
+            params: list[Any] = [
+                present,
+                idf,
+                match_query,
+                phrase_term,
+                filters.tenant_id,
+                filters.permission_scope,
+                avgdl,
+            ]
+            clauses = ["c.level = 'child'", "d.tenant_id = $5", "d.permission_scope && $6"]
+            if filters.document_ids:
+                clauses.append(f"d.id = ANY(${len(params) + 1}::uuid[])")
+                params.append(filters.document_ids)
+            sql = f"""
+                SELECT c.id, c.document_id, c.parent_chunk_id, c.content, c.section_path,
+                       c.page_number, d.title AS document_title, d.source_uri,
+                       (COALESCE(bm.score, 0.0) +
+                        (CASE WHEN length($4) > 0 AND c.content ILIKE '%' || $4 || '%'
+                              THEN 10.0 ELSE 0.0 END)) AS score
+                FROM chunks c
+                JOIN documents d ON d.id = c.document_id
+                LEFT JOIN LATERAL (
+                    SELECT SUM(
+                        t.idf * (COALESCE(array_length(u.positions, 1), 1) * {k1 + 1.0})
+                        / (COALESCE(array_length(u.positions, 1), 1)
+                           + {k1} * (1.0 - {b} + {b} * GREATEST(c.token_count, 1)::float8 / $7))
+                    ) AS score
+                    FROM unnest(c.tsv) AS u
+                    JOIN unnest($1::text[], $2::float8[]) AS t(lex, idf) ON t.lex = u.lexeme
+                ) bm ON TRUE
+                WHERE {" AND ".join(clauses)} AND (
+                    (length($3) > 0 AND c.tsv @@ $3::tsquery) OR
+                    (length($4) > 0 AND c.content ILIKE '%' || $4 || '%')
+                )
+                ORDER BY score DESC, c.created_at DESC LIMIT {int(limit)};
+            """
+            rows = await conn.fetch(sql, *params)
+            return [
+                {
+                    "id": str(r["id"]),
+                    "document_id": str(r["document_id"]),
+                    "parent_chunk_id": (
+                        str(r["parent_chunk_id"]) if r["parent_chunk_id"] else None
+                    ),
+                    "content": r["content"],
+                    "section_path": r["section_path"],
+                    "page_number": r["page_number"],
+                    "document_title": r["document_title"],
+                    "source_uri": r["source_uri"],
+                    "score": float(r["score"]),
+                }
+                for r in rows
+            ]
+
+    async def _search_ts_rank(
+        self,
+        query: str,
+        filters: RetrievalFilters,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """Original lexical ranking (``LEXICAL_RANKING=ts_rank``)."""
         import re
 
         clean_query = (
