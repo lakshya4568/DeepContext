@@ -23,8 +23,9 @@ BOOTSTRAP_SEED = 0  # bootstrap resampling
 BOOTSTRAP_RESAMPLES = 10_000
 
 # --- Models ----------------------------------------------------------------------------
-GENERATOR_MODEL = os.environ.get("EVAL_GENERATOR_MODEL", "gemini-2.5-flash")
-JUDGE_MODEL = os.environ.get("EVAL_JUDGE_MODEL", "gemini-2.5-pro")
+# Gemini 3.x only (no 2.x models). Judge must differ from the generator.
+GENERATOR_MODEL = os.environ.get("EVAL_GENERATOR_MODEL", "gemini-3.8-flash")
+JUDGE_MODEL = os.environ.get("EVAL_JUDGE_MODEL", "gemini-3.7-flash")
 EMBEDDING_MODEL = "gemini-embedding-2"
 EMBEDDING_DIM = 768
 # gemini-embedding-2 is not served from us-central1 on this project (404); "global" works.
@@ -44,7 +45,7 @@ RANK_K_NDCG = (5, 10)
 # id -> (display name, retrieval kind, generation mode)
 CONFIGS: dict[str, tuple[str, str, str]] = {
     "dense_only": ("Dense only", "dense", "one_pass"),
-    "bm25_only": ("BM25 only", "bm25", "one_pass"),
+    "bm25_only": ("Lexical only (Postgres FTS ts_rank; FTS5 BM25 on SQLite)", "bm25", "one_pass"),
     "rrf": ("RRF hybrid", "rrf", "one_pass"),
     "rrf_bge": ("RRF + BGE rerank", "rrf_bge", "one_pass"),
     "rrf_bge_two_pass": ("RRF + BGE + two-pass gen", "rrf_bge", "two_pass"),
@@ -57,9 +58,9 @@ ENGINE_CONFIG = "engine_as_shipped"
 # Source: Gemini API pricing page (standard paid tier), checked 2026-10-18. Vertex AI billing
 # can differ; these are used only for the *estimated* cost-per-1k-queries column.
 PRICES_USD_PER_M = {
-    "gemini-2.5-flash": {"in": 0.30, "out": 2.50},
-    "gemini-2.5-pro": {"in": 1.25, "out": 10.00},  # prompts <= 200k tokens
-    "gemini-3.7-flash": {"in": 0.75, "out": 3.75},  # through 2026-12-31
+    # Gemini API list price, standard paid tier, valid through 2026-12-31 (doubles from 2027-01-01).
+    "gemini-3.7-flash": {"in": 0.75, "out": 3.75},
+    "gemini-3.8-flash": {"in": 0.75, "out": 3.75},
     "gemini-embedding-2": {"in": 0.20, "out": 0.0},
 }
 

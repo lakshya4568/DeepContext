@@ -157,8 +157,24 @@ def main() -> None:
         + ", ".join(f"{p} {ver(p)}" for p in pk)
         + ".\n"
     )
+    backends = sorted({m.get("index", {}).get("backend", "?") for m in meta.values()})
+    storages = sorted(
+        {m.get("index", {}).get("storage", "?").split(", schema")[0] for m in meta.values()}
+    )
+    n_schemas = len(meta)
+    pg_note = (
+        "On PostgreSQL the lexical channel is the product's Postgres full-text search (`ts_rank` over the first 8 "
+        "query terms), **not BM25**, and the dense channel is pgvector HNSW (approximate). `bm25_only` rows "
+        "therefore mean *Postgres full-text only*.\n"
+    )
+    sqlite_note = "Lexical channel = SQLite FTS5 `bm25()`; dense channel = exact cosine.\n"
     out.append(
-        "Storage backend: SQLite (FTS5 `bm25()` for the lexical channel; in-memory cosine for the dense channel) — not the Postgres/pgvector/ParadeDB deployment described in the docs, so lexical-channel scores are not comparable to a Postgres `ts_rank_cd` run.\n"
+        "Storage backend: "
+        + ", ".join(backends)
+        + " — "
+        + "; ".join(storages)
+        + f" (one schema per index; {n_schemas} indexes, see `dataset_meta.json`). "
+        + (pg_note if "postgres" in backends else sqlite_note)
     )
     out.append(
         "Ingestion: *fast* path only (`DocumentParser` + `ParentChildChunker`, child 300–600 tokens, parent 1000–2500, 15% overlap); no Docling, no local summariser, no model loaded on the host. Title (when present) is prepended to the chunk text and passed in the embedding prefix.\n"
@@ -166,16 +182,38 @@ def main() -> None:
     out.append(
         "### Harness deviations from the stock code (all inside `eval/`, `src/` untouched)\n"
     )
-    out.append("""1. **Strict transport** (`eval/strict_clients.py`): Vertex AI (ADC) instead of API keys; no mock/hash embeddings, no Gemini→Groq→NVIDIA→mock failover, no silent heuristic-reranker fallback — a failure raises and the row is retried on the next run. The stock client would otherwise have produced hash embeddings with this environment.
-2. `gemini-embedding-2` is called from the `global` endpoint (404 in `us-central1`), one content per request (batching is rejected by the API).
-3. The stock Gemini branch of `LLMClient.complete` ignores `enable_thinking=False`; with `gemini-2.5-flash` default thinking the two-pass extractor (`max_tokens=512`) spent ~490 tokens thinking and returned truncated JSON in a spot check. The harness honours the flag (`thinking_budget=0`); set `EVAL_HONOR_ENABLE_THINKING=0` to reproduce the stock behaviour.
-4. Per-call caller timeouts (5–15 s) are replaced by 180 s so results do not depend on API load; the whole pipeline (rewriter, classifier, generator) is routed to the generator model by configuration.
-5. `SQLiteStore.search_vector` is replaced by a vectorised equivalent (unit-tested against the stock method).
-6. One-pass baseline = the product's `PromptAssembler` prompt + one Gemini call, with the (empty) memory lookup stubbed to avoid a no-op embedding call.
-7. Cached model calls replay their recorded first-call latency; **latency percentiles come only from the separate live pass (`raw_latency.jsonl`)**.
-8. RAGAS `ResponseRelevancy` uses `strictness=1` (a temperature-0 judge returns identical candidates, so the default 3 only triples cost).
+    out.append("""1. **Strict transport** (`eval/strict_clients.py`): Vertex AI (ADC) instead of API keys; no mock/hash embeddings, no Gemini→Groq→NVIDIA→mock failover, no silent heuristic-reranker fallback — a failure raises and the row is retried on the next run. The stock client would otherwise have produced hash embeddings in this environment.
+2. **Models**: Gemini 3.x only. `gemini-embedding-2` is served from the `global` endpoint (404 in `us-central1`) and accepts one content per request; Gemini 3.x chat models are also called via `global`.
+3. **Thinking flag**: the stock Gemini branch of `LLMClient.complete` ignores `enable_thinking=False`. The harness honours it (`thinking_budget=0`); the table below quantifies what the stock behaviour does to the two-pass extractor on the generator model. Set `EVAL_HONOR_ENABLE_THINKING=0` to reproduce the stock behaviour.
+4. **Timeouts**: per-call caller timeouts (5–15 s) are replaced by 180 s so results do not depend on API load; the whole pipeline (rewriter, classifier, generator) is routed to the generator model by configuration.
+5. **PostgreSQL schema**: on pgvector 0.8.x the stock `PostgresStore.initialize()` fails on a fresh database ("column does not have dimensions": HNSW index on an untyped `vector` column). The harness subclass runs the *same* DDL (extracted from the stock source) with `vector(768)` columns and without the ALTER-back-to-untyped block; all queries are the stock ones.
+6. **HNSW search width**: the stock store never sets `hnsw.ef_search`, so pgvector's default (40) would cap a `LIMIT 100` dense query at 40 rows; the eval database sets `hnsw.ef_search = 100` (the value the project docs describe).
+7. **Isolation**: all benchmark data lives in a dedicated database (`deepcontext_eval`), one schema per index; the application's own database is never written. The model-call cache (`eval/cache/llm_cache.sqlite`) is a local file, not corpus data.
+8. **One-pass baseline** = the product's `PromptAssembler` prompt + one Gemini call, with the (empty) memory lookup stubbed to avoid a no-op embedding call.
+9. **Latency**: cached model calls replay their recorded first-call latency; **latency percentiles come only from the separate live pass (`raw_latency.jsonl`)**.
+10. RAGAS `ResponseRelevancy` uses `strictness=1` (a temperature-0 judge returns identical candidates, so the default 3 only triples cost).
 """)
-
+    tf = rd / "thinking_flag_check.json"
+    if tf.exists():
+        d = json.loads(tf.read_text())
+        rows = []
+        for mode in ("honoured (harness default)", "ignored (stock client)"):
+            for ds, v in d.get(mode, {}).items():
+                rows.append(
+                    {
+                        "enable_thinking flag": mode,
+                        "dataset": ds,
+                        "queries": v["queries"],
+                        "generation calls": v["generation_calls"],
+                        "calls hitting MAX_TOKENS": v["calls_hitting_max_tokens"],
+                        "mean thinking tokens": round(v["think_tokens_mean"], 1),
+                        "two-pass refusals": v["two_pass_refusals"],
+                    }
+                )
+        out.append(
+            f"\n**Thinking-flag check on `{d.get('generator_model')}`** (`thinking_flag_check.json`):\n"
+        )
+        out.append(md_table(pd.DataFrame(rows)))
     out.append("## 2. Datasets\n")
     if meta:
         rows = []
@@ -372,8 +410,39 @@ def main() -> None:
         "\nNo multiple-comparison correction is applied; with this many comparisons treat p-values as descriptive.\n"
     )
 
+    ca = rd / "claude_audit_summary.json"
+    if ca.exists():
+        d = json.loads(ca.read_text())
+        out.append("## 8b. Judge cross-check by Claude (model labels, not human labels)\n")
+        out.append(
+            f"Claude (an Anthropic model) independently labelled {d['n_labelled']} sampled answers (read in full against the evidence "
+            "the generator saw; labels in `claude_labels.jsonl`, merged into `judge_audit.csv`). "
+            "`human_label` is still blank.\n"
+        )
+        rows = []
+        for m in ("faithfulness", "correctness"):
+            v = d[m]
+            rows.append(
+                {
+                    "metric (Claude label vs Gemini judge score)": m
+                    if m == "faithfulness"
+                    else "correctness vs RAGAS FactualCorrectness F1",
+                    "n": v["n"],
+                    "Claude mean": round(v["claude_mean"], 3),
+                    "judge mean": round(v["gemini_judge_mean"], 3),
+                    "mean |diff|": round(v["mean_abs_diff"], 3),
+                    "Pearson r": round(v.get("pearson_r", float("nan")), 3),
+                    "Spearman ρ": round(v.get("spearman_rho", float("nan")), 3),
+                    "binary agreement @0.5": round(v["binary_agreement_at_0.5"], 3),
+                    "judge stricter (>0.25)": round(v["judge_stricter_share"], 3),
+                    "judge more lenient (>0.25)": round(v["judge_more_lenient_share"], 3),
+                }
+            )
+        out.append(md_table(pd.DataFrame(rows)))
+        out.append("\n")
+
     out.append("## 9. Limitations, leakage and comparability (read before citing)\n")
-    out.append("""- **Judge validity.** The judge is a Google model scoring a Google generator (family/self-preference bias). In the judge comparison on the smoke batch, a different judge changed mean Faithfulness by a large margin (see `judge_comparison.md`). `judge_audit.csv` holds 50 sampled judgments with a blank `human_label` column for manual validation; **no human labels exist yet** and no agreement figure is claimed.
+    out.append("""- **Judge validity.** The primary judge (`gemini-3.7-flash`) is a different model from the generator (`gemini-3.8-flash`) but from the same vendor/family, so family and self-preference bias are possible. An independent cross-check by Claude (Anthropic) on a sample is reported in `claude_audit_summary.json` / `judge_audit.csv` (`claude_label` column) when present. These are **model labels, not human labels**: the `human_label` column is intentionally blank and no human agreement figure is claimed.
 - **Data leakage.** BEIR (SciFact/FiQA/HotpotQA), HotpotQA's Wikipedia text, MultiHop-RAG news articles (2023) and RGB are public and may be in the training data of both the generator and the judge; the embedding model and reranker may also have seen them. The documentation-QA set is derived from this repository's own docs and cannot be leaked into any model trained before it existed, but it was authored by an AI assistant (quotes machine-verified; answers not human-reviewed).
 - **Comparability with published numbers.** Corpus subsampling (HotpotQA, FiQA/others where capped) makes the task easier than the BEIR leaderboard task; BM25 here is SQLite FTS5 (no stemming/stopwords) not Lucene/Pyserini; chunking splits long documents and scores are max-chunk-per-document; query counts differ from published protocols. Do **not** put these next to leaderboard numbers without these qualifiers.
 - **RAGBench** questions are written against their own source passages; pooling passages from many questions makes some questions under-specified, which inflates false abstention and depresses retrieval metrics. References are LLM-generated.

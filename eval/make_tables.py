@@ -253,7 +253,12 @@ def visibility_table(gen: list[dict[str, Any]]) -> pd.DataFrame:
 def write_judge_audit(
     gen: list[dict[str, Any]], scores: list[dict[str, Any]], judge: str, path: Path, n: int = 50
 ) -> int:
-    """50 sampled judgments for hand validation. ``human_label`` is intentionally left blank."""
+    """50 sampled judgments for validation.
+
+    ``human_label`` is intentionally left blank. ``claude_*`` columns are filled from
+    ``claude_labels.jsonl`` (labels by Claude, an Anthropic model - NOT human labels) when present.
+    Also writes ``claude_audit_items.jsonl`` with the full evidence the generator saw.
+    """
     import csv
     import random
 
@@ -265,38 +270,31 @@ def write_judge_audit(
     cands = [r for r in gen if (r["run_tag"], r["config"], r["qid"]) in sc and not r["abstained"]]
     cands.sort(key=lambda r: (r["dataset"], r["config"], r["qid"]))
     picked = random.Random(C.BOOTSTRAP_SEED).sample(cands, min(n, len(cands)))
-    with path.open("w", newline="") as f:
+    labels: dict[tuple[str, str, str], dict[str, Any]] = {}
+    lp = path.parent / "claude_labels.jsonl"
+    if lp.exists():
+        for line in lp.open():
+            d = json.loads(line)
+            labels[(d["dataset"], d["config"], d["qid"])] = d
+    with (
+        path.open("w", newline="") as f,
+        (path.parent / "claude_audit_items.jsonl").open("w") as items,
+    ):
         w = csv.writer(f)
-        w.writerow(
-            [
-                "dataset",
-                "config",
-                "qid",
-                "query",
-                "answer",
-                "context_snippet",
-                "metric",
-                "judge_model",
-                "judge_score",
-                "human_label",
-            ]
-        )
+        w.writerow(["dataset", "config", "qid", "query", "answer", "context_snippet", "metric", "judge_model",
+                    "judge_score", "claude_faithfulness", "claude_correctness", "human_label"])  # fmt: skip
         for r in picked:
-            ctx = " ||| ".join(r.get("contexts_seen") or r.get("contexts", []))[:900]
-            w.writerow(
-                [
-                    r["dataset"],
-                    r["config"],
-                    r["qid"],
-                    r["query"],
-                    r["answer"],
-                    ctx,
-                    "faithfulness",
-                    judge,
-                    round(sc[(r["run_tag"], r["config"], r["qid"])]["faithfulness"], 4),
-                    "",
-                ]
-            )
+            s_ = sc[(r["run_tag"], r["config"], r["qid"])]
+            ctx_full = r.get("contexts_seen") or r.get("contexts", [])
+            lab = labels.get((r["dataset"], r["config"], r["qid"]), {})
+            w.writerow([r["dataset"], r["config"], r["qid"], r["query"], r["answer"],
+                        " ||| ".join(ctx_full)[:900], "faithfulness", judge, round(s_["faithfulness"], 4),
+                        lab.get("faithfulness", ""), lab.get("correctness", ""), ""])  # fmt: skip
+            items.write(json.dumps({
+                "dataset": r["dataset"], "config": r["config"], "qid": r["qid"], "query": r["query"],
+                "answer": r["answer"], "reference": r["reference"], "contexts_seen": ctx_full,
+                "judge_scores": {k: s_[k] for k in RAGAS_METRICS},
+            }) + "\n")  # fmt: skip
     return len(picked)
 
 

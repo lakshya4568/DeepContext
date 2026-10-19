@@ -595,7 +595,7 @@ def install_strict_patches() -> VertexRuntime:
             raise MockFallbackError(
                 f"Non-Gemini model '{target}' requested; the harness is single-provider."
             )
-        # The stock Gemini branch ignores ``enable_thinking``. With gemini-2.5-flash's default
+        # The stock Gemini branch ignores ``enable_thinking``. With a thinking model's default
         # dynamic thinking, the two-pass extractor (max_tokens=512) spends ~490 tokens thinking
         # and returns truncated JSON. Callers pass enable_thinking=False precisely to avoid that,
         # so we honour it (EVAL_HONOR_ENABLE_THINKING=0 reproduces the stock behaviour).

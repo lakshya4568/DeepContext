@@ -4,7 +4,7 @@ Reads ``raw_generation.jsonl`` and appends one row per (run, config, query) to
 ``ragas_scores.jsonl``; resumable and idempotent (judge responses are cached on disk).
 
 Usage:
-    uv run python -m eval.score_ragas --results-dir eval/results/smoke [--model gemini-2.5-pro]
+    uv run python -m eval.score_ragas --results-dir eval/results/smoke [--model gemini-3.7-flash]
 """
 
 from __future__ import annotations

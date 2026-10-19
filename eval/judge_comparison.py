@@ -21,7 +21,7 @@ MET = [
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--results-dir", required=True)
-    ap.add_argument("--reference", default="gemini-2.5-pro")
+    ap.add_argument("--reference", default=None, help="judge label to compare the others against")
     a = ap.parse_args()
     rd = Path(a.results_dir)
     by: dict[str, dict[tuple[str, str, str], dict]] = defaultdict(dict)
@@ -51,7 +51,7 @@ def main() -> None:
             else "n/a"
         )
         out.append(f"| {j} | {cost} | " + " | ".join(means) + " |")
-    if a.reference in by:
+    if a.reference and a.reference in by:
         for j, d in by.items():
             if j == a.reference:
                 continue
