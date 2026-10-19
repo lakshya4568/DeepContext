@@ -34,7 +34,7 @@ import numpy as np
 from scipy import stats as sp_stats
 
 from eval import config as C
-from eval.strict_clients import get_runtime, stage_scope
+from eval.strict_clients import ApiExhaustedError, get_runtime, stage_scope
 
 log = logging.getLogger("eval.judge_correctness")
 
@@ -135,14 +135,18 @@ async def grade_all(
 
     async def one(r: dict[str, Any]) -> dict[str, Any]:
         async with sem:
-            return await grade(
-                r["query"],
-                r["reference"],
-                r["answer"],
-                answerable=r["answerable"],
-                model=model,
-                thinking_budget=thinking_budget,
-            )
+            try:
+                return await grade(
+                    r["query"],
+                    r["reference"],
+                    r["answer"],
+                    answerable=r["answerable"],
+                    model=model,
+                    thinking_budget=thinking_budget,
+                )
+            except ApiExhaustedError as exc:  # recorded; the row is retried on the next run
+                log.warning("grading failed after retries (%s): %s", r.get("qid"), str(exc)[:120])
+                return {"verdict": None, "score": None, "reason": "api_exhausted"}
 
     return await asyncio.gather(*(one(r) for r in rows))
 

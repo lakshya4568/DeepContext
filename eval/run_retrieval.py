@@ -27,8 +27,11 @@ RETRIEVAL_CONFIGS = [
 ]  # fmt: skip
 
 
-def run_tag(dataset: str, n_queries: int | None, max_docs: int | None) -> str:
-    return f"{dataset}|q{n_queries or 'all'}|d{max_docs or 'full'}"
+def run_tag(
+    dataset: str, n_queries: int | None, max_docs: int | None, split: str = "test"
+) -> str:
+    tag = f"{dataset}|q{n_queries or 'all'}|d{max_docs or 'full'}"
+    return tag if split == "test" else f"{tag}|{split}"
 
 
 def load_done(path: Path, tag: str) -> set[tuple[str, str]]:
@@ -119,6 +122,7 @@ def main() -> None:
     ap.add_argument("--dataset", required=True)
     ap.add_argument("--n-queries", type=int, default=None)
     ap.add_argument("--max-docs", type=int, default=None)
+    ap.add_argument("--split", default="test", help="BEIR qrels split (dev/train are for tuning only)")
     ap.add_argument("--configs", nargs="*", default=RETRIEVAL_CONFIGS)
     ap.add_argument("--results-dir", default=str(C.RESULTS_DIR))
     ap.add_argument("--concurrency", type=int, default=6)
@@ -128,12 +132,12 @@ def main() -> None:
     )
     for noisy in ("httpx", "google_genai", "deep_context", "google_genai.models"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
-    task = build_task(args.dataset, args.n_queries, args.max_docs)
+    task = build_task(args.dataset, args.n_queries, args.max_docs, args.split)
     log.info("Task %s: %s", task.name, json.dumps(task.meta))
     asyncio.run(
         run_dataset(
             task,
-            run_tag(args.dataset, args.n_queries, args.max_docs),
+            run_tag(args.dataset, args.n_queries, args.max_docs, args.split),
             Path(args.results_dir) / "raw_retrieval.jsonl",
             args.configs,
             args.concurrency,

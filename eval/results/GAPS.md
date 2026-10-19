@@ -7,6 +7,32 @@ Numbers used: nDCG@10 (0 to 1, higher is better; how high the correct page sits 
 
 ---
 
+## Update 2026-10-20: P1, P2, P3 fixed on branch `fix/search-gaps` (full table: `eval/results_fix/BEFORE_AFTER.md`)
+
+nDCG@10 on the test questions, merged search before → after all three fixes (BM25 + exact-duplicate removal + lexical vote 0.1):
+
+| dataset | before | after | change (paired 95% CI) | dense-only for reference |
+|---|---|---|---|---|
+| SciFact | 0.702 | 0.867 | +0.164 [+0.132, +0.198] | 0.900 |
+| FiQA | 0.378 | 0.592 | +0.213 [+0.192, +0.235] | 0.614 |
+| HotpotQA (30k docs) | 0.868 | 0.978 | +0.110 [+0.092, +0.129] | 0.982 |
+| MultiHop-RAG | 0.637 | 0.814 | +0.177 [+0.152, +0.202] | 0.804 |
+| RAGBench Covid | 0.712 | 0.851 | +0.139 [+0.106, +0.172] | 0.850 |
+| Docs set | 0.760 | 0.826 | +0.066 [-0.003, +0.140] | 0.824 |
+| GoT PDF | 0.419 | 0.722 | +0.303 [+0.208, +0.396] | 0.779 |
+| Quantum PDF | 0.481 | 0.537 | +0.056 [+0.019, +0.097] | 0.518 |
+
+What each fix did on its own:
+- **P1 (real BM25)** alone: the word-search half rose from 0.13 to 0.24 on FiQA, 0.49 to 0.69 on SciFact, 0.40 to 0.75 on MultiHop-RAG; merged search rose +0.01 to +0.17 (not significant on RAGBench and the quantum PDF).
+- **P3 (duplicate removal)** alone: only matters where passages share an opening line: RAGBench +0.073 (0.725 → 0.798), recall@100 0.855 → 0.996. No effect elsewhere.
+- **P2 (lexical vote)**: chosen on separate dev questions (SciFact train, FiQA dev; grid 1, 0.5, 0.25, 0.1 — the best was the edge of the grid, 0.1). It adds +0.01 to +0.17 over BM25+dedup on 6 of 8 datasets.
+
+Honest reading: after the fixes the merged search is about as good as meaning-only search (equal within the error ranges on 5 of 8 datasets, still below it on SciFact, FiQA and the GoT PDF), **not better**. The weight search also shows the pattern: the less the word channel votes, the better, down to the edge of the grid. With this embedding model, the word search adds little on these datasets. It may still matter for exact-term queries (names, codes) that these sets contain few of.
+
+Not yet re-measured after the fixes: reranked setups (`rrf_bge`, `rrf_bge_two_pass`) and the full engine, and all answer quality (these need the reranker; Colab is off). The reranked and answer rows in the main results are still the "before" versions.
+
+---
+
 ## Part 1 — Gaps in the product (why accuracy is lower than it could be)
 
 | # | Gap | Evidence (from our files) | Why it happens | Possible fix | Size of problem |

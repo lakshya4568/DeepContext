@@ -128,7 +128,8 @@ def load_beir(
     seed: int = C.SAMPLE_SEED,
 ) -> Task:
     """Load a BEIR dataset; optionally sample queries and cap the corpus (relevant docs kept)."""
-    cache = C.DATA_DIR / f"{name}_sub_q{n_queries}_d{max_docs}_s{seed}.json"
+    suffix = "" if split == "test" else f"_{split}"
+    cache = C.DATA_DIR / f"{name}_sub_q{n_queries}_d{max_docs}_s{seed}{suffix}.json"
     if cache.exists():
         return _task_from_json(json.loads(cache.read_text()))
 
@@ -352,9 +353,11 @@ def _task_from_json(d: dict[str, Any]) -> Task:
 PUBLIC_DATASETS = ("scifact", "fiqa", "hotpotqa", "multihoprag", "ragbench-covidqa")
 
 
-def build_task(name: str, n_queries: int | None = None, max_docs: int | None = None) -> Task:
+def build_task(
+    name: str, n_queries: int | None = None, max_docs: int | None = None, split: str = "test"
+) -> Task:
     if name in ("scifact", "fiqa", "hotpotqa"):
-        return load_beir(name, n_queries=n_queries, max_docs=max_docs)
+        return load_beir(name, n_queries=n_queries, max_docs=max_docs, split=split)
     if name == "multihoprag":
         return load_multihoprag(n_queries=n_queries)
     if name.startswith("ragbench-"):
