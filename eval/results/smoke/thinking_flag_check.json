@@ -1,0 +1,39 @@
+{
+ "generator_model": "gemini-3.8-flash",
+ "honoured (harness default)": {
+  "docsqa": {
+   "queries": 20,
+   "generation_calls": 40,
+   "calls_hitting_max_tokens": 0,
+   "two_pass_refusals": 1,
+   "think_tokens_mean": 3.025,
+   "think_tokens_max": 68
+  },
+  "multihoprag": {
+   "queries": 12,
+   "generation_calls": 24,
+   "calls_hitting_max_tokens": 0,
+   "two_pass_refusals": 4,
+   "think_tokens_mean": 0.0,
+   "think_tokens_max": 0
+  }
+ },
+ "ignored (stock client)": {
+  "docsqa": {
+   "queries": 20,
+   "generation_calls": 40,
+   "calls_hitting_max_tokens": 3,
+   "two_pass_refusals": 1,
+   "think_tokens_mean": 252.1,
+   "think_tokens_max": 670
+  },
+  "multihoprag": {
+   "queries": 12,
+   "generation_calls": 24,
+   "calls_hitting_max_tokens": 9,
+   "two_pass_refusals": 3,
+   "think_tokens_mean": 391.1666666666667,
+   "think_tokens_max": 620
+  }
+ }
+}
