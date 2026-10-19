@@ -1,0 +1,50 @@
+{"dataset": "ragbench-covidqa", "config": "rrf_bge_two_pass", "qid": "r0026", "faithfulness": 1, "correctness": 1, "note": "all claims in evidence [1],[3]", "labeller": "claude"}
+{"dataset": "docsqa", "config": "rrf_bge_two_pass", "qid": "f03", "faithfulness": 1, "correctness": 1, "note": "quotes present in evidence", "labeller": "claude"}
+{"dataset": "ragbench-covidqa", "config": "rrf_bge", "qid": "r0062", "faithfulness": 1, "correctness": 1, "note": "IL-12/23/27 in [2]; IL-10 omitted but answer valid", "labeller": "claude"}
+{"dataset": "ragbench-covidqa", "config": "rrf_bge_two_pass", "qid": "r0070", "faithfulness": 1, "correctness": 1, "note": "all claims in [1],[2]", "labeller": "claude"}
+{"dataset": "docsqa", "config": "rrf_bge_two_pass", "qid": "m03", "faithfulness": 1, "correctness": 1, "note": "table rows present", "labeller": "claude"}
+{"dataset": "docsqa", "config": "rrf_bge", "qid": "d06", "faithfulness": 1, "correctness": 1, "note": "AGENTIC_MAX_REWRITES=2 in [1]", "labeller": "claude"}
+{"dataset": "docsqa", "config": "rrf_bge", "qid": "p08", "faithfulness": 1, "correctness": 1, "note": "all in Key design", "labeller": "claude"}
+{"dataset": "docsqa", "config": "rrf_bge_two_pass", "qid": "p06", "faithfulness": 1, "correctness": 0.5, "note": "honest about missing detail; term-overlap and 0.30 default not in shown evidence", "labeller": "claude"}
+{"dataset": "docsqa", "config": "rrf_bge_two_pass", "qid": "p03", "faithfulness": 1, "correctness": 1, "note": "invalidation + TTL both in evidence", "labeller": "claude"}
+{"dataset": "docsqa", "config": "rrf_bge_two_pass", "qid": "m01", "faithfulness": 1, "correctness": 1, "note": "setting, file, env var, default all in [1]", "labeller": "claude"}
+{"dataset": "ragbench-covidqa", "config": "rrf_bge", "qid": "r0163", "faithfulness": 1, "correctness": 1, "note": "1.1% in [1]; missing interval stated honestly", "labeller": "claude"}
+{"dataset": "ragbench-covidqa", "config": "rrf_bge_two_pass", "qid": "r0022", "faithfulness": 1, "correctness": 1, "note": "all three figures present in [1],[2],[3]; judge stricter (0.67)", "labeller": "claude"}
+{"dataset": "docsqa", "config": "rrf_bge_two_pass", "qid": "d05", "faithfulness": 1, "correctness": 1, "note": "in-memory default/fallback in [1],[2]", "labeller": "claude"}
+{"dataset": "docsqa", "config": "rrf_bge_two_pass", "qid": "p02", "faithfulness": 0.5, "correctness": 0.5, "note": "name consensus protection is in evidence [4]; equating it with RRF rank consensus/blend is a conflation", "labeller": "claude"}
+{"dataset": "docsqa", "config": "rrf_bge_two_pass", "qid": "d12", "faithfulness": 1, "correctness": 1, "note": "28.3% in [1],[3],[4]", "labeller": "claude"}
+{"dataset": "multihoprag", "config": "rrf_bge", "qid": "q2201", "faithfulness": 1, "correctness": 1, "note": "Swift/Person of the Year/Kelce supported; absence statement about CBS/The Age accurate for shown evidence", "labeller": "claude"}
+{"dataset": "docsqa", "config": "rrf_bge", "qid": "p02", "faithfulness": 0.5, "correctness": 0.5, "note": "same conflation as #13, hedged less", "labeller": "claude"}
+{"dataset": "docsqa", "config": "rrf_bge_two_pass", "qid": "p05", "faithfulness": 1, "correctness": 1, "note": "all three conditions in [1],[2]", "labeller": "claude"}
+{"dataset": "docsqa", "config": "rrf_bge", "qid": "m01", "faithfulness": 1, "correctness": 1, "note": "setting+file+default in [1]", "labeller": "claude"}
+{"dataset": "docsqa", "config": "rrf_bge_two_pass", "qid": "d03", "faithfulness": 1, "correctness": 1, "note": "0.30 in [1]", "labeller": "claude"}
+{"dataset": "ragbench-covidqa", "config": "rrf_bge", "qid": "r0188", "faithfulness": 1, "correctness": 0.5, "note": "both quoted phrases present; first way in reference (estimate infections) not given; question ill-posed", "labeller": "claude"}
+{"dataset": "ragbench-covidqa", "config": "rrf_bge", "qid": "r0057", "faithfulness": 1, "correctness": 1, "note": "MDI + DPI in [1]", "labeller": "claude"}
+{"dataset": "docsqa", "config": "rrf_bge", "qid": "d14", "faithfulness": 1, "correctness": 1, "note": "30-50 in [1]", "labeller": "claude"}
+{"dataset": "multihoprag", "config": "rrf_bge_two_pass", "qid": "q0331", "faithfulness": 1, "correctness": 1, "note": "Google/Megan Gray supported; absence statements accurate for shown evidence; judge stricter (0.60)", "labeller": "claude"}
+{"dataset": "docsqa", "config": "rrf_bge", "qid": "p07", "faithfulness": 1, "correctness": 1, "note": "all claims in [1],[4]", "labeller": "claude"}
+{"dataset": "multihoprag", "config": "rrf_bge", "qid": "q0076", "faithfulness": 0.67, "correctness": 0.5, "note": "quote supported; Walmart Cyber Monday attribution not verifiable from shown text; absence claim accurate", "labeller": "claude"}
+{"dataset": "ragbench-covidqa", "config": "rrf_bge", "qid": "r0008", "faithfulness": 1, "correctness": 1, "note": "bank vole/deer mouse in [1]", "labeller": "claude"}
+{"dataset": "multihoprag", "config": "rrf_bge_two_pass", "qid": "q0076", "faithfulness": 1, "correctness": 0, "note": "faithful, but declines to answer; reference is no", "labeller": "claude"}
+{"dataset": "docsqa", "config": "rrf_bge", "qid": "m02", "faithfulness": 1, "correctness": 1, "note": "two layers + Ragas in [1]", "labeller": "claude"}
+{"dataset": "docsqa", "config": "rrf_bge_two_pass", "qid": "d06", "faithfulness": 1, "correctness": 1, "note": "2 in [1]", "labeller": "claude"}
+{"dataset": "ragbench-covidqa", "config": "rrf_bge", "qid": "r0108", "faithfulness": 1, "correctness": 1, "note": "SARS/MERS claims in [1],[2],[3]", "labeller": "claude"}
+{"dataset": "docsqa", "config": "rrf_bge", "qid": "d10", "faithfulness": 1, "correctness": 1, "note": "32.3% in [1]", "labeller": "claude"}
+{"dataset": "multihoprag", "config": "rrf_bge_two_pass", "qid": "q2251", "faithfulness": 1, "correctness": 0, "note": "all claims grounded in Fortune/TechCrunch text; never gives the Yes", "labeller": "claude"}
+{"dataset": "docsqa", "config": "rrf_bge_two_pass", "qid": "d09", "faithfulness": 1, "correctness": 1, "note": "model name in [1]", "labeller": "claude"}
+{"dataset": "docsqa", "config": "rrf_bge_two_pass", "qid": "p01", "faithfulness": 1, "correctness": 1, "note": "43->86.2% masking in [3]", "labeller": "claude"}
+{"dataset": "multihoprag", "config": "rrf_bge", "qid": "q0338", "faithfulness": 1, "correctness": 1, "note": "No; quotes/claims present (Paris ~3C paraphrased as catastrophic)", "labeller": "claude"}
+{"dataset": "ragbench-covidqa", "config": "rrf_bge", "qid": "r0028", "faithfulness": 1, "correctness": 1, "note": "all diseases listed are in evidence; ambiguous question; reference content present", "labeller": "claude"}
+{"dataset": "ragbench-covidqa", "config": "rrf_bge_two_pass", "qid": "r0028", "faithfulness": 1, "correctness": 1, "note": "same; judge 0.88 slightly stricter", "labeller": "claude"}
+{"dataset": "docsqa", "config": "rrf_bge_two_pass", "qid": "m05", "faithfulness": 1, "correctness": 1, "note": "README memory list", "labeller": "claude"}
+{"dataset": "docsqa", "config": "rrf_bge_two_pass", "qid": "d07", "faithfulness": 1, "correctness": 1, "note": "200,000 TPD in [1]", "labeller": "claude"}
+{"dataset": "multihoprag", "config": "rrf_bge_two_pass", "qid": "q0141", "faithfulness": 1, "correctness": 1, "note": "Engadget+Polygon details present incl. 1000 vs 400 nits, 30g, Wi-Fi/BT", "labeller": "claude"}
+{"dataset": "docsqa", "config": "rrf_bge", "qid": "p01", "faithfulness": 1, "correctness": 1, "note": "43% -> 86.2% present in shown evidence", "labeller": "claude"}
+{"dataset": "multihoprag", "config": "rrf_bge", "qid": "q0331", "faithfulness": 1, "correctness": 1, "note": "Google; absence claims accurate for shown evidence", "labeller": "claude"}
+{"dataset": "ragbench-covidqa", "config": "rrf_bge_two_pass", "qid": "r0023", "faithfulness": 1, "correctness": 0, "note": "faithful; declines to conclude, reference says not sufficient", "labeller": "claude"}
+{"dataset": "docsqa", "config": "rrf_bge_two_pass", "qid": "m06", "faithfulness": 1, "correctness": 1, "note": "fields + user id exclusion in [1]", "labeller": "claude"}
+{"dataset": "docsqa", "config": "rrf_bge_two_pass", "qid": "p07", "faithfulness": 1, "correctness": 1, "note": "claims in [1],[4]", "labeller": "claude"}
+{"dataset": "ragbench-covidqa", "config": "rrf_bge_two_pass", "qid": "r0108", "faithfulness": 1, "correctness": 0.5, "note": "faithful; gives pneumonia->ARDS facts but says no single primary finding", "labeller": "claude"}
+{"dataset": "docsqa", "config": "rrf_bge", "qid": "d08", "faithfulness": 1, "correctness": 1, "note": "12,000 chars in [2]", "labeller": "claude"}
+{"dataset": "multihoprag", "config": "rrf_bge_two_pass", "qid": "q0338", "faithfulness": 1, "correctness": 1, "note": "No; quotes present in [1],[2]", "labeller": "claude"}
+{"dataset": "docsqa", "config": "rrf_bge", "qid": "d02", "faithfulness": 1, "correctness": 1, "note": "87.1 -> 61.3 in [1]", "labeller": "claude"}

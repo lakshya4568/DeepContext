@@ -113,7 +113,7 @@ def load_pdf_set(name: str) -> Task:
     pages = extract_pages(name)
     items = json.loads((C.REPO_ROOT / spec["queries"]).read_text())
     corpus = {
-        page_id(i): {"title": spec["title"], "text": text}
+        page_id(i): {"title": spec["title"], "text": text, "title_in_content": "0"}
         for i, text in enumerate(pages, start=1)
         if text.strip()
     }

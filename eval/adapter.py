@@ -58,6 +58,8 @@ def corpus_fingerprint(corpus: dict[str, dict[str, str]]) -> str:
         d = corpus[doc_id]
         h.update(doc_id.encode())
         h.update(hashlib.sha1((d.get("title", "") + "\x1f" + d.get("text", "")).encode()).digest())
+        if d.get("title_in_content") == "0":  # default (absent) keeps the original fingerprints
+            h.update(b"\x1fnotitle")
     h.update(json.dumps([C.EMBEDDING_MODEL, C.EMBEDDING_DIM, "v1-title-in-content"]).encode())
     return h.hexdigest()
 
@@ -242,7 +244,12 @@ class DeepContextAdapter:
             doc_id = self.store_doc_id(ext_doc_id)
             title = (d.get("title") or "").strip()
             text = (d.get("text") or "").strip()
-            content = f"{title}\n\n{text}" if title else text
+            # Default: title + text (BEIR convention). Corpora whose titles are long and shared by
+            # every document (PDF pages, doc sections) set title_in_content="0": the title then lives
+            # only in Document.title and the embedding prefix (as in the shipped ingestion), so the
+            # shipped near-duplicate filter (first 120 characters) is not triggered by the title.
+            with_title = bool(title) and d.get("title_in_content") != "0"
+            content = f"{title}\n\n{text}" if with_title else text
             if not content:
                 return None
             sections = DocumentParser.parse(content, doc_type="text")

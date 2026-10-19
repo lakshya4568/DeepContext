@@ -43,7 +43,11 @@ def build_sections(root: Path = C.REPO_ROOT, min_chars: int = 80) -> dict[str, d
             body = "\n".join(buf).strip()
             if len(body) >= min_chars:
                 title = " > ".join(trail) if trail else rel
-                sections[f"{rel}#{n:03d}"] = {"title": f"{rel} › {title}", "text": body}
+                sections[f"{rel}#{n:03d}"] = {
+                    "title": f"{rel} › {title}",
+                    "text": body,
+                    "title_in_content": "0",
+                }
                 n += 1
 
         for line in lines:

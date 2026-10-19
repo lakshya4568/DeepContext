@@ -493,17 +493,34 @@ class VertexRuntime:
         """Hosted bge-reranker-v2-m3 relevance scores, aligned with ``documents``."""
         from deep_context.core.config import settings
 
-        key = _sha("rerank", settings.ecohash_rerank_model, query, documents)
+        # EVAL_RERANK_URL switches to a self-hosted bge-reranker-v2-m3 server (POST <url>/rerank,
+        # same response shape, no API key). The backend is part of the cache key and of the model
+        # label recorded in every trace, so rows produced by different backends stay identifiable.
+        selfhosted = os.environ.get("EVAL_RERANK_URL", "").rstrip("/")
+        model_label = (
+            f"{settings.ecohash_rerank_model}@{'self-hosted' if selfhosted else 'ecohash'}"
+        )
+        key = (
+            _sha("rerank-selfhosted", "BAAI/bge-reranker-v2-m3", query, documents)
+            if selfhosted
+            else _sha("rerank", settings.ecohash_rerank_model, query, documents)
+        )
         stage_name = "rerank"
         hit = None if self.bypass_cache else self.cache.get(key)
         if hit is not None:
             d = json.loads(hit)
-            _record(CallRecord(stage=stage_name, kind="rerank", model=settings.ecohash_rerank_model,
+            _record(CallRecord(stage=stage_name, kind="rerank", model=model_label,
                                in_tokens=d["tokens"], latency_s=d["latency_s"], cached=True))  # fmt: skip
             return list(d["scores"])
 
         async def call() -> httpx.Response:
             async with httpx.AsyncClient(timeout=C.REQUEST_TIMEOUT_S) as http:
+                if selfhosted:
+                    r = await http.post(
+                        f"{selfhosted}/rerank", json={"query": query, "documents": documents}
+                    )
+                    r.raise_for_status()
+                    return r
                 r = await http.post(
                     settings.ecohash_rerank_url,
                     headers={
@@ -537,7 +554,7 @@ class VertexRuntime:
             self.cache.put(
                 key, json.dumps({"scores": scores, "tokens": tokens, "latency_s": secs}).encode()
             )
-        _record(CallRecord(stage=stage_name, kind="rerank", model=settings.ecohash_rerank_model,
+        _record(CallRecord(stage=stage_name, kind="rerank", model=model_label,
                            in_tokens=tokens, latency_s=secs, retries=retries))  # fmt: skip
         return scores
 

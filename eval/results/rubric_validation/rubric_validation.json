@@ -1,0 +1,113 @@
+{
+ "labeller": "Claude (Anthropic model) - NOT human labels",
+ "judge": "gemini-3.7-flash@think0",
+ "rubric_version": "v1",
+ "n_items": 50,
+ "n_scored": 50,
+ "claude_mean": 0.88,
+ "rubric_mean": 0.9,
+ "mean_abs_diff": 0.06,
+ "exact_agreement": 0.88,
+ "binary_agreement_at_0.5": 1.0,
+ "rubric_more_lenient_share": 0.08,
+ "rubric_stricter_share": 0.04,
+ "confusion_claude_rows_x_rubric_cols": {
+  "claude=0.0": {
+   "rubric=0.0": 3,
+   "rubric=0.5": 0,
+   "rubric=1.0": 0
+  },
+  "claude=0.5": {
+   "rubric=0.0": 0,
+   "rubric=0.5": 2,
+   "rubric=1.0": 4
+  },
+  "claude=1.0": {
+   "rubric=0.0": 0,
+   "rubric=0.5": 2,
+   "rubric=1.0": 39
+  }
+ },
+ "pearson_r": 0.7972932288809117,
+ "spearman_rho": 0.6160942449841205,
+ "weighted_kappa_linear": 0.6861924686192469,
+ "ragas_factual_correctness_f1_for_comparison": {
+  "mean": 0.2682,
+  "mean_abs_diff_vs_claude": 0.6186,
+  "pearson_r": 0.090217126465473
+ },
+ "disagreements": [
+  {
+   "key": [
+    "docsqa",
+    "rrf_bge",
+    "p02"
+   ],
+   "claude": 0.5,
+   "rubric": 1.0,
+   "rubric_verdict": "correct",
+   "rubric_reason": "The system answer correctly identifies the consensus protection mechanism described in the reference answer.",
+   "claude_note": "same conflation as #13, hedged less"
+  },
+  {
+   "key": [
+    "docsqa",
+    "rrf_bge_two_pass",
+    "p02"
+   ],
+   "claude": 0.5,
+   "rubric": 1.0,
+   "rubric_verdict": "correct",
+   "rubric_reason": "The system answer correctly identifies the consensus protection mechanism specified in the reference answer.",
+   "claude_note": "name consensus protection is in evidence [4]; equating it with RRF rank consensus/blend is a conflation"
+  },
+  {
+   "key": [
+    "multihoprag",
+    "rrf_bge",
+    "q0076"
+   ],
+   "claude": 0.5,
+   "rubric": 1.0,
+   "rubric_verdict": "correct",
+   "rubric_reason": "The system answer effectively explains why the premises in the question are false/not supported, matching the negative ('no') conclusion of the reference answer.",
+   "claude_note": "quote supported; Walmart Cyber Monday attribution not verifiable from shown text; absence claim accurate"
+  },
+  {
+   "key": [
+    "ragbench-covidqa",
+    "rrf_bge",
+    "r0062"
+   ],
+   "claude": 1,
+   "rubric": 0.5,
+   "rubric_verdict": "partial",
+   "rubric_reason": "The system answer includes most of the examples listed in the reference answer (MCP-1, TNF-\u03b1, IL-1\u03b2, IL-6, IL-12) but omits IL-10.",
+   "claude_note": "IL-12/23/27 in [2]; IL-10 omitted but answer valid"
+  },
+  {
+   "key": [
+    "ragbench-covidqa",
+    "rrf_bge",
+    "r0163"
+   ],
+   "claude": 1,
+   "rubric": 0.5,
+   "rubric_verdict": "partial",
+   "rubric_reason": "The system correctly identifies the 1.1% estimate, but claims details like the date and credible interval are missing, making the answer incomplete.",
+   "claude_note": "1.1% in [1]; missing interval stated honestly"
+  },
+  {
+   "key": [
+    "ragbench-covidqa",
+    "rrf_bge",
+    "r0188"
+   ],
+   "claude": 0.5,
+   "rubric": 1.0,
+   "rubric_verdict": "correct",
+   "rubric_reason": "The system answer correctly identifies one of the methods mentioned in the reference answer (using interventions as the only covariate in the model).",
+   "claude_note": "both quoted phrases present; first way in reference (estimate infections) not given; question ill-posed"
+  }
+ ]
+}
