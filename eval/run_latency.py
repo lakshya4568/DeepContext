@@ -31,7 +31,7 @@ ALL_CONFIGS = RETRIEVAL_CONFIGS + ["rrf_bge_two_pass", C.ENGINE_CONFIG]
 async def main_async(args: argparse.Namespace) -> None:
     task = build_task(args.dataset, args.n_queries, args.max_docs)
     fp = corpus_fingerprint(task.corpus)[:10]
-    adapter = DeepContextAdapter(C.INDEX_DIR / f"{task.name}_{fp}.db", "rrf")
+    adapter = DeepContextAdapter(f"{task.name}_{fp}", "rrf")
     await adapter.open()
     await adapter.index(task.corpus)  # reuse; fails loudly if the index is missing/mismatched
     qids = [q for q in task.qids if q not in task.unanswerable]

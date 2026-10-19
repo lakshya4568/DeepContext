@@ -4,8 +4,8 @@ Entry points reused from the product (nothing re-implemented except the corpus-l
 
 * index    : ``DocumentParser`` + ``ParentChildChunker`` (the "fast" ingestion path: no Docling,
              no local summariser), ``llm_client.get_embeddings`` (patched to the strict Vertex
-             client), ``SQLiteStore``.
-* retrieve : ``SQLiteStore.search_vector`` / ``search_bm25``, ``HybridRetriever`` (RRF k=60),
+             client), ``PostgresStore`` (default) or ``SQLiteStore``.
+* retrieve : the store's ``search_vector`` / ``search_bm25``, ``HybridRetriever`` (RRF k=60),
              ``Reranker`` -> ``EcoHashReranker`` (hosted bge-reranker-v2-m3) + ``protect_consensus``.
 * answer   : ``RetrievalEngine._resolve_parent_chunks`` (child -> parent), then either the
              ``PromptAssembler`` single call (one-pass) or ``generate_grounded_answer`` (two-pass).
@@ -19,6 +19,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 import time
 import uuid
 from dataclasses import dataclass
@@ -26,6 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from eval import config as C
+from eval import pg
 from eval.fast_vector import invalidate_vector_index
 from eval.strict_clients import (
     Trace,
@@ -112,23 +114,59 @@ class _NoMemory:
 
 
 class DeepContextAdapter:
-    """Benchmark adapter around the DeepContext retrieval + generation stack."""
+    """Benchmark adapter around the DeepContext retrieval + generation stack.
 
-    def __init__(self, db_path: Path, config: str = "rrf_bge_two_pass") -> None:
+    ``backend``: ``postgres`` (default; dedicated ``deepcontext_eval`` database, one schema per
+    index, pgvector HNSW + Postgres full-text) or ``sqlite`` (FTS5 BM25 + exact cosine; explicit
+    opt-in via ``EVAL_BACKEND=sqlite``). Results from the two backends are not interchangeable.
+    """
+
+    def __init__(
+        self, index_name: str | Path, config: str = "rrf_bge_two_pass", backend: str | None = None
+    ) -> None:
         if config not in C.CONFIGS and config != C.ENGINE_CONFIG:
             raise ValueError(f"Unknown config '{config}'. Supported: {list(C.CONFIGS)}")
-        self.db_path = Path(db_path)
+        self.backend = (backend or os.environ.get("EVAL_BACKEND", "postgres")).lower()
+        if self.backend not in ("postgres", "sqlite"):
+            raise ValueError(f"Unknown backend '{self.backend}' (postgres | sqlite).")
+        self.index_name = Path(str(index_name)).stem
+        self.db_path = C.INDEX_DIR / f"{self.index_name}.db"  # sqlite only
+        self.schema = pg.schema_name(self.index_name)  # postgres only
         self.config = config
         self.runtime: VertexRuntime = install_strict_patches()
         self.store: Any = None
+        self._ext_by_store: dict[str, str] = {}
+
+    # ------------------------------------------------------------------ ids
+    def store_doc_id(self, external_id: str) -> str:
+        """Id under which a benchmark document is stored (UUID on Postgres, as-is on SQLite)."""
+        return pg.doc_uuid(external_id) if self.backend == "postgres" else external_id
+
+    def _register_ids(self, corpus: dict[str, dict[str, str]]) -> None:
+        self._ext_by_store = {self.store_doc_id(d): d for d in corpus}
+
+    def ext_id(self, store_id: str) -> str:
+        return self._ext_by_store.get(store_id, store_id)
 
     # ------------------------------------------------------------------ lifecycle
     async def open(self) -> None:
         import deep_context.storage as storage_mod
-        from deep_context.storage.sqlite_store import SQLiteStore
 
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self.store = SQLiteStore(str(self.db_path))
+        if self.backend == "postgres":
+            if not await pg.server_available():
+                raise RuntimeError(
+                    "PostgreSQL is not reachable with the configured POSTGRES_DSN. Start it "
+                    "(brew services start postgresql@15) or run with EVAL_BACKEND=sqlite - "
+                    "results from the two backends must not be mixed."
+                )
+            await pg.ensure_database()
+            await pg.ensure_schema(self.schema)
+            self.store = pg.make_store_class()(pg.dsn_for(pg.EVAL_DB, self.schema))
+        else:
+            from deep_context.storage.sqlite_store import SQLiteStore
+
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
+            self.store = SQLiteStore(str(self.db_path))
         await self.store.initialize()
         # The retrieval engine resolves storage through the module-level singleton.
         storage_mod._active_store = self.store
@@ -146,6 +184,29 @@ class DeepContextAdapter:
             raise ValueError(f"Unknown config '{config}'.")
         self.config = config
 
+    # ------------------------------------------------------------------ index metadata
+    async def _read_meta(self) -> dict[str, Any] | None:
+        if self.backend == "postgres":
+            async with self.store._get_pool().acquire() as c:
+                await c.execute(
+                    "CREATE TABLE IF NOT EXISTS eval_index_meta (k TEXT PRIMARY KEY, v JSONB NOT NULL)"
+                )
+                row = await c.fetchrow("SELECT v FROM eval_index_meta WHERE k = 'meta'")
+            return json.loads(row["v"]) if row else None
+        path = Path(f"{self.db_path}.meta.json")
+        return json.loads(path.read_text()) if path.exists() else None
+
+    async def _write_meta(self, meta: dict[str, Any]) -> None:
+        if self.backend == "postgres":
+            async with self.store._get_pool().acquire() as c:
+                await c.execute(
+                    "INSERT INTO eval_index_meta (k, v) VALUES ('meta', $1::jsonb) "
+                    "ON CONFLICT (k) DO UPDATE SET v = EXCLUDED.v",
+                    json.dumps(meta),
+                )
+        else:
+            Path(f"{self.db_path}.meta.json").write_text(json.dumps(meta))
+
     # ------------------------------------------------------------------ index
     async def index(self, corpus: dict[str, dict[str, str]]) -> IndexStats:
         """Fast ingestion of ``{doc_id: {title, text}}``; reuses an existing identical index."""
@@ -156,24 +217,27 @@ class DeepContextAdapter:
         t0 = time.perf_counter()
         if self.store is None:
             await self.open()
-        meta_path = Path(f"{self.db_path}.meta.json")
+        self._register_ids(corpus)
         fp = corpus_fingerprint(corpus)
-        if meta_path.exists():
-            meta = json.loads(meta_path.read_text())
+        meta = await self._read_meta()
+        if meta is not None:
             if meta.get("fingerprint") == fp:
-                log.info("Reusing index %s (%d docs).", self.db_path.name, meta["n_docs"])
+                log.info(
+                    "Reusing %s index %s (%d docs).", self.backend, self.index_name, meta["n_docs"]
+                )
                 return IndexStats(
                     meta["n_docs"], meta["n_parents"], meta["n_children"], True,
                     time.perf_counter() - t0, meta.get("approx_embed_tokens", 0),
                 )  # fmt: skip
             raise RuntimeError(
-                f"{self.db_path} holds a different corpus (fingerprint mismatch); "
-                "delete it or choose another path."
+                f"{self.index_name} holds a different corpus (fingerprint mismatch); "
+                "delete it or choose another name."
             )
 
         chunker = ParentChildChunker()
         staged: list[tuple[Document, list[Any], list[Any]]] = []
-        for doc_id, d in corpus.items():
+        for ext_doc_id, d in corpus.items():
+            doc_id = self.store_doc_id(ext_doc_id)
             title = (d.get("title") or "").strip()
             text = (d.get("text") or "").strip()
             content = f"{title}\n\n{text}" if title else text
@@ -183,14 +247,17 @@ class DeepContextAdapter:
             parents, children = chunker.chunk_sections(doc_id, sections)
             id_map: dict[str, str] = {}
             for n, p in enumerate(parents):
-                new = str(uuid.uuid5(_NS, f"{doc_id}|parent|{n}"))
+                new = str(uuid.uuid5(_NS, f"{ext_doc_id}|parent|{n}"))
                 id_map[p.id], p.id = new, new
             for n, ch in enumerate(children):
-                ch.id = str(uuid.uuid5(_NS, f"{doc_id}|child|{n}"))
+                ch.id = str(uuid.uuid5(_NS, f"{ext_doc_id}|child|{n}"))
                 if ch.parent_chunk_id is not None:
                     ch.parent_chunk_id = id_map[ch.parent_chunk_id]
             doc = Document(
-                id=doc_id, title=title or doc_id, doc_type="text", metadata={"eval": True}
+                id=doc_id,
+                title=title or ext_doc_id,
+                doc_type="text",
+                metadata={"eval": True, "external_id": ext_doc_id},
             )
             staged.append((doc, parents, children))
 
@@ -205,14 +272,13 @@ class DeepContextAdapter:
                     self.runtime.format_embedding_text(
                         ch.content,
                         is_query=False,
-                        title=doc.title if doc.title != doc.id else None,
+                        title=doc.title if doc.title != doc.metadata["external_id"] else None,
                         task=None,
                     )
                 )
                 owners.append(ch)
         log.info("Embedding %d child chunks for %d docs ...", len(texts), len(staged))
         window = 2000
-        approx_tokens = 0
         with stage_scope("index"):
             for start in range(0, len(texts), window):
                 vecs = await self.runtime.embed_many(
@@ -226,7 +292,7 @@ class DeepContextAdapter:
 
         n_parents = n_children = 0
         batch: list[Any] = []
-        for doc, parents, children in staged:
+        for i, (doc, parents, children) in enumerate(staged, start=1):
             await self.store.insert_document(doc)
             batch.extend(parents)
             batch.extend(children)
@@ -235,22 +301,29 @@ class DeepContextAdapter:
             if len(batch) >= 2000:
                 await self.store.insert_chunks(batch)
                 batch = []
+            if i % 20000 == 0:
+                log.info("  stored %d/%d docs", i, len(staged))
         if batch:
             await self.store.insert_chunks(batch)
-        invalidate_vector_index(self.store)
+        if self.backend == "postgres":
+            async with self.store._get_pool().acquire() as c:
+                await c.execute("ANALYZE documents")
+                await c.execute("ANALYZE chunks")
+        else:
+            invalidate_vector_index(self.store)
 
-        meta_path.write_text(
-            json.dumps(
-                {
-                    "fingerprint": fp,
-                    "n_docs": len(staged),
-                    "n_parents": n_parents,
-                    "n_children": n_children,
-                    "embedding_model": C.EMBEDDING_MODEL,
-                    "embedding_dim": C.EMBEDDING_DIM,
-                    "approx_embed_tokens": approx_tokens,
-                }  # fmt: skip
-            )
+        await self._write_meta(
+            {
+                "fingerprint": fp,
+                "backend": self.backend,
+                "n_docs": len(staged),
+                "n_parents": n_parents,
+                "n_children": n_children,
+                "n_skipped_empty_docs": len(corpus) - len(staged),
+                "embedding_model": C.EMBEDDING_MODEL,
+                "embedding_dim": C.EMBEDDING_DIM,
+                "approx_embed_tokens": approx_tokens,
+            }
         )
         return IndexStats(
             len(staged), n_parents, n_children, False, time.perf_counter() - t0, approx_tokens
@@ -313,20 +386,22 @@ class DeepContextAdapter:
                 return float(c[key])
         return 0.0
 
-    async def retrieve(self, query: str, k: int) -> list[tuple[str, float]]:
-        """Top-``k`` *documents* (best chunk per document, rank order preserved)."""
-        children = await self.retrieve_children(query, depth=max(k, C.RETRIEVAL_DEPTH))
+    def rank_documents(self, children: list[dict[str, Any]]) -> list[tuple[str, float]]:
+        """Collapse ranked chunks to ranked *documents* (best chunk wins), external ids."""
         seen: set[str] = set()
         ranked: list[tuple[str, float]] = []
         for ch in children:
-            doc_id = ch["document_id"]
-            if doc_id in seen:
+            ext = self.ext_id(ch["document_id"])
+            if ext in seen:
                 continue
-            seen.add(doc_id)
-            ranked.append((doc_id, self._child_score(ch)))
-            if len(ranked) >= k:
-                break
+            seen.add(ext)
+            ranked.append((ext, self._child_score(ch)))
         return ranked
+
+    async def retrieve(self, query: str, k: int) -> list[tuple[str, float]]:
+        """Top-``k`` *documents* (best chunk per document, rank order preserved)."""
+        children = await self.retrieve_children(query, depth=max(k, C.RETRIEVAL_DEPTH))
+        return self.rank_documents(children)[:k]
 
     # ------------------------------------------------------------------ generation
     async def answer(self, query: str, config: str | None = None) -> dict[str, Any]:
@@ -399,9 +474,9 @@ class DeepContextAdapter:
         return {
             "answer": answer,
             "contexts": [p.get("content", "") for p in parents],
-            "context_ids": [p["document_id"] for p in parents],
+            "context_ids": [self.ext_id(p["document_id"]) for p in parents],
             "contexts_seen": [t for _, t in vis],
-            "context_ids_seen": [parents[i - 1]["document_id"] for i, _ in vis],
+            "context_ids_seen": [self.ext_id(parents[i - 1]["document_id"]) for i, _ in vis],
             "evidence_chars_total": sum(len(p.get("content", "")) for p in parents),
             "evidence_chars_seen": sum(len(t) for _, t in vis),
             "latency_s": time.perf_counter() - t0,

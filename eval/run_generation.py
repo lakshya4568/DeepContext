@@ -41,10 +41,9 @@ async def run_dataset(
     configs: list[str],
     concurrency: int = 4,
     max_queries: int | None = None,
-    index_dir: Path = C.INDEX_DIR,
 ) -> None:
     fp = corpus_fingerprint(task.corpus)[:10]
-    adapter = DeepContextAdapter(index_dir / f"{task.name}_{fp}.db", configs[0])
+    adapter = DeepContextAdapter(f"{task.name}_{fp}", configs[0])
     await adapter.open()
     stats = await adapter.index(task.corpus)
     log.info("[%s] index: %s", tag, stats)

@@ -15,6 +15,7 @@ import time
 from pathlib import Path
 
 from eval import config as C
+from eval import pg
 from eval.adapter import DeepContextAdapter, corpus_fingerprint
 from eval.datasets import Task, build_task
 from eval.metrics import rank_metrics
@@ -44,10 +45,9 @@ async def run_dataset(
     out_path: Path,
     configs: list[str],
     concurrency: int = 6,
-    index_dir: Path = C.INDEX_DIR,
 ) -> None:
     fp = corpus_fingerprint(task.corpus)[:10]
-    adapter = DeepContextAdapter(index_dir / f"{task.name}_{fp}.db", configs[0])
+    adapter = DeepContextAdapter(f"{task.name}_{fp}", configs[0])
     await adapter.open()
     t0 = time.perf_counter()
     stats = await adapter.index(task.corpus)
@@ -60,7 +60,10 @@ async def run_dataset(
     all_meta[tag] = {
         **task.meta,
         "n_queries_with_relevance_labels": sum(1 for q in task.qids if task.qrels[q]),
-        "index": {"n_docs": stats.n_docs, "n_parents": stats.n_parents, "n_children": stats.n_children,
+        "index": {"backend": adapter.backend,
+                  "storage": (f"PostgreSQL database {pg.EVAL_DB}, schema {adapter.schema}, hnsw.ef_search={pg.HNSW_EF_SEARCH}"
+                              if adapter.backend == "postgres" else f"SQLite file {adapter.db_path.name}"),
+                  "n_docs": stats.n_docs, "n_parents": stats.n_parents, "n_children": stats.n_children,
                   "approx_embed_tokens": stats.approx_embed_tokens, "embedding_model": C.EMBEDDING_MODEL,
                   "embedding_dim": C.EMBEDDING_DIM, "chunker": "ParentChildChunker (child 300-600 tok, parent 1000-2500 tok, 15% overlap)"},
     }  # fmt: skip
@@ -85,12 +88,7 @@ async def run_dataset(
                         task.queries[qid], depth=C.RETRIEVAL_DEPTH, config=config
                     )
                 row["wall_s"] = round(time.perf_counter() - t, 4)
-                seen: set[str] = set()
-                ranked: list[tuple[str, float]] = []
-                for ch in children:
-                    if ch["document_id"] not in seen:
-                        seen.add(ch["document_id"])
-                        ranked.append((ch["document_id"], adapter._child_score(ch)))
+                ranked = adapter.rank_documents(children)
                 row["ranked"] = [d for d, _ in ranked]
                 row["top_scores"] = [round(s, 5) for _, s in ranked[:20]]
                 row["metrics"] = rank_metrics(row["ranked"], task.qrels[qid])

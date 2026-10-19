@@ -168,3 +168,61 @@ def test_runtime_semaphores_are_per_event_loop() -> None:
 
     asyncio.run(use())
     asyncio.run(use())  # second loop must not reuse the first loop's semaphore
+
+
+# --------------------------------------------------------------------------- PostgreSQL backend
+def test_pg_helpers_are_deterministic_and_safe(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    import uuid
+
+    from eval import pg
+
+    assert pg.doc_uuid("abc") == pg.doc_uuid("abc") != pg.doc_uuid("abd")
+    uuid.UUID(pg.doc_uuid("abc"))  # valid UUID
+    monkeypatch.setenv("EVAL_PG_DSN", "postgresql://user:secret@127.0.0.1:5432/awems")
+    dsn = pg.dsn_for("deepcontext_eval", "scifact_ab12")
+    assert dsn.endswith("/deepcontext_eval?search_path=scifact_ab12,public")
+    assert "awems" not in dsn  # never the application database
+    for bad in ("x; DROP DATABASE y", "UPPER", "a-b"):
+        with pytest.raises(ValueError):
+            pg.dsn_for(bad)
+    assert pg.schema_name("MultiHopRAG_0329 6ea13e").startswith("multihoprag_")
+
+
+async def test_postgres_store_schema_hnsw_and_search_depth() -> None:
+    """Live check against the local server (skipped if unreachable): the harness subclass builds the
+    schema on a fresh database, HNSW search width allows LIMIT 100, and the schema is dropped after."""
+    import uuid as uuidlib
+
+    import numpy as np
+    from eval import pg
+
+    from deep_context.core.types import Chunk, ChunkLevel, Document, RetrievalFilters
+
+    if not await pg.server_available():
+        pytest.skip("PostgreSQL is not reachable")
+    await pg.ensure_database()
+    schema = f"test_{uuidlib.uuid4().hex[:8]}"
+    await pg.ensure_schema(schema)
+    store = pg.make_store_class()(pg.dsn_for(pg.EVAL_DB, schema))
+    try:
+        await store.initialize()
+        rng = np.random.default_rng(0)
+        for i in range(30):
+            doc = Document(id=pg.doc_uuid(f"d{i}"), title=f"T{i}", doc_type="text")
+            await store.insert_document(doc)
+            chunks = []
+            for j in range(10):
+                v = rng.normal(size=768).astype(np.float32)
+                v /= np.linalg.norm(v)
+                chunks.append(
+                    Chunk(id=str(uuidlib.uuid4()), document_id=doc.id, level=ChunkLevel.CHILD,
+                          content=f"alpha beta {i} {j}", token_count=4, embedding=v.tolist())
+                )  # fmt: skip
+            await store.insert_chunks(chunks)
+        q = rng.normal(size=768).astype(np.float32)
+        hits = await store.search_vector(q.tolist(), RetrievalFilters(), limit=100)
+        assert len(hits) == 100  # would be 40 with pgvector's default hnsw.ef_search
+        assert await store.search_bm25("alpha beta", RetrievalFilters(), limit=50)
+    finally:
+        await store.close()
+        await pg.drop_schema(schema)
