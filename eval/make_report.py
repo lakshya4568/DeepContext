@@ -157,6 +157,11 @@ def main() -> None:
     )
 
     out.append("## 1. Setup and versions\n")
+    rs = rd / "run_settings.json"
+    if rs.exists():
+        st = json.loads(rs.read_text())
+        out.append("**Search/run settings of this results directory** (`run_settings.json`):\n")
+        out.append("\n".join(f"- {k}: {v}" for k, v in st.items()) + "\n")
     pk = [
         "ragas",
         "beir",
@@ -289,6 +294,56 @@ def main() -> None:
         "\n**Custom corpora** (project documentation and the two project PDFs; separate table because the queries and page/section labels were written for this project and are not human-audited)\n"
     )
     out.append(md_table(hl[hl["dataset"].map(is_custom)]) if not hl.empty else "_no data_\n")
+
+    ba = rd / "before_after.csv"
+    if ba.exists():
+        bdf = pd.read_csv(ba)
+        out.append("## 3b. Before vs after the search fixes (nDCG@10, test questions)\n")
+        out.append(
+            "Original code = ts_rank word search, drop-by-first-120-characters, equal votes. Fixed code = BM25 word search, exact-duplicate removal, lexical vote 0.1 (vote chosen on SciFact-train / FiQA-dev questions, not on these). "
+            "Δ = after − before on identical questions (paired bootstrap 95% CI). Full table with Hit@5, Recall@100 and every intermediate variant: `BEFORE_AFTER.md`. Rows marked † are the full engine, which returns ≤ 6 documents.\n"
+        )
+        rows_ba = []
+        for ds in sorted(bdf["dataset"].unique()):
+            g = bdf[bdf["dataset"] == ds].set_index("setup")
+
+            def cell(before: str, after: str) -> list[str]:
+                if before not in g.index or after not in g.index:
+                    return ["–", "–", "–"]
+                a = g.loc[after]
+                return [
+                    f"{g.loc[before]['ndcg@10']:.3f}",
+                    f"{a['ndcg@10']:.3f}",
+                    f"{a['delta_ndcg10']:+.3f} [{a['delta_lo']:+.3f}, {a['delta_hi']:+.3f}]",
+                ]
+
+            rows_ba.append(
+                [ds]
+                + [
+                    f"{g.loc['dense only (unchanged)']['ndcg@10']:.3f}"
+                    if "dense only (unchanged)" in g.index
+                    else "–"
+                ]
+                + cell("merged — before", "merged, BM25 + dedup + lexical vote 0.1 (P1+P2+P3)")
+                + cell("merged + reranker — before", "merged + reranker, all fixes")
+                + cell(
+                    "full engine (≤6 documents) — before", "full engine (≤6 documents), all fixes"
+                )
+            )
+        hdr = [
+            "dataset",
+            "dense only",
+            "merged before",
+            "merged after",
+            "Δ merged",
+            "+reranker before",
+            "+reranker after",
+            "Δ +reranker",
+            "engine † before",
+            "engine † after",
+            "Δ engine †",
+        ]
+        out.append(md_table(pd.DataFrame(rows_ba, columns=hdr)))
 
     out.append("## 4. Retrieval (document level)\n")
     cols = [
@@ -605,6 +660,9 @@ def main() -> None:
 - **MultiHop-RAG / long documents.** Both generators cap the evidence sent to the model at 12,000 characters, so on long articles most retrieved context never reaches the LLM (see §6). This is a property of the shipped system and is measured, not tuned.
 - **Hard-coded anachronism gate** (`quality_gates.is_anachronism`) is specific to the GoT corpus; it is only exercised by the `engine_as_shipped` rows (fire rate in §6).
 - **Small samples.** `docsqa` has 44 items (9 unanswerable) and RAGBench-covidqa 242; per-category breakdowns would be too thin to interpret. The `smoke/` directory (n=20 per dataset) is a pipeline check, not evidence of differences between configs.
+- **Scope reductions (stated, not hidden).** HotpotQA uses 300 questions over a 30,000-document corpus (all correct documents plus random distractors), so it is far easier than the published 5-million-document task (meaning-only nDCG@10 ≈ 0.98); do not compare it with leaderboards. Answer-level metrics use a fixed, hash-chosen subset: 100 questions each from MultiHop-RAG and RAGBench (plus all 35 unanswerable MultiHop-RAG questions), all 44 docs questions and all 36 questions of each PDF; RAGAS (the most expensive judge) covers 50 of those per large dataset, for three setups only. Intervals are wide for the 30–50-question cells.
+- **Before/after fairness.** The merge weight (0.1) was chosen on separate dev-split questions (a grid of 1, 0.5, 0.25, 0.1; the best value was at the edge of the grid, so even lower values might do better), then applied unchanged to the test questions. `dense_only` is unaffected by the fixes and reused. Answers in this results directory were all re-written with the fixed search; the original answers (before the fixes) are in `eval/results/` for comparison.
+- **Reranker backends.** Early runs called the hosted EcoHash `bge-reranker-v2-m3`; later runs used a self-hosted copy of the same model on a Colab GPU (rankings were identical on 242 RAGBench queries). Latency numbers that include the reranker include the network path to that GPU and are not production latency.
 - The SLM contextual-summary ingestion variant (Qwen3-0.6B) was **not run** (not on the base branch; deferred by request). No numbers are reported for it.
 """)
     out.append(
