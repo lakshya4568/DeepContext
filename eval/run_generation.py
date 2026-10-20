@@ -41,6 +41,7 @@ async def run_dataset(
     configs: list[str],
     concurrency: int = 4,
     max_queries: int | None = None,
+    per_dataset: int | None = None,
 ) -> None:
     fp = corpus_fingerprint(task.corpus)[:10]
     adapter = DeepContextAdapter(f"{task.name}_{fp}", configs[0])
@@ -49,6 +50,15 @@ async def run_dataset(
     log.info("[%s] index: %s", tag, stats)
 
     qids = task.qids[:max_queries] if max_queries else task.qids
+    if per_dataset:  # same deterministic subset as eval.score_ragas / judge_correctness --per-dataset
+        import hashlib
+
+        answerable = sorted(
+            (q for q in qids if q not in task.unanswerable),
+            key=lambda q: hashlib.md5(f"{task.name}|{q}".encode()).hexdigest(),
+        )[:per_dataset]
+        keep = set(answerable) | {q for q in qids if q in task.unanswerable}
+        qids = [q for q in qids if q in keep]
     done = load_done(out_path, tag)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     sem, lock = asyncio.Semaphore(concurrency), asyncio.Lock()
@@ -119,6 +129,7 @@ def main() -> None:
     ap.add_argument("--n-queries", type=int, default=None)
     ap.add_argument("--max-docs", type=int, default=None)
     ap.add_argument("--max-gen", type=int, default=None, help="cap generated queries (first N)")
+    ap.add_argument("--per-dataset", type=int, default=None, help="answer N hash-selected answerable queries (+ all unanswerable)")
     ap.add_argument("--configs", nargs="*", default=GEN_CONFIGS)
     ap.add_argument("--results-dir", default=str(C.RESULTS_DIR))
     ap.add_argument("--concurrency", type=int, default=4)
@@ -137,6 +148,7 @@ def main() -> None:
             args.configs,
             args.concurrency,
             args.max_gen,
+            args.per_dataset,
         )
     )
 

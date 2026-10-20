@@ -25,7 +25,7 @@ from eval.run_retrieval import RETRIEVAL_CONFIGS, run_tag
 from eval.strict_clients import get_runtime
 
 log = logging.getLogger("eval.run_latency")
-ALL_CONFIGS = RETRIEVAL_CONFIGS + ["rrf_bge_two_pass", C.ENGINE_CONFIG]
+ALL_CONFIGS = list(dict.fromkeys(RETRIEVAL_CONFIGS + ["rrf_bge_two_pass", C.ENGINE_CONFIG]))
 
 
 async def main_async(args: argparse.Namespace) -> None:
