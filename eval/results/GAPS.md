@@ -64,7 +64,7 @@ The full engine also improved (SciFact 0.738 → 0.827, RAGBench 0.744 → 0.836
 - **C1. Meaning-only search gives the best (or tied-best) answers on every set.** Only the GoT PDF difference to merged (+0.19) is significant before the multiple-comparison correction.
 - **C2. Two-pass writing does not improve correctness.** It is lower than one-pass on the quantum PDF (−0.11, p = 0.007) and RAGBench (−0.07, p = 0.046), lower on docs and MultiHop-RAG (not significant), higher on the GoT PDF (+0.05, not significant). None survive the Holm correction across all 161 contrasts.
 - **C3. The full engine is not better than simpler setups** (quantum PDF 0.69 vs 0.90 for merged+reranker, RAGBench 0.62 vs 0.74).
-- **C4. MultiHop-RAG answers are mostly lost to refusals,** not to wrong answers: the writer refuses 36–69% of questions depending on the setup (see gap analysis F); only 14–20% of questions have all needed articles inside the 12,000-character limit (P5).
+- **C4. MultiHop-RAG answers are mostly lost to refusals,** not to wrong answers: the grader marks 34–70% of answers as refusals depending on the setup (50 shared questions; see gap analysis F for the all-question refusal rates); only 14–20% of questions have all needed articles inside the 12,000-character limit (P5).
 - **C5. Declining unanswerable questions works** (rubric: 97–100% handled correctly, small n: 9 docs, 5+5 PDF, 35 MultiHop-RAG).
 - Caveat: rubric validated against Claude's labels on 50 items from the smoke run (r = 0.80; slightly lenient on half-correct answers); with 30–50 questions per cell, differences below about 0.1 are within noise.
 
