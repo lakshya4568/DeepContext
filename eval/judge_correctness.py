@@ -238,7 +238,7 @@ def _weighted_kappa(a: np.ndarray, b: np.ndarray) -> float:
 
 def score_results(
     rdir: Path, model: str, thinking_budget: int | None, concurrency: int, batch: int,
-    datasets: list[str] | None, configs: list[str] | None,
+    datasets: list[str] | None, configs: list[str] | None, per_dataset: int | None = None,
 ) -> None:  # fmt: skip
     label = _label(model, thinking_budget)
     raw = [json.loads(x) for x in (rdir / "raw_generation.jsonl").open()]
@@ -256,6 +256,18 @@ def score_results(
         and (datasets is None or r["dataset"] in datasets)
         and (configs is None or r["config"] in configs)
     ]  # fmt: skip
+    if per_dataset:
+        import hashlib
+
+        keep: dict[str, set[str]] = {}
+        for ds in {r["dataset"] for r in raw if not r.get("error")}:
+            qids = sorted(  # same deterministic subset as eval.score_ragas --per-dataset
+                {r["qid"] for r in raw if r["dataset"] == ds and not r["unanswerable"]},
+                key=lambda q: hashlib.md5(f"{ds}|{q}".encode()).hexdigest(),
+            )
+            keep[ds] = set(qids[:per_dataset])
+        # unanswerable questions are few; always graded
+        todo = [r for r in todo if r["unanswerable"] or r["qid"] in keep[r["dataset"]]]
     log.info("%d rows to grade with rubric %s, judge=%s", len(todo), RUBRIC_VERSION, label)
     t0 = time.perf_counter()
     for i in range(0, len(todo), batch):
@@ -311,6 +323,9 @@ def main() -> None:
     )
     ap.add_argument("--datasets", nargs="*", default=None)
     ap.add_argument("--configs", nargs="*", default=None)
+    ap.add_argument(
+        "--per-dataset", type=int, default=None, help="grade N answerable queries per dataset"
+    )
     a = ap.parse_args()
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(name)s %(message)s", stream=sys.stderr
@@ -326,7 +341,9 @@ def main() -> None:
         print(json.dumps({k: v for k, v in out.items() if k != "disagreements"}, indent=1))
         print(f"{len(out['disagreements'])} disagreements -> {rdir / 'rubric_validation.json'}")
         return
-    score_results(rdir, a.model, a.thinking_budget, a.concurrency, a.batch, a.datasets, a.configs)
+    score_results(
+        rdir, a.model, a.thinking_budget, a.concurrency, a.batch, a.datasets, a.configs, a.per_dataset
+    )
 
 
 if __name__ == "__main__":

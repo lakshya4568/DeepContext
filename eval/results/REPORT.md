@@ -1,8 +1,8 @@
 # DeepContext public-benchmark report
 
-**INTERIM - batches 1+2 (retrieval and answer writing); rubric, RAGAS, latency not yet in** — generated from files in `eval/results`; every number below is read from them.
+**INTERIM - batches 1-3 (retrieval, answers, rubric correctness); RAGAS and live latency not yet in** — generated from files in `eval/results`; every number below is read from them.
 
-- Branch `eval/public-benchmarks` @ `cb3575d` (base `feat/rag-quality-generation`), working tree dirty at report time
+- Branch `fix/search-gaps` @ `937d801` (base `feat/rag-quality-generation`), working tree dirty at report time
 - Judge: `gemini-3.7-flash` (temperature 0) — generator: `gemini-3.8-flash` (different model; both are Google models, so family bias is possible)
 - Embeddings: `gemini-embedding-2` 768-d via Vertex AI (`global` endpoint); reranker: bge-reranker-v2-m3 (hosted, EcoHash API)
 
@@ -68,18 +68,18 @@ RGB (generation-only): `en_refine` / `en_int` / `en_fact` from github.com/chen70
 | hotpotqa | rrf | 300 | 0.993 [0.983, 1.000] | 0.868 [0.848, 0.887] | – | – | – | – | – |
 | hotpotqa | rrf_bge | 300 | 0.997 [0.990, 1.000] | 0.952 [0.939, 0.963] | – | – | – | – | – |
 | hotpotqa | rrf_bge_two_pass | 300 | 0.997 [0.990, 1.000] | 0.952 [0.939, 0.963] | – | – | – | – | – |
-| multihoprag | dense_only | 265 | 0.977 [0.958, 0.992] | 0.804 [0.781, 0.826] | – | – | – | – | – |
-| multihoprag | bm25_only | 265 | 0.702 [0.645, 0.755] | 0.395 [0.362, 0.429] | – | – | – | – | – |
-| multihoprag | rrf | 265 | 0.947 [0.917, 0.974] | 0.637 [0.610, 0.665] | – | – | – | – | – |
-| multihoprag | rrf_bge | 265 | 0.970 [0.947, 0.989] | 0.727 [0.701, 0.752] | – | – | – | – | – |
-| multihoprag | rrf_bge_two_pass | 265 | 0.970 [0.947, 0.989] | 0.727 [0.701, 0.752] | – | – | – | – | – |
-| multihoprag | engine_as_shipped † | 265 | 0.977 [0.958, 0.992] | 0.736 [0.707, 0.766] | – | – | – | – | – |
-| ragbench-covidqa | dense_only | 242 | 0.971 [0.950, 0.992] | 0.850 [0.821, 0.877] | – | – | – | – | – |
-| ragbench-covidqa | bm25_only | 242 | 0.740 [0.682, 0.793] | 0.588 [0.542, 0.635] | – | – | – | – | – |
-| ragbench-covidqa | rrf | 242 | 0.917 [0.880, 0.950] | 0.712 [0.675, 0.749] | – | – | – | – | – |
-| ragbench-covidqa | rrf_bge | 242 | 0.930 [0.897, 0.959] | 0.743 [0.705, 0.778] | – | – | – | – | – |
-| ragbench-covidqa | rrf_bge_two_pass | 242 | 0.930 [0.897, 0.959] | 0.743 [0.705, 0.778] | – | – | – | – | – |
-| ragbench-covidqa | engine_as_shipped † | 242 | 0.921 [0.884, 0.955] | 0.744 [0.707, 0.780] | – | – | – | – | – |
+| multihoprag | dense_only | 265 | 0.977 [0.958, 0.992] | 0.804 [0.781, 0.826] | – | – | – | 0.488 [0.429, 0.546] | – |
+| multihoprag | bm25_only | 265 | 0.702 [0.645, 0.755] | 0.395 [0.362, 0.429] | – | – | – | 0.209 [0.109, 0.318] | – |
+| multihoprag | rrf | 265 | 0.947 [0.917, 0.974] | 0.637 [0.610, 0.665] | – | – | – | 0.390 [0.260, 0.520] | – |
+| multihoprag | rrf_bge | 265 | 0.970 [0.947, 0.989] | 0.727 [0.701, 0.752] | – | – | – | 0.440 [0.310, 0.580] | – |
+| multihoprag | rrf_bge_two_pass | 265 | 0.970 [0.947, 0.989] | 0.727 [0.701, 0.752] | – | – | – | 0.390 [0.260, 0.520] | – |
+| multihoprag | engine_as_shipped † | 265 | 0.977 [0.958, 0.992] | 0.736 [0.707, 0.766] | – | – | – | 0.390 [0.260, 0.530] | – |
+| ragbench-covidqa | dense_only | 242 | 0.971 [0.950, 0.992] | 0.850 [0.821, 0.877] | – | – | – | 0.780 [0.670, 0.880] | – |
+| ragbench-covidqa | bm25_only | 242 | 0.740 [0.682, 0.793] | 0.588 [0.542, 0.635] | – | – | – | 0.650 [0.530, 0.770] | – |
+| ragbench-covidqa | rrf | 242 | 0.917 [0.880, 0.950] | 0.712 [0.675, 0.749] | – | – | – | 0.730 [0.620, 0.840] | – |
+| ragbench-covidqa | rrf_bge | 242 | 0.930 [0.897, 0.959] | 0.743 [0.705, 0.778] | – | – | – | 0.740 [0.630, 0.840] | – |
+| ragbench-covidqa | rrf_bge_two_pass | 242 | 0.930 [0.897, 0.959] | 0.743 [0.705, 0.778] | – | – | – | 0.670 [0.550, 0.780] | – |
+| ragbench-covidqa | engine_as_shipped † | 242 | 0.921 [0.884, 0.955] | 0.744 [0.707, 0.780] | – | – | – | 0.620 [0.500, 0.740] | – |
 | scifact | dense_only | 300 | 0.953 [0.930, 0.977] | 0.900 [0.874, 0.923] | – | – | – | – | – |
 | scifact | bm25_only | 300 | 0.573 [0.520, 0.630] | 0.487 [0.439, 0.536] | – | – | – | – | – |
 | scifact | rrf | 300 | 0.783 [0.737, 0.830] | 0.702 [0.660, 0.744] | – | – | – | – | – |
@@ -92,30 +92,30 @@ RGB (generation-only): `en_refine` / `en_int` / `en_fact` from github.com/chen70
 
 | dataset | config | n | Hit@5 | nDCG@10 | Faithfulness | Context Recall | Factual F1 | Rubric correctness | p95 latency (s) |
 |---|---|---|---|---|---|---|---|---|---|
-| docsqa | dense_only | 35 | 0.914 [0.829, 1.000] | 0.824 [0.742, 0.900] | – | – | – | – | – |
-| docsqa | bm25_only | 35 | 0.743 [0.600, 0.886] | 0.635 [0.506, 0.760] | – | – | – | – | – |
-| docsqa | rrf | 35 | 0.886 [0.771, 0.971] | 0.760 [0.665, 0.849] | – | – | – | – | – |
-| docsqa | rrf_bge | 35 | 0.914 [0.800, 1.000] | 0.794 [0.700, 0.883] | – | – | – | – | – |
-| docsqa | rrf_bge_two_pass | 35 | 0.914 [0.800, 1.000] | 0.794 [0.700, 0.883] | – | – | – | – | – |
-| docsqa | engine_as_shipped † | 35 | 0.857 [0.743, 0.971] | 0.776 [0.660, 0.878] | – | – | – | – | – |
-| pdf-got | dense_only | 31 | 1.000 [1.000, 1.000] | 0.779 [0.694, 0.855] | – | – | – | – | – |
-| pdf-got | bm25_only | 31 | 0.323 [0.161, 0.484] | 0.162 [0.091, 0.243] | – | – | – | – | – |
-| pdf-got | rrf | 31 | 0.710 [0.548, 0.871] | 0.419 [0.312, 0.525] | – | – | – | – | – |
-| pdf-got | rrf_bge | 31 | 0.710 [0.548, 0.871] | 0.419 [0.314, 0.522] | – | – | – | – | – |
-| pdf-got | rrf_bge_two_pass | 31 | 0.710 [0.548, 0.871] | 0.419 [0.314, 0.522] | – | – | – | – | – |
-| pdf-got | engine_as_shipped † | 31 | 0.839 [0.710, 0.968] | 0.486 [0.382, 0.589] | – | – | – | – | – |
+| docsqa | dense_only | 35 | 0.914 [0.829, 1.000] | 0.824 [0.742, 0.900] | – | – | – | 1.000 [1.000, 1.000] | – |
+| docsqa | bm25_only | 35 | 0.743 [0.600, 0.886] | 0.635 [0.506, 0.760] | – | – | – | 0.829 [0.700, 0.943] | – |
+| docsqa | rrf | 35 | 0.886 [0.771, 0.971] | 0.760 [0.665, 0.849] | – | – | – | 0.929 [0.843, 1.000] | – |
+| docsqa | rrf_bge | 35 | 0.914 [0.800, 1.000] | 0.794 [0.700, 0.883] | – | – | – | 0.986 [0.957, 1.000] | – |
+| docsqa | rrf_bge_two_pass | 35 | 0.914 [0.800, 1.000] | 0.794 [0.700, 0.883] | – | – | – | 0.943 [0.871, 1.000] | – |
+| docsqa | engine_as_shipped † | 35 | 0.857 [0.743, 0.971] | 0.776 [0.660, 0.878] | – | – | – | 0.929 [0.843, 1.000] | – |
+| pdf-got | dense_only | 31 | 1.000 [1.000, 1.000] | 0.779 [0.694, 0.855] | – | – | – | 0.823 [0.694, 0.935] | – |
+| pdf-got | bm25_only | 31 | 0.323 [0.161, 0.484] | 0.162 [0.091, 0.243] | – | – | – | 0.300 [0.167, 0.433] | – |
+| pdf-got | rrf | 31 | 0.710 [0.548, 0.871] | 0.419 [0.312, 0.525] | – | – | – | 0.629 [0.468, 0.790] | – |
+| pdf-got | rrf_bge | 31 | 0.710 [0.548, 0.871] | 0.419 [0.314, 0.522] | – | – | – | 0.581 [0.419, 0.742] | – |
+| pdf-got | rrf_bge_two_pass | 31 | 0.710 [0.548, 0.871] | 0.419 [0.314, 0.522] | – | – | – | 0.629 [0.468, 0.774] | – |
+| pdf-got | engine_as_shipped † | 31 | 0.839 [0.710, 0.968] | 0.486 [0.382, 0.589] | – | – | – | 0.677 [0.532, 0.823] | – |
 | pdf-got (±1 page) | dense_only | 31 | 1.000 [1.000, 1.000] | 0.659 [0.614, 0.699] | – | – | – | – | – |
 | pdf-got (±1 page) | bm25_only | 31 | 0.484 [0.323, 0.645] | 0.188 [0.123, 0.262] | – | – | – | – | – |
 | pdf-got (±1 page) | rrf | 31 | 0.806 [0.645, 0.935] | 0.400 [0.319, 0.478] | – | – | – | – | – |
 | pdf-got (±1 page) | rrf_bge | 31 | 0.871 [0.742, 0.968] | 0.400 [0.322, 0.474] | – | – | – | – | – |
 | pdf-got (±1 page) | rrf_bge_two_pass | 31 | 0.871 [0.742, 0.968] | 0.400 [0.322, 0.474] | – | – | – | – | – |
 | pdf-got (±1 page) | engine_as_shipped † | 31 | 0.871 [0.742, 0.968] | 0.406 [0.336, 0.476] | – | – | – | – | – |
-| pdf-quantum | dense_only | 31 | 0.935 [0.839, 1.000] | 0.518 [0.452, 0.577] | – | – | – | – | – |
-| pdf-quantum | bm25_only | 31 | 0.710 [0.548, 0.871] | 0.292 [0.220, 0.366] | – | – | – | – | – |
-| pdf-quantum | rrf | 31 | 0.871 [0.742, 0.968] | 0.481 [0.416, 0.539] | – | – | – | – | – |
-| pdf-quantum | rrf_bge | 31 | 0.871 [0.742, 0.968] | 0.460 [0.392, 0.523] | – | – | – | – | – |
-| pdf-quantum | rrf_bge_two_pass | 31 | 0.871 [0.742, 0.968] | 0.460 [0.392, 0.523] | – | – | – | – | – |
-| pdf-quantum | engine_as_shipped † | 31 | 0.871 [0.742, 0.968] | 0.410 [0.342, 0.477] | – | – | – | – | – |
+| pdf-quantum | dense_only | 31 | 0.935 [0.839, 1.000] | 0.518 [0.452, 0.577] | – | – | – | 0.935 [0.839, 1.000] | – |
+| pdf-quantum | bm25_only | 31 | 0.710 [0.548, 0.871] | 0.292 [0.220, 0.366] | – | – | – | 0.758 [0.613, 0.887] | – |
+| pdf-quantum | rrf | 31 | 0.871 [0.742, 0.968] | 0.481 [0.416, 0.539] | – | – | – | 0.919 [0.823, 1.000] | – |
+| pdf-quantum | rrf_bge | 31 | 0.871 [0.742, 0.968] | 0.460 [0.392, 0.523] | – | – | – | 0.903 [0.806, 0.984] | – |
+| pdf-quantum | rrf_bge_two_pass | 31 | 0.871 [0.742, 0.968] | 0.460 [0.392, 0.523] | – | – | – | 0.790 [0.661, 0.903] | – |
+| pdf-quantum | engine_as_shipped † | 31 | 0.871 [0.742, 0.968] | 0.410 [0.342, 0.477] | – | – | – | 0.694 [0.548, 0.839] | – |
 | pdf-quantum (±1 page) | dense_only | 31 | 0.935 [0.839, 1.000] | 0.505 [0.434, 0.571] | – | – | – | – | – |
 | pdf-quantum (±1 page) | bm25_only | 31 | 0.839 [0.710, 0.968] | 0.288 [0.229, 0.346] | – | – | – | – | – |
 | pdf-quantum (±1 page) | rrf | 31 | 0.903 [0.774, 1.000] | 0.462 [0.397, 0.523] | – | – | – | – | – |
@@ -258,26 +258,26 @@ RAGAS `retrieved_contexts` = the slice of each retrieved parent that fits the pr
 
 ### multihoprag — `multihoprag|q300|dfull`
 
-| config | answerable | judged | EM | token F1 | contains-answer |
-|---|---|---|---|---|---|
-| dense_only | 265 | 0 | 0.000 [0.000, 0.000] | 0.026 [0.021, 0.032] | 0.543 [0.483, 0.600] |
-| bm25_only | 265 | 0 | 0.000 [0.000, 0.000] | 0.013 [0.010, 0.016] | 0.317 [0.260, 0.374] |
-| rrf | 265 | 0 | 0.000 [0.000, 0.000] | 0.019 [0.016, 0.023] | 0.449 [0.389, 0.509] |
-| rrf_bge | 265 | 0 | 0.000 [0.000, 0.000] | 0.024 [0.019, 0.030] | 0.521 [0.460, 0.581] |
-| rrf_bge_two_pass | 265 | 0 | 0.000 [0.000, 0.000] | 0.016 [0.014, 0.019] | 0.479 [0.419, 0.540] |
-| engine_as_shipped | 265 | 0 | 0.000 [0.000, 0.000] | 0.016 [0.014, 0.018] | 0.494 [0.434, 0.555] |
+| config | answerable | judged | Rubric correctness | EM | token F1 | contains-answer |
+|---|---|---|---|---|---|---|
+| dense_only | 265 | 0 | 0.488 [0.429, 0.546] | 0.000 [0.000, 0.000] | 0.026 [0.021, 0.032] | 0.543 [0.483, 0.600] |
+| bm25_only | 265 | 0 | 0.209 [0.109, 0.318] | 0.000 [0.000, 0.000] | 0.013 [0.010, 0.016] | 0.317 [0.260, 0.374] |
+| rrf | 265 | 0 | 0.390 [0.260, 0.520] | 0.000 [0.000, 0.000] | 0.019 [0.016, 0.023] | 0.449 [0.389, 0.509] |
+| rrf_bge | 265 | 0 | 0.440 [0.310, 0.580] | 0.000 [0.000, 0.000] | 0.024 [0.019, 0.030] | 0.521 [0.460, 0.581] |
+| rrf_bge_two_pass | 265 | 0 | 0.390 [0.260, 0.520] | 0.000 [0.000, 0.000] | 0.016 [0.014, 0.019] | 0.479 [0.419, 0.540] |
+| engine_as_shipped | 265 | 0 | 0.390 [0.260, 0.530] | 0.000 [0.000, 0.000] | 0.016 [0.014, 0.018] | 0.494 [0.434, 0.555] |
 
 
 ### ragbench-covidqa — `ragbench-covidqa|qall|dfull`
 
-| config | answerable | judged |
-|---|---|---|
-| dense_only | 242 | 0 |
-| bm25_only | 242 | 0 |
-| rrf | 242 | 0 |
-| rrf_bge | 242 | 0 |
-| rrf_bge_two_pass | 242 | 0 |
-| engine_as_shipped | 242 | 0 |
+| config | answerable | judged | Rubric correctness |
+|---|---|---|---|
+| dense_only | 242 | 0 | 0.780 [0.670, 0.880] |
+| bm25_only | 242 | 0 | 0.650 [0.530, 0.770] |
+| rrf | 242 | 0 | 0.730 [0.620, 0.840] |
+| rrf_bge | 242 | 0 | 0.740 [0.630, 0.840] |
+| rrf_bge_two_pass | 242 | 0 | 0.670 [0.550, 0.780] |
+| engine_as_shipped | 242 | 0 | 0.620 [0.500, 0.740] |
 
 
 #### Custom corpora (not public benchmarks: the project's own documentation and the two project PDFs; queries and labels were written for this project, not human-audited)
@@ -285,38 +285,38 @@ RAGAS `retrieved_contexts` = the slice of each retrieved parent that fits the pr
 
 ### docsqa — `docsqa|qall|dfull`
 
-| config | answerable | judged |
-|---|---|---|
-| dense_only | 35 | 0 |
-| bm25_only | 35 | 0 |
-| rrf | 35 | 0 |
-| rrf_bge | 35 | 0 |
-| rrf_bge_two_pass | 35 | 0 |
-| engine_as_shipped | 35 | 0 |
+| config | answerable | judged | Rubric correctness |
+|---|---|---|---|
+| dense_only | 35 | 0 | 1.000 [1.000, 1.000] |
+| bm25_only | 35 | 0 | 0.829 [0.700, 0.943] |
+| rrf | 35 | 0 | 0.929 [0.843, 1.000] |
+| rrf_bge | 35 | 0 | 0.986 [0.957, 1.000] |
+| rrf_bge_two_pass | 35 | 0 | 0.943 [0.871, 1.000] |
+| engine_as_shipped | 35 | 0 | 0.929 [0.843, 1.000] |
 
 
 ### pdf-got — `pdf-got|qall|dfull`
 
-| config | answerable | judged |
-|---|---|---|
-| dense_only | 31 | 0 |
-| bm25_only | 31 | 0 |
-| rrf | 31 | 0 |
-| rrf_bge | 31 | 0 |
-| rrf_bge_two_pass | 31 | 0 |
-| engine_as_shipped | 31 | 0 |
+| config | answerable | judged | Rubric correctness |
+|---|---|---|---|
+| dense_only | 31 | 0 | 0.823 [0.694, 0.935] |
+| bm25_only | 31 | 0 | 0.300 [0.167, 0.433] |
+| rrf | 31 | 0 | 0.629 [0.468, 0.790] |
+| rrf_bge | 31 | 0 | 0.581 [0.419, 0.742] |
+| rrf_bge_two_pass | 31 | 0 | 0.629 [0.468, 0.774] |
+| engine_as_shipped | 31 | 0 | 0.677 [0.532, 0.823] |
 
 
 ### pdf-quantum — `pdf-quantum|qall|dfull`
 
-| config | answerable | judged |
-|---|---|---|
-| dense_only | 31 | 0 |
-| bm25_only | 31 | 0 |
-| rrf | 31 | 0 |
-| rrf_bge | 31 | 0 |
-| rrf_bge_two_pass | 31 | 0 |
-| engine_as_shipped | 31 | 0 |
+| config | answerable | judged | Rubric correctness |
+|---|---|---|---|
+| dense_only | 31 | 0 | 0.935 [0.839, 1.000] |
+| bm25_only | 31 | 0 | 0.758 [0.613, 0.887] |
+| rrf | 31 | 0 | 0.919 [0.823, 1.000] |
+| rrf_bge | 31 | 0 | 0.903 [0.806, 0.984] |
+| rrf_bge_two_pass | 31 | 0 | 0.790 [0.661, 0.903] |
+| engine_as_shipped | 31 | 0 | 0.694 [0.548, 0.839] |
 
 
 ## 5b. LLM-rubric answer correctness (all six configurations)
@@ -328,24 +328,24 @@ RAGAS `FactualCorrectness` (F1 over decomposed claims) penalises a correct answe
 
 | config | answerable (scored) | rubric correctness | correct | partial | incorrect | abstained | unanswerable handled correctly |
 |---|---|---|---|---|---|---|---|
-| dense_only | 265 (0) | – | – | – | – | – | – |
-| bm25_only | 265 (0) | – | – | – | – | – | – |
-| rrf | 265 (0) | – | – | – | – | – | – |
-| rrf_bge | 265 (0) | – | – | – | – | – | – |
-| rrf_bge_two_pass | 265 (0) | – | – | – | – | – | – |
-| engine_as_shipped | 265 (0) | – | – | – | – | – | – |
+| dense_only | 50 (50) | 0.520 [0.390, 0.660] | 0.500 [0.360, 0.640] | 0.040 [0.000, 0.100] | 0.120 [0.040, 0.220] | 0.340 [0.220, 0.480] | 1.000 [1.000, 1.000] (n=35) |
+| bm25_only | 50 (50) | 0.200 [0.100, 0.310] | 0.180 [0.080, 0.300] | 0.040 [0.000, 0.100] | 0.080 [0.020, 0.160] | 0.700 [0.560, 0.820] | 1.000 [1.000, 1.000] (n=35) |
+| rrf | 50 (50) | 0.390 [0.260, 0.520] | 0.360 [0.240, 0.500] | 0.060 [0.000, 0.140] | 0.080 [0.020, 0.160] | 0.500 [0.360, 0.640] | 1.000 [1.000, 1.000] (n=35) |
+| rrf_bge | 50 (50) | 0.440 [0.310, 0.580] | 0.420 [0.280, 0.560] | 0.040 [0.000, 0.100] | 0.060 [0.000, 0.140] | 0.480 [0.340, 0.620] | 1.000 [1.000, 1.000] (n=35) |
+| rrf_bge_two_pass | 50 (50) | 0.390 [0.260, 0.520] | 0.360 [0.240, 0.500] | 0.060 [0.000, 0.140] | 0.120 [0.040, 0.220] | 0.460 [0.320, 0.600] | 1.000 [1.000, 1.000] (n=35) |
+| engine_as_shipped | 50 (50) | 0.390 [0.260, 0.530] | 0.380 [0.240, 0.520] | 0.020 [0.000, 0.060] | 0.160 [0.060, 0.260] | 0.440 [0.300, 0.580] | 0.971 [0.914, 1.000] (n=35) |
 
 
 ### ragbench-covidqa — `ragbench-covidqa|qall|dfull`
 
 | config | answerable (scored) | rubric correctness | correct | partial | incorrect | abstained | unanswerable handled correctly |
 |---|---|---|---|---|---|---|---|
-| dense_only | 242 (0) | – | – | – | – | – | – |
-| bm25_only | 242 (0) | – | – | – | – | – | – |
-| rrf | 242 (0) | – | – | – | – | – | – |
-| rrf_bge | 242 (0) | – | – | – | – | – | – |
-| rrf_bge_two_pass | 242 (0) | – | – | – | – | – | – |
-| engine_as_shipped | 242 (0) | – | – | – | – | – | – |
+| dense_only | 50 (50) | 0.780 [0.670, 0.880] | 0.740 [0.620, 0.860] | 0.080 [0.020, 0.160] | 0.060 [0.000, 0.140] | 0.120 [0.040, 0.220] | – |
+| bm25_only | 50 (50) | 0.650 [0.530, 0.770] | 0.580 [0.440, 0.720] | 0.140 [0.060, 0.240] | 0.060 [0.000, 0.140] | 0.220 [0.120, 0.340] | – |
+| rrf | 50 (50) | 0.730 [0.620, 0.840] | 0.660 [0.520, 0.780] | 0.140 [0.060, 0.240] | 0.060 [0.000, 0.140] | 0.140 [0.060, 0.240] | – |
+| rrf_bge | 50 (50) | 0.740 [0.630, 0.840] | 0.640 [0.500, 0.760] | 0.200 [0.100, 0.320] | 0.060 [0.000, 0.140] | 0.100 [0.020, 0.180] | – |
+| rrf_bge_two_pass | 50 (50) | 0.670 [0.550, 0.780] | 0.580 [0.440, 0.720] | 0.180 [0.080, 0.300] | 0.080 [0.020, 0.160] | 0.160 [0.060, 0.260] | – |
+| engine_as_shipped | 50 (50) | 0.620 [0.500, 0.740] | 0.520 [0.380, 0.660] | 0.200 [0.100, 0.320] | 0.100 [0.020, 0.180] | 0.180 [0.080, 0.280] | – |
 
 
 #### Custom corpora (not public benchmarks: the project's own documentation and the two project PDFs; queries and labels were written for this project, not human-audited)
@@ -355,36 +355,36 @@ RAGAS `FactualCorrectness` (F1 over decomposed claims) penalises a correct answe
 
 | config | answerable (scored) | rubric correctness | correct | partial | incorrect | abstained | unanswerable handled correctly |
 |---|---|---|---|---|---|---|---|
-| dense_only | 35 (0) | – | – | – | – | – | – |
-| bm25_only | 35 (0) | – | – | – | – | – | – |
-| rrf | 35 (0) | – | – | – | – | – | – |
-| rrf_bge | 35 (0) | – | – | – | – | – | – |
-| rrf_bge_two_pass | 35 (0) | – | – | – | – | – | – |
-| engine_as_shipped | 35 (0) | – | – | – | – | – | – |
+| dense_only | 35 (35) | 1.000 [1.000, 1.000] | 1.000 [1.000, 1.000] | 0.000 [0.000, 0.000] | 0.000 [0.000, 0.000] | 0.000 [0.000, 0.000] | 1.000 [1.000, 1.000] (n=9) |
+| bm25_only | 35 (35) | 0.829 [0.700, 0.943] | 0.800 [0.657, 0.914] | 0.057 [0.000, 0.143] | 0.029 [0.000, 0.086] | 0.114 [0.029, 0.229] | 1.000 [1.000, 1.000] (n=9) |
+| rrf | 35 (35) | 0.929 [0.843, 1.000] | 0.914 [0.800, 1.000] | 0.029 [0.000, 0.086] | 0.029 [0.000, 0.086] | 0.029 [0.000, 0.086] | 1.000 [1.000, 1.000] (n=9) |
+| rrf_bge | 35 (35) | 0.986 [0.957, 1.000] | 0.971 [0.914, 1.000] | 0.029 [0.000, 0.086] | 0.000 [0.000, 0.000] | 0.000 [0.000, 0.000] | 1.000 [1.000, 1.000] (n=9) |
+| rrf_bge_two_pass | 35 (35) | 0.943 [0.871, 1.000] | 0.914 [0.800, 1.000] | 0.057 [0.000, 0.143] | 0.000 [0.000, 0.000] | 0.029 [0.000, 0.086] | 1.000 [1.000, 1.000] (n=9) |
+| engine_as_shipped | 35 (35) | 0.929 [0.843, 1.000] | 0.914 [0.800, 1.000] | 0.029 [0.000, 0.086] | 0.000 [0.000, 0.000] | 0.057 [0.000, 0.143] | 1.000 [1.000, 1.000] (n=9) |
 
 
 ### pdf-got — `pdf-got|qall|dfull`
 
 | config | answerable (scored) | rubric correctness | correct | partial | incorrect | abstained | unanswerable handled correctly |
 |---|---|---|---|---|---|---|---|
-| dense_only | 31 (0) | – | – | – | – | – | – |
-| bm25_only | 31 (0) | – | – | – | – | – | – |
-| rrf | 31 (0) | – | – | – | – | – | – |
-| rrf_bge | 31 (0) | – | – | – | – | – | – |
-| rrf_bge_two_pass | 31 (0) | – | – | – | – | – | – |
-| engine_as_shipped | 31 (0) | – | – | – | – | – | – |
+| dense_only | 30 (30) | 0.817 [0.683, 0.917] | 0.733 [0.567, 0.900] | 0.167 [0.033, 0.300] | 0.033 [0.000, 0.100] | 0.067 [0.000, 0.167] | 1.000 [1.000, 1.000] (n=5) |
+| bm25_only | 30 (30) | 0.300 [0.167, 0.433] | 0.167 [0.033, 0.300] | 0.267 [0.133, 0.433] | 0.033 [0.000, 0.100] | 0.533 [0.367, 0.700] | 1.000 [1.000, 1.000] (n=5) |
+| rrf | 30 (30) | 0.617 [0.450, 0.783] | 0.567 [0.400, 0.733] | 0.100 [0.000, 0.233] | 0.033 [0.000, 0.100] | 0.300 [0.133, 0.467] | 1.000 [1.000, 1.000] (n=5) |
+| rrf_bge | 30 (30) | 0.600 [0.433, 0.767] | 0.533 [0.367, 0.700] | 0.133 [0.033, 0.267] | 0.033 [0.000, 0.100] | 0.300 [0.133, 0.467] | 1.000 [1.000, 1.000] (n=5) |
+| rrf_bge_two_pass | 30 (30) | 0.650 [0.500, 0.800] | 0.567 [0.400, 0.733] | 0.167 [0.033, 0.300] | 0.000 [0.000, 0.000] | 0.267 [0.133, 0.433] | 1.000 [1.000, 1.000] (n=5) |
+| engine_as_shipped | 30 (30) | 0.667 [0.517, 0.817] | 0.567 [0.400, 0.733] | 0.200 [0.067, 0.367] | 0.033 [0.000, 0.100] | 0.200 [0.067, 0.367] | 1.000 [1.000, 1.000] (n=5) |
 
 
 ### pdf-quantum — `pdf-quantum|qall|dfull`
 
 | config | answerable (scored) | rubric correctness | correct | partial | incorrect | abstained | unanswerable handled correctly |
 |---|---|---|---|---|---|---|---|
-| dense_only | 31 (0) | – | – | – | – | – | – |
-| bm25_only | 31 (0) | – | – | – | – | – | – |
-| rrf | 31 (0) | – | – | – | – | – | – |
-| rrf_bge | 31 (0) | – | – | – | – | – | – |
-| rrf_bge_two_pass | 31 (0) | – | – | – | – | – | – |
-| engine_as_shipped | 31 (0) | – | – | – | – | – | – |
+| dense_only | 31 (31) | 0.935 [0.839, 1.000] | 0.935 [0.839, 1.000] | 0.000 [0.000, 0.000] | 0.032 [0.000, 0.097] | 0.032 [0.000, 0.097] | 1.000 [1.000, 1.000] (n=5) |
+| bm25_only | 31 (31) | 0.758 [0.613, 0.887] | 0.710 [0.548, 0.871] | 0.097 [0.000, 0.226] | 0.000 [0.000, 0.000] | 0.194 [0.065, 0.355] | 1.000 [1.000, 1.000] (n=5) |
+| rrf | 31 (31) | 0.919 [0.823, 1.000] | 0.903 [0.774, 1.000] | 0.032 [0.000, 0.097] | 0.000 [0.000, 0.000] | 0.065 [0.000, 0.161] | 1.000 [1.000, 1.000] (n=5) |
+| rrf_bge | 31 (31) | 0.903 [0.806, 0.984] | 0.871 [0.742, 0.968] | 0.065 [0.000, 0.161] | 0.000 [0.000, 0.000] | 0.065 [0.000, 0.161] | 1.000 [1.000, 1.000] (n=5) |
+| rrf_bge_two_pass | 31 (31) | 0.790 [0.661, 0.903] | 0.710 [0.548, 0.871] | 0.161 [0.032, 0.290] | 0.000 [0.000, 0.000] | 0.129 [0.032, 0.258] | 1.000 [1.000, 1.000] (n=5) |
+| engine_as_shipped | 31 (31) | 0.694 [0.548, 0.839] | 0.613 [0.452, 0.774] | 0.161 [0.032, 0.290] | 0.000 [0.000, 0.000] | 0.226 [0.097, 0.387] | 1.000 [1.000, 1.000] (n=5) |
 
 
 ## 5c. Validation of the rubric metric against Claude's labels (model labels, not human)
@@ -573,7 +573,7 @@ Paired tests on identical queries (baseline → variant; positive = variant bett
 | fiqa | rrf vs rrf+bge | recall@100 | 648 | 0.8761 | 0.8761 | 0.0 | 0.0 | 0.0 | 1.0000 | 1.0000 | 0.0 | 1.0000 |
 | fiqa | rrf vs rrf+bge | map | 648 | 0.3162 | 0.3663 | 0.0501 | 0.0386 | 0.0619 | 0.0000 | 0.0000 | 0.3292 | 0.0000 |
 | hotpotqa | dense vs rrf | hit@5 | 300 | 0.9967 | 0.9933 | -0.0033 | -0.0167 | 0.0067 | 0.7956 | 0.5637 | -0.0333 | 1.0000 |
-| hotpotqa | dense vs rrf | mrr | 300 | 0.9933 | 0.9664 | -0.0269 | -0.0455 | -0.0097 | 0.0022 | 0.0122 | -0.1669 | 0.1760 |
+| hotpotqa | dense vs rrf | mrr | 300 | 0.9933 | 0.9664 | -0.0269 | -0.0455 | -0.0097 | 0.0022 | 0.0122 | -0.1669 | 0.2200 |
 | hotpotqa | dense vs rrf | ndcg@10 | 300 | 0.9821 | 0.8679 | -0.1143 | -0.1335 | -0.0956 | 0.0000 | 0.0000 | -0.6708 | 0.0000 |
 | hotpotqa | dense vs rrf | recall@100 | 300 | 0.9933 | 0.9967 | 0.0033 | 0.0 | 0.0083 | 0.2640 | 0.1573 | 0.0818 | 1.0000 |
 | hotpotqa | dense vs rrf | map | 300 | 0.9742 | 0.8115 | -0.1627 | -0.1866 | -0.1389 | 0.0000 | 0.0000 | -0.7624 | 0.0000 |
@@ -588,7 +588,7 @@ Paired tests on identical queries (baseline → variant; positive = variant bett
 | hotpotqa | rrf vs rrf+bge | recall@100 | 300 | 0.9967 | 0.9967 | 0.0 | 0.0 | 0.0 | 1.0000 | 1.0000 | 0.0 | 1.0000 |
 | hotpotqa | rrf vs rrf+bge | map | 300 | 0.8115 | 0.9208 | 0.1093 | 0.0907 | 0.1283 | 0.0000 | 0.0000 | 0.6486 | 0.0000 |
 | multihoprag | dense vs rrf | hit@5 | 265 | 0.9774 | 0.9472 | -0.0302 | -0.0604 | -0.0038 | 0.0392 | 0.0325 | -0.1322 | 1.0000 |
-| multihoprag | dense vs rrf | mrr | 265 | 0.8389 | 0.7726 | -0.0663 | -0.1086 | -0.0234 | 0.0018 | 0.0015 | -0.1865 | 0.1458 |
+| multihoprag | dense vs rrf | mrr | 265 | 0.8389 | 0.7726 | -0.0663 | -0.1086 | -0.0234 | 0.0018 | 0.0015 | -0.1865 | 0.1818 |
 | multihoprag | dense vs rrf | ndcg@10 | 265 | 0.804 | 0.637 | -0.167 | -0.1924 | -0.1416 | 0.0000 | 0.0000 | -0.783 | 0.0000 |
 | multihoprag | dense vs rrf | recall@100 | 265 | 0.9937 | 0.9909 | -0.0028 | -0.0088 | 0.0025 | 0.3404 | 0.3573 | -0.063 | 1.0000 |
 | multihoprag | dense vs rrf | map | 265 | 0.7131 | 0.5412 | -0.1719 | -0.1994 | -0.144 | 0.0000 | 0.0000 | -0.7482 | 0.0000 |
@@ -603,7 +603,7 @@ Paired tests on identical queries (baseline → variant; positive = variant bett
 | multihoprag | rrf vs rrf+bge | recall@100 | 265 | 0.9909 | 0.9909 | 0.0 | 0.0 | 0.0 | 1.0000 | 1.0000 | 0.0 | 1.0000 |
 | multihoprag | rrf vs rrf+bge | map | 265 | 0.5412 | 0.6291 | 0.0879 | 0.0681 | 0.1076 | 0.0000 | 0.0000 | 0.5308 | 0.0000 |
 | multihoprag | rrf+bge vs engine_as_shipped | hit@5 | 265 | 0.9698 | 0.9774 | 0.0075 | -0.0113 | 0.0302 | 0.6144 | 0.4795 | 0.0434 | 1.0000 |
-| multihoprag | rrf+bge vs engine_as_shipped | recall@5 | 265 | 0.705 | 0.7632 | 0.0582 | 0.0299 | 0.0858 | 0.0002 | 0.0001 | 0.2478 | 0.0178 |
+| multihoprag | rrf+bge vs engine_as_shipped | recall@5 | 265 | 0.705 | 0.7632 | 0.0582 | 0.0299 | 0.0858 | 0.0002 | 0.0001 | 0.2478 | 0.0218 |
 | pdf-got | dense vs rrf | hit@5 | 31 | 1.0 | 0.7097 | -0.2903 | -0.4516 | -0.129 | 0.0000 | 0.0027 | -0.6292 | 0.0000 |
 | pdf-got | dense vs rrf | mrr | 31 | 0.8253 | 0.4974 | -0.3278 | -0.4806 | -0.171 | 0.0000 | 0.0015 | -0.7318 | 0.0000 |
 | pdf-got | dense vs rrf | ndcg@10 | 31 | 0.7791 | 0.4194 | -0.3597 | -0.484 | -0.2371 | 0.0000 | 0.0000 | -1.0156 | 0.0000 |
@@ -628,9 +628,9 @@ Paired tests on identical queries (baseline → variant; positive = variant bett
 | pdf-quantum | dense vs rrf | map | 31 | 0.3848 | 0.3409 | -0.0439 | -0.0814 | -0.0082 | 0.0148 | 0.0428 | -0.4183 | 1.0000 |
 | pdf-quantum | dense vs rrf+bge | hit@5 | 31 | 0.9355 | 0.871 | -0.0645 | -0.1935 | 0.0645 | 0.4482 | 0.3173 | -0.1796 | 1.0000 |
 | pdf-quantum | dense vs rrf+bge | mrr | 31 | 0.8475 | 0.7428 | -0.1047 | -0.2064 | -0.0111 | 0.0292 | 0.0481 | -0.3772 | 1.0000 |
-| pdf-quantum | dense vs rrf+bge | ndcg@10 | 31 | 0.5181 | 0.4604 | -0.0577 | -0.1027 | -0.0166 | 0.0056 | 0.0088 | -0.4656 | 0.4368 |
+| pdf-quantum | dense vs rrf+bge | ndcg@10 | 31 | 0.5181 | 0.4604 | -0.0577 | -0.1027 | -0.0166 | 0.0056 | 0.0088 | -0.4656 | 0.5488 |
 | pdf-quantum | dense vs rrf+bge | recall@100 | 31 | 0.6351 | 0.6649 | 0.0297 | -0.0058 | 0.0667 | 0.1068 | 0.1181 | 0.286 | 1.0000 |
-| pdf-quantum | dense vs rrf+bge | map | 31 | 0.3848 | 0.3213 | -0.0636 | -0.1008 | -0.0282 | 0.0006 | 0.0036 | -0.6076 | 0.0516 |
+| pdf-quantum | dense vs rrf+bge | map | 31 | 0.3848 | 0.3213 | -0.0636 | -0.1008 | -0.0282 | 0.0006 | 0.0036 | -0.6076 | 0.0636 |
 | pdf-quantum | rrf vs rrf+bge | hit@5 | 31 | 0.871 | 0.871 | 0.0 | 0.0 | 0.0 | 1.0000 | 1.0000 | 0.0 | 1.0000 |
 | pdf-quantum | rrf vs rrf+bge | mrr | 31 | 0.792 | 0.7428 | -0.0492 | -0.1344 | 0.0336 | 0.2352 | 0.3054 | -0.209 | 1.0000 |
 | pdf-quantum | rrf vs rrf+bge | ndcg@10 | 31 | 0.4809 | 0.4604 | -0.0205 | -0.0514 | 0.0115 | 0.2038 | 0.1615 | -0.2313 | 1.0000 |
@@ -638,18 +638,18 @@ Paired tests on identical queries (baseline → variant; positive = variant bett
 | pdf-quantum | rrf vs rrf+bge | map | 31 | 0.3409 | 0.3213 | -0.0196 | -0.0449 | 0.004 | 0.1124 | 0.1363 | -0.2831 | 1.0000 |
 | pdf-quantum | rrf+bge vs engine_as_shipped | hit@5 | 31 | 0.871 | 0.871 | 0.0 | -0.0968 | 0.0968 | 1.0000 | 1.0000 | 0.0 | 1.0000 |
 | pdf-quantum | rrf+bge vs engine_as_shipped | recall@5 | 31 | 0.3245 | 0.3016 | -0.0228 | -0.0712 | 0.0202 | 0.3208 | 0.2583 | -0.1724 | 1.0000 |
-| ragbench-covidqa | dense vs rrf | hit@5 | 242 | 0.9711 | 0.9174 | -0.0537 | -0.0868 | -0.0207 | 0.0008 | 0.0016 | -0.2065 | 0.0672 |
-| ragbench-covidqa | dense vs rrf | mrr | 242 | 0.8584 | 0.7854 | -0.073 | -0.1137 | -0.033 | 0.0002 | 0.0004 | -0.2283 | 0.0178 |
+| ragbench-covidqa | dense vs rrf | hit@5 | 242 | 0.9711 | 0.9174 | -0.0537 | -0.0868 | -0.0207 | 0.0008 | 0.0016 | -0.2065 | 0.0832 |
+| ragbench-covidqa | dense vs rrf | mrr | 242 | 0.8584 | 0.7854 | -0.073 | -0.1137 | -0.033 | 0.0002 | 0.0004 | -0.2283 | 0.0218 |
 | ragbench-covidqa | dense vs rrf | ndcg@10 | 242 | 0.8496 | 0.7124 | -0.1372 | -0.1724 | -0.1025 | 0.0000 | 0.0000 | -0.4974 | 0.0000 |
 | ragbench-covidqa | dense vs rrf | recall@100 | 242 | 1.0 | 0.8636 | -0.1364 | -0.1711 | -0.104 | 0.0000 | 0.0000 | -0.5118 | 0.0000 |
 | ragbench-covidqa | dense vs rrf | map | 242 | 0.7899 | 0.6348 | -0.1551 | -0.1952 | -0.1159 | 0.0000 | 0.0000 | -0.4971 | 0.0000 |
-| ragbench-covidqa | dense vs rrf+bge | hit@5 | 242 | 0.9711 | 0.9298 | -0.0413 | -0.0744 | -0.0124 | 0.0066 | 0.0075 | -0.174 | 0.5082 |
+| ragbench-covidqa | dense vs rrf+bge | hit@5 | 242 | 0.9711 | 0.9298 | -0.0413 | -0.0744 | -0.0124 | 0.0066 | 0.0075 | -0.174 | 0.6402 |
 | ragbench-covidqa | dense vs rrf+bge | mrr | 242 | 0.8584 | 0.8173 | -0.0411 | -0.0816 | -0.0019 | 0.0414 | 0.0496 | -0.1288 | 1.0000 |
 | ragbench-covidqa | dense vs rrf+bge | ndcg@10 | 242 | 0.8496 | 0.7426 | -0.107 | -0.1441 | -0.0718 | 0.0000 | 0.0000 | -0.3742 | 0.0000 |
 | ragbench-covidqa | dense vs rrf+bge | recall@100 | 242 | 1.0 | 0.8636 | -0.1364 | -0.1711 | -0.104 | 0.0000 | 0.0000 | -0.5118 | 0.0000 |
 | ragbench-covidqa | dense vs rrf+bge | map | 242 | 0.7899 | 0.6707 | -0.1192 | -0.1614 | -0.0781 | 0.0000 | 0.0000 | -0.365 | 0.0000 |
 | ragbench-covidqa | rrf vs rrf+bge | hit@5 | 242 | 0.9174 | 0.9298 | 0.0124 | -0.0041 | 0.0289 | 0.2452 | 0.1797 | 0.0864 | 1.0000 |
-| ragbench-covidqa | rrf vs rrf+bge | mrr | 242 | 0.7854 | 0.8173 | 0.0319 | 0.0114 | 0.0536 | 0.0014 | 0.0024 | 0.1898 | 0.1162 |
+| ragbench-covidqa | rrf vs rrf+bge | mrr | 242 | 0.7854 | 0.8173 | 0.0319 | 0.0114 | 0.0536 | 0.0014 | 0.0024 | 0.1898 | 0.1442 |
 | ragbench-covidqa | rrf vs rrf+bge | ndcg@10 | 242 | 0.7124 | 0.7426 | 0.0302 | 0.0171 | 0.044 | 0.0000 | 0.0000 | 0.2867 | 0.0000 |
 | ragbench-covidqa | rrf vs rrf+bge | recall@100 | 242 | 0.8636 | 0.8636 | 0.0 | 0.0 | 0.0 | 1.0000 | 1.0000 | 0.0 | 1.0000 |
 | ragbench-covidqa | rrf vs rrf+bge | map | 242 | 0.6348 | 0.6707 | 0.0359 | 0.0203 | 0.0525 | 0.0000 | 0.0000 | 0.2808 | 0.0000 |
@@ -665,11 +665,11 @@ Paired tests on identical queries (baseline → variant; positive = variant bett
 | scifact | dense vs rrf+bge | ndcg@10 | 300 | 0.8996 | 0.7437 | -0.156 | -0.1902 | -0.1222 | 0.0000 | 0.0000 | -0.5223 | 0.0000 |
 | scifact | dense vs rrf+bge | recall@100 | 300 | 0.9933 | 0.9933 | 0.0 | 0.0 | 0.0 | 1.0000 | 1.0000 | 0.0 | 1.0000 |
 | scifact | dense vs rrf+bge | map | 300 | 0.8713 | 0.6958 | -0.1754 | -0.2151 | -0.1359 | 0.0000 | 0.0000 | -0.5028 | 0.0000 |
-| scifact | rrf vs rrf+bge | hit@5 | 300 | 0.7833 | 0.82 | 0.0367 | 0.0133 | 0.0633 | 0.0028 | 0.0045 | 0.166 | 0.2212 |
-| scifact | rrf vs rrf+bge | mrr | 300 | 0.6795 | 0.7121 | 0.0327 | 0.0125 | 0.0535 | 0.0016 | 0.0000 | 0.1771 | 0.1312 |
-| scifact | rrf vs rrf+bge | ndcg@10 | 300 | 0.7022 | 0.7437 | 0.0414 | 0.0246 | 0.059 | 0.0002 | 0.0000 | 0.2645 | 0.0178 |
+| scifact | rrf vs rrf+bge | hit@5 | 300 | 0.7833 | 0.82 | 0.0367 | 0.0133 | 0.0633 | 0.0028 | 0.0045 | 0.166 | 0.2772 |
+| scifact | rrf vs rrf+bge | mrr | 300 | 0.6795 | 0.7121 | 0.0327 | 0.0125 | 0.0535 | 0.0016 | 0.0000 | 0.1771 | 0.1632 |
+| scifact | rrf vs rrf+bge | ndcg@10 | 300 | 0.7022 | 0.7437 | 0.0414 | 0.0246 | 0.059 | 0.0002 | 0.0000 | 0.2645 | 0.0218 |
 | scifact | rrf vs rrf+bge | recall@100 | 300 | 0.9933 | 0.9933 | 0.0 | 0.0 | 0.0 | 1.0000 | 1.0000 | 0.0 | 1.0000 |
-| scifact | rrf vs rrf+bge | map | 300 | 0.6596 | 0.6958 | 0.0363 | 0.017 | 0.0562 | 0.0006 | 0.0000 | 0.205 | 0.0516 |
+| scifact | rrf vs rrf+bge | map | 300 | 0.6596 | 0.6958 | 0.0363 | 0.017 | 0.0562 | 0.0006 | 0.0000 | 0.205 | 0.0636 |
 | scifact | rrf+bge vs engine_as_shipped | hit@5 | 300 | 0.82 | 0.84 | 0.02 | 0.0 | 0.04 | 0.0746 | 0.0578 | 0.11 | 1.0000 |
 | scifact | rrf+bge vs engine_as_shipped | recall@5 | 300 | 0.7934 | 0.8178 | 0.0244 | 0.0035 | 0.0468 | 0.0208 | 0.0254 | 0.1285 | 1.0000 |
 | multihoprag | one-pass vs two-pass | false_abstention | 265 | 0.3472 | 0.1472 | -0.2 | -0.2528 | -0.1472 | 0.0000 | 0.0000 | -0.4671 | 0.0000 |
@@ -681,6 +681,26 @@ Paired tests on identical queries (baseline → variant; positive = variant bett
 | pdf-quantum | one-pass vs two-pass | abstention_on_unanswerable | 5 | 1.0 | 1.0 | 0.0 | 0.0 | 0.0 | 1.0000 | 1.0000 | 0.0 | 1.0000 |
 | pdf-got | one-pass vs two-pass | false_abstention | 31 | 0.3226 | 0.1935 | -0.129 | -0.2581 | -0.0323 | 0.0266 | 0.0455 | -0.3786 | 1.0000 |
 | pdf-got | one-pass vs two-pass | abstention_on_unanswerable | 5 | 1.0 | 1.0 | 0.0 | 0.0 | 0.0 | 1.0000 | 1.0000 | 0.0 | 1.0000 |
+| docsqa | dense vs rrf | rubric_correctness | 35 | 1.0 | 0.9286 | -0.0714 | -0.1571 | 0.0 | 0.0926 | 0.1025 | -0.2894 | 1.0000 |
+| docsqa | rrf vs rrf+bge | rubric_correctness | 35 | 0.9286 | 0.9857 | 0.0571 | 0.0 | 0.1429 | 0.2576 | 0.1573 | 0.2426 | 1.0000 |
+| docsqa | one-pass vs two-pass | rubric_correctness | 35 | 0.9857 | 0.9429 | -0.0429 | -0.1143 | 0.0 | 0.2428 | 0.1797 | -0.2295 | 1.0000 |
+| docsqa | two-pass vs engine_as_shipped | rubric_correctness | 35 | 0.9429 | 0.9286 | -0.0143 | -0.1 | 0.0714 | 0.8676 | 0.7855 | -0.0556 | 1.0000 |
+| multihoprag | dense vs rrf | rubric_correctness | 50 | 0.52 | 0.39 | -0.13 | -0.27 | 0.01 | 0.0908 | 0.1022 | -0.2485 | 1.0000 |
+| multihoprag | rrf vs rrf+bge | rubric_correctness | 50 | 0.39 | 0.44 | 0.05 | -0.03 | 0.13 | 0.2784 | 0.2579 | 0.1723 | 1.0000 |
+| multihoprag | one-pass vs two-pass | rubric_correctness | 50 | 0.44 | 0.39 | -0.05 | -0.15 | 0.04 | 0.3648 | 0.2717 | -0.1414 | 1.0000 |
+| multihoprag | two-pass vs engine_as_shipped | rubric_correctness | 50 | 0.39 | 0.39 | 0.0 | -0.04 | 0.05 | 1.0000 | 1.0000 | 0.0 | 1.0000 |
+| pdf-got | dense vs rrf | rubric_correctness | 31 | 0.8226 | 0.629 | -0.1935 | -0.371 | -0.0161 | 0.0354 | 0.0378 | -0.3786 | 1.0000 |
+| pdf-got | rrf vs rrf+bge | rubric_correctness | 31 | 0.629 | 0.5806 | -0.0484 | -0.1613 | 0.0645 | 0.4910 | 0.4497 | -0.1487 | 1.0000 |
+| pdf-got | one-pass vs two-pass | rubric_correctness | 31 | 0.5806 | 0.629 | 0.0484 | 0.0 | 0.129 | 0.2580 | 0.1797 | 0.2442 | 1.0000 |
+| pdf-got | two-pass vs engine_as_shipped | rubric_correctness | 31 | 0.629 | 0.6774 | 0.0484 | -0.0645 | 0.1774 | 0.5030 | 0.3795 | 0.1487 | 1.0000 |
+| pdf-quantum | dense vs rrf | rubric_correctness | 31 | 0.9355 | 0.9194 | -0.0161 | -0.1129 | 0.0806 | 0.8676 | 0.7855 | -0.059 | 1.0000 |
+| pdf-quantum | rrf vs rrf+bge | rubric_correctness | 31 | 0.9194 | 0.9032 | -0.0161 | -0.1129 | 0.0806 | 0.8678 | 0.7855 | -0.059 | 1.0000 |
+| pdf-quantum | one-pass vs two-pass | rubric_correctness | 31 | 0.9032 | 0.7903 | -0.1129 | -0.2258 | -0.0323 | 0.0066 | 0.0384 | -0.403 | 0.6402 |
+| pdf-quantum | two-pass vs engine_as_shipped | rubric_correctness | 31 | 0.7903 | 0.6935 | -0.0968 | -0.2097 | 0.0 | 0.0690 | 0.0836 | -0.322 | 1.0000 |
+| ragbench-covidqa | dense vs rrf | rubric_correctness | 50 | 0.78 | 0.73 | -0.05 | -0.13 | 0.03 | 0.2522 | 0.2482 | -0.1723 | 1.0000 |
+| ragbench-covidqa | rrf vs rrf+bge | rubric_correctness | 50 | 0.73 | 0.74 | 0.01 | -0.05 | 0.07 | 0.9010 | 0.7389 | 0.0467 | 1.0000 |
+| ragbench-covidqa | one-pass vs two-pass | rubric_correctness | 50 | 0.74 | 0.67 | -0.07 | -0.14 | -0.01 | 0.0464 | 0.0522 | -0.2827 | 1.0000 |
+| ragbench-covidqa | two-pass vs engine_as_shipped | rubric_correctness | 50 | 0.67 | 0.62 | -0.05 | -0.14 | 0.04 | 0.3074 | 0.2733 | -0.1546 | 1.0000 |
 
 
 `p_bootstrap_holm` is the Holm step-down adjustment of `p_bootstrap` over every contrast in this table (a conservative family); raw p-values are descriptive.

@@ -25,6 +25,8 @@ VARIANTS = [
     ("v1_bm25", "rrf", "merged, BM25 only (P1)"),
     ("v2_bm25_dedup", "rrf", "merged, BM25 + exact dedup (P1+P3)"),
     ("v3_weighted", "rrf", "merged, BM25 + dedup + lexical vote 0.1 (P1+P2+P3)"),
+    ("v3_weighted", "rrf_bge", "merged + reranker, all fixes"),
+    ("v3_weighted", "engine_as_shipped", "full engine (≤6 documents), all fixes"),
 ]
 
 
@@ -97,8 +99,10 @@ def main() -> None:
         row("dense only (unchanged)", base.get((ds, "dense_only"), {}), None)
         row("word search — before (ts_rank)", base.get((ds, "bm25_only"), {}), None)
         row("merged — before", base.get((ds, "rrf"), {}), None)
+        row("merged + reranker — before", base.get((ds, "rrf_bge"), {}), None)
+        row("full engine (≤6 documents) — before", base.get((ds, "engine_as_shipped"), {}), None)
         for v, cfg, label in VARIANTS:
-            ref_cfg = "bm25_only" if cfg == "bm25_only" else "rrf"
+            ref_cfg = cfg
             row(
                 label + (" — after" if cfg == "bm25_only" else ""),
                 variants[v].get((ds, cfg), {}),

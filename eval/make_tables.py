@@ -176,8 +176,14 @@ def rubric_table(
     groups: dict[tuple[str, str, str], list[dict[str, Any]]] = defaultdict(list)
     for r in gen:
         groups[(r["dataset"], r["run_tag"], r["config"])].append(r)
+    # Compare configs on the same questions: keep only questions graded under every config of the run.
+    graded_by: dict[tuple[str, str], list[set[str]]] = defaultdict(list)
+    for (ds, tag, cfg), rs in groups.items():
+        graded_by[(ds, tag)].append({r["qid"] for r in rs if (tag, cfg, r["qid"]) in rb})
+    common = {k: set.intersection(*v) for k, v in graded_by.items() if v}
     recs = []
     for (ds, tag, cfg), rs in groups.items():
+        rs = [r for r in rs if r["qid"] in common[(ds, tag)]]
         rec: dict[str, Any] = {"dataset": ds, "run_tag": tag, "config": cfg,
                                "judge_model": rubric_judge or "any", "rubric_version": "v1"}  # fmt: skip
         ans = [
@@ -189,7 +195,7 @@ def rubric_table(
             rb[(tag, cfg, r["qid"])] for r in rs if r["unanswerable"] and (tag, cfg, r["qid"]) in rb
         ]
         rec["n_answerable"] = sum(1 for r in rs if not r["unanswerable"])
-        rec["n_scored_answerable"] = len(ans)
+        rec["n_scored_answerable"] = len(ans)  # same questions for every config of the dataset
         for m, vals in (
             ("rubric_correctness", [x["score"] for x in ans]),
             ("share_correct", [float(x["verdict"] == "correct") for x in ans]),

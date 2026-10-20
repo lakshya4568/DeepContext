@@ -497,6 +497,8 @@ class VertexRuntime:
         # same response shape, no API key). The backend is part of the cache key and of the model
         # label recorded in every trace, so rows produced by different backends stay identifiable.
         selfhosted = os.environ.get("EVAL_RERANK_URL", "").rstrip("/")
+        if selfhosted:
+            ensure_resolvable(selfhosted)
         model_label = (
             f"{settings.ecohash_rerank_model}@{'self-hosted' if selfhosted else 'ecohash'}"
         )
@@ -557,6 +559,49 @@ class VertexRuntime:
         _record(CallRecord(stage=stage_name, kind="rerank", model=model_label,
                            in_tokens=tokens, latency_s=secs, retries=retries))  # fmt: skip
         return scores
+
+
+_DNS_FIXED: set[str] = set()
+
+
+def ensure_resolvable(url: str) -> None:
+    """Make ``url``'s host resolvable even when the local resolver cannot look it up.
+
+    Quick-tunnel hostnames (``*.trycloudflare.com``) sometimes fail in the macOS system resolver while
+    a direct DNS query works. If ``getaddrinfo`` fails for the host, resolve it through Cloudflare's
+    DNS-over-HTTPS endpoint (only the hostname is sent) and pin the answer for this process. TLS still
+    validates the certificate for the original hostname.
+    """
+    import socket
+    from urllib.parse import urlparse
+
+    host = urlparse(url).hostname
+    if not host or host in _DNS_FIXED:
+        return
+    try:
+        socket.getaddrinfo(host, 443)
+        _DNS_FIXED.add(host)
+        return
+    except socket.gaierror:
+        pass
+    r = httpx.get(
+        "https://cloudflare-dns.com/dns-query",
+        params={"name": host, "type": "A"},
+        headers={"accept": "application/dns-json"},
+        timeout=20,
+    )
+    r.raise_for_status()
+    ips = [a["data"] for a in r.json().get("Answer", []) if a.get("type") == 1]
+    if not ips:
+        raise ApiExhaustedError(f"Could not resolve {host} (system resolver and DNS-over-HTTPS)")
+    original = socket.getaddrinfo
+
+    def patched(h: Any, *a: Any, **k: Any) -> Any:
+        return original(ips[0] if h == host else h, *a, **k)
+
+    socket.getaddrinfo = patched  # type: ignore[assignment]
+    _DNS_FIXED.add(host)
+    log.warning("pinned %s -> %s via DNS-over-HTTPS (system resolver failed)", host, ips[0])
 
 
 def _approx_tokens(text: str) -> int:

@@ -69,4 +69,4 @@ LLM_CONCURRENCY = int(os.environ.get("EVAL_LLM_CONCURRENCY", "8"))
 EMBED_CONCURRENCY = int(os.environ.get("EVAL_EMBED_CONCURRENCY", "64"))
 RERANK_CONCURRENCY = int(os.environ.get("EVAL_RERANK_CONCURRENCY", "6"))
 MAX_API_ATTEMPTS = 8
-REQUEST_TIMEOUT_S = 180.0  # replaces the stock 5-15 s caller timeouts (see strict_clients.py)
+REQUEST_TIMEOUT_S = float(os.environ.get("EVAL_REQUEST_TIMEOUT_S", "180"))

@@ -33,6 +33,43 @@ Not yet re-measured after the fixes: reranked setups (`rrf_bge`, `rrf_bge_two_pa
 
 ---
 
+## Update 2026-10-20 (later): reranked setups after the fixes, and batch 3 (answer correctness)
+
+**Reranked search, nDCG@10, before → after all three fixes** (same questions; paired test; reranker = your Colab `bge-reranker-v2-m3`, verified identical to EcoHash earlier):
+
+| dataset | merged+reranker before | after | change | dense-only |
+|---|---|---|---|---|
+| SciFact | 0.744 | 0.843 | +0.100 | 0.900 |
+| FiQA | 0.437 | 0.562 | +0.125 | 0.614 |
+| HotpotQA (30k) | 0.952 | 0.983 | +0.031 | 0.982 |
+| MultiHop-RAG | 0.727 | 0.837 | +0.111 | 0.804 |
+| RAGBench | 0.743 | 0.855 | +0.112 | 0.850 |
+| Docs set | 0.794 | 0.825 | +0.031 (n.s.) | 0.824 |
+| GoT PDF | 0.419 | 0.648 | +0.229 | 0.779 |
+| Quantum PDF | 0.460 | 0.478 | +0.018 (n.s.) | 0.518 |
+
+The full engine also improved (SciFact 0.738 → 0.827, RAGBench 0.744 → 0.836, GoT PDF 0.486 → 0.617; docs, MultiHop-RAG and the quantum PDF not significant). Reranked search is now better than meaning-only on MultiHop-RAG and level on RAGBench, docs and HotpotQA, but still below it on SciFact, FiQA and both PDFs. Full numbers: `eval/results_fix/BEFORE_AFTER.md`.
+
+**Batch 3: answer correctness (LLM-rubric, judge `gemini-3.7-flash`, same questions for every setup; 50 per big dataset, all for docs/PDFs). These are the "before-fix" answers; answers have not been rewritten after the fixes.**
+
+| dataset | meaning-only | words-only | merged | +reranker | +reranker, two-pass | full engine |
+|---|---|---|---|---|---|---|
+| Docs set (35) | 1.00 | 0.83 | 0.93 | 0.99 | 0.94 | 0.93 |
+| MultiHop-RAG (50) | 0.52 | 0.20 | 0.39 | 0.44 | 0.39 | 0.39 |
+| GoT PDF (31) | 0.82 | 0.30 | 0.62 | 0.60 | 0.65 | 0.67 |
+| Quantum PDF (31) | 0.94 | 0.76 | 0.92 | 0.90 | 0.79 | 0.69 |
+| RAGBench (50) | 0.78 | 0.65 | 0.73 | 0.74 | 0.67 | 0.62 |
+
+(1 = fully correct, 0.5 = partly, 0 = wrong or refused.) Findings:
+- **C1. Meaning-only search gives the best (or tied-best) answers on every set.** Only the GoT PDF difference to merged (+0.19) is significant before the multiple-comparison correction.
+- **C2. Two-pass writing does not improve correctness.** It is lower than one-pass on the quantum PDF (−0.11, p = 0.007) and RAGBench (−0.07, p = 0.046), lower on docs and MultiHop-RAG (not significant), higher on the GoT PDF (+0.05, not significant). None survive the Holm correction across all 161 contrasts.
+- **C3. The full engine is not better than simpler setups** (quantum PDF 0.69 vs 0.90 for merged+reranker, RAGBench 0.62 vs 0.74).
+- **C4. MultiHop-RAG answers are mostly lost to refusals,** not to wrong answers: the writer refuses 36–69% of questions depending on the setup (see gap analysis F); only 14–20% of questions have all needed articles inside the 12,000-character limit (P5).
+- **C5. Declining unanswerable questions works** (rubric: 97–100% handled correctly, small n: 9 docs, 5+5 PDF, 35 MultiHop-RAG).
+- Caveat: rubric validated against Claude's labels on 50 items from the smoke run (r = 0.80; slightly lenient on half-correct answers); with 30–50 questions per cell, differences below about 0.1 are within noise.
+
+---
+
 ## Part 1 — Gaps in the product (why accuracy is lower than it could be)
 
 | # | Gap | Evidence (from our files) | Why it happens | Possible fix | Size of problem |
