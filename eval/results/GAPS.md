@@ -1,7 +1,7 @@
-# Gaps found so far (after batches 1 and 2; updated 2026-10-20)
+# Gaps found, and what happened to them (original list 2026-10-20; updates at the bottom of each part)
 
 Plain-language list. Every number comes from the saved result files (`eval/results/gap_analysis.md`, `table_retrieval.csv`, `significance.csv`, `smoke/`).
-"Product" = the DeepContext system being measured. "Test" = my benchmark harness. Nothing below has been fixed yet.
+"Product" = the DeepContext system being measured. "Test" = my benchmark harness. Parts 1-3 are the original findings; **P1, P2, P3 and the test bug H1 have since been fixed** (see the "Update" sections, which carry the current numbers). P4-P12 are still open.
 
 Numbers used: nDCG@10 (0 to 1, higher is better; how high the correct page sits in the top 10).
 
@@ -67,6 +67,17 @@ The full engine also improved (SciFact 0.738 → 0.827, RAGBench 0.744 → 0.836
 - **C4. MultiHop-RAG answers are mostly lost to refusals,** not to wrong answers: the grader marks 34–70% of answers as refusals depending on the setup (50 shared questions; see gap analysis F for the all-question refusal rates); only 14–20% of questions have all needed articles inside the 12,000-character limit (P5).
 - **C5. Declining unanswerable questions works** (rubric: 97–100% handled correctly, small n: 9 docs, 5+5 PDF, 35 MultiHop-RAG).
 - Caveat: rubric validated against Claude's labels on 50 items from the smoke run (r = 0.80; slightly lenient on half-correct answers); with 30–50 questions per cell, differences below about 0.1 are within noise.
+
+---
+
+## Update 2026-10-21: final run (fixed search, answers re-written, RAGAS, out-of-sample check)
+
+- **Answers re-written with the fixed search** (`eval/results_final/`). Merged search (`rrf`) now gives answer correctness at least level with meaning-only on 4 of 5 answer sets (MultiHop-RAG 0.57 vs 0.53, p = 0.034 before correction; RAGBench 0.775 vs 0.76; GoT PDF 0.89 vs 0.82; quantum PDF equal; docs set 0.97 vs 1.00). Nothing survives the Holm correction over 186 contrasts.
+- **Two-pass writing is still not better.** Correctness: docs −0.11 (p = 0.025), quantum PDF −0.11 (p = 0.028), RAGBench −0.07 (p = 0.027), MultiHop-RAG −0.04, GoT PDF +0.07 (n.s.); none survive Holm. It does cut MultiHop-RAG false refusals from 30% to 9% (p < 0.001), at the price of lower answer relevancy on docs (−0.10) and the quantum PDF (−0.11).
+- **P11 now has a measured cost.** The GoT-specific "anachronism" gate fired on 7 of 36 quantum-thesis questions in the full engine; 2 of those were answerable and were wrongly refused (both scored 0). It also fired on 5 GoT questions, all unanswerable (correct).
+- **Out-of-sample rubric check passed.** On 50 fresh answers labelled by Claude (model labels, not human), the LLM-rubric correctness agrees at r = 0.91, mean absolute difference 0.05, 94% agreement on right/wrong. RAGAS FactualCorrectness F1 on the same items: r = 0.33, and it is stricter than Claude on 77% of items. Faithfulness: judge and Claude both give ~0.99 (no unfaithful answers in the sample, so the check cannot discriminate).
+- **RAGAS has gaps.** On MultiHop-RAG, RAGAS faithfulness has only 29–41 valid values per setup out of 50 (judge timeouts); counts are in the report tables.
+- **Not run in the final results:** the thinking-flag check and the live latency pass (both need a live reranker; the tunnel was gone). The earlier small thinking-flag check is in `smoke/`.
 
 ---
 

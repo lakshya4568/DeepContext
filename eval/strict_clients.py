@@ -497,8 +497,6 @@ class VertexRuntime:
         # same response shape, no API key). The backend is part of the cache key and of the model
         # label recorded in every trace, so rows produced by different backends stay identifiable.
         selfhosted = os.environ.get("EVAL_RERANK_URL", "").rstrip("/")
-        if selfhosted:
-            ensure_resolvable(selfhosted)
         model_label = (
             f"{settings.ecohash_rerank_model}@{'self-hosted' if selfhosted else 'ecohash'}"
         )
@@ -518,6 +516,7 @@ class VertexRuntime:
         async def call() -> httpx.Response:
             async with httpx.AsyncClient(timeout=C.REQUEST_TIMEOUT_S) as http:
                 if selfhosted:
+                    ensure_resolvable(selfhosted)  # only needed on a cache miss
                     r = await http.post(
                         f"{selfhosted}/rerank", json={"query": query, "documents": documents}
                     )

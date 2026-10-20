@@ -1,0 +1,20 @@
+{
+ "pdf-got": {
+  "dataset": "pdf-got",
+  "answerable_items": 31,
+  "facts_total": 95,
+  "mean_fact_word_coverage_on_expected_pages": 0.8,
+  "share_facts_supported_ge_0.8": 0.6,
+  "items_with_all_facts_supported": 9,
+  "heuristic": "share of an expected fact's content words (len>3) found on the union of the expected pages; supported = share >= 0.8"
+ },
+ "pdf-quantum": {
+  "dataset": "pdf-quantum",
+  "answerable_items": 31,
+  "facts_total": 107,
+  "mean_fact_word_coverage_on_expected_pages": 0.739,
+  "share_facts_supported_ge_0.8": 0.561,
+  "items_with_all_facts_supported": 7,
+  "heuristic": "share of an expected fact's content words (len>3) found on the union of the expected pages; supported = share >= 0.8"
+ }
+}

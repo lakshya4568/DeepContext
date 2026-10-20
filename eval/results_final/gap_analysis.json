@@ -1,0 +1,460 @@
+{
+ "merge_effect": {
+  "ragbench-covidqa": {
+   "n": 242,
+   "hurt": 11,
+   "helped": 13,
+   "same": 218,
+   "lexical_found_nothing": 7
+  },
+  "scifact": {
+   "n": 300,
+   "hurt": 36,
+   "helped": 12,
+   "same": 252,
+   "lexical_found_nothing": 23
+  },
+  "multihoprag": {
+   "n": 265,
+   "hurt": 2,
+   "helped": 12,
+   "same": 251,
+   "lexical_found_nothing": 0
+  },
+  "fiqa": {
+   "n": 648,
+   "hurt": 145,
+   "helped": 89,
+   "same": 414,
+   "lexical_found_nothing": 166
+  },
+  "docsqa": {
+   "n": 35,
+   "hurt": 1,
+   "helped": 2,
+   "same": 32,
+   "lexical_found_nothing": 0
+  },
+  "pdf-quantum": {
+   "n": 31,
+   "hurt": 1,
+   "helped": 2,
+   "same": 28,
+   "lexical_found_nothing": 0
+  },
+  "pdf-got": {
+   "n": 31,
+   "hurt": 5,
+   "helped": 2,
+   "same": 24,
+   "lexical_found_nothing": 2
+  },
+  "hotpotqa": {
+   "n": 300,
+   "hurt": 1,
+   "helped": 2,
+   "same": 297,
+   "lexical_found_nothing": 0
+  }
+ },
+ "engine": {
+  "docsqa": {
+   "n": 35,
+   "declined": 0,
+   "empty": 0,
+   "retried": 0
+  },
+  "multihoprag": {
+   "n": 265,
+   "declined": 1,
+   "empty": 1,
+   "retried": 0
+  },
+  "pdf-got": {
+   "n": 31,
+   "declined": 0,
+   "empty": 0,
+   "retried": 0
+  },
+  "pdf-quantum": {
+   "n": 31,
+   "declined": 2,
+   "empty": 2,
+   "retried": 0
+  },
+  "ragbench-covidqa": {
+   "n": 242,
+   "declined": 0,
+   "empty": 0,
+   "retried": 0
+  },
+  "scifact": {
+   "n": 300,
+   "declined": 1,
+   "empty": 1,
+   "retried": 0
+  }
+ },
+ "generation": {
+  "docsqa|bm25_only": {
+   "answerable": 35,
+   "gold_not_retrieved": 2,
+   "gold_cut_by_budget": 0,
+   "gold_visible": 33,
+   "abstained": 1,
+   "all_gold_visible": 33,
+   "refused_with_all_gold_visible": 0,
+   "false_abstain_with_gold_visible": 0,
+   "answered_unanswerable": 1,
+   "unanswerable": 9
+  },
+  "docsqa|dense_only": {
+   "answerable": 35,
+   "gold_not_retrieved": 1,
+   "gold_cut_by_budget": 0,
+   "gold_visible": 34,
+   "abstained": 1,
+   "all_gold_visible": 34,
+   "refused_with_all_gold_visible": 1,
+   "false_abstain_with_gold_visible": 1,
+   "answered_unanswerable": 1,
+   "unanswerable": 9
+  },
+  "docsqa|engine_as_shipped": {
+   "answerable": 35,
+   "gold_not_retrieved": 2,
+   "gold_cut_by_budget": 0,
+   "gold_visible": 33,
+   "abstained": 4,
+   "all_gold_visible": 33,
+   "refused_with_all_gold_visible": 4,
+   "false_abstain_with_gold_visible": 4,
+   "answered_unanswerable": 0,
+   "unanswerable": 9
+  },
+  "docsqa|rrf": {
+   "answerable": 35,
+   "gold_not_retrieved": 1,
+   "gold_cut_by_budget": 0,
+   "gold_visible": 34,
+   "abstained": 1,
+   "all_gold_visible": 34,
+   "refused_with_all_gold_visible": 1,
+   "false_abstain_with_gold_visible": 1,
+   "answered_unanswerable": 1,
+   "unanswerable": 9
+  },
+  "docsqa|rrf_bge": {
+   "answerable": 35,
+   "gold_not_retrieved": 1,
+   "gold_cut_by_budget": 0,
+   "gold_visible": 34,
+   "abstained": 1,
+   "all_gold_visible": 34,
+   "refused_with_all_gold_visible": 1,
+   "false_abstain_with_gold_visible": 1,
+   "answered_unanswerable": 1,
+   "unanswerable": 9
+  },
+  "docsqa|rrf_bge_two_pass": {
+   "answerable": 35,
+   "gold_not_retrieved": 1,
+   "gold_cut_by_budget": 0,
+   "gold_visible": 34,
+   "abstained": 4,
+   "all_gold_visible": 34,
+   "refused_with_all_gold_visible": 4,
+   "false_abstain_with_gold_visible": 4,
+   "answered_unanswerable": 0,
+   "unanswerable": 9
+  },
+  "multihoprag|bm25_only": {
+   "answerable": 100,
+   "gold_not_retrieved": 2,
+   "gold_cut_by_budget": 9,
+   "gold_visible": 89,
+   "abstained": 34,
+   "all_gold_visible": 16,
+   "refused_with_all_gold_visible": 2,
+   "false_abstain_with_gold_visible": 28,
+   "answered_unanswerable": 0,
+   "unanswerable": 35
+  },
+  "multihoprag|dense_only": {
+   "answerable": 100,
+   "gold_not_retrieved": 2,
+   "gold_cut_by_budget": 5,
+   "gold_visible": 93,
+   "abstained": 34,
+   "all_gold_visible": 18,
+   "refused_with_all_gold_visible": 2,
+   "false_abstain_with_gold_visible": 29,
+   "answered_unanswerable": 0,
+   "unanswerable": 35
+  },
+  "multihoprag|engine_as_shipped": {
+   "answerable": 100,
+   "gold_not_retrieved": 0,
+   "gold_cut_by_budget": 11,
+   "gold_visible": 89,
+   "abstained": 11,
+   "all_gold_visible": 19,
+   "refused_with_all_gold_visible": 1,
+   "false_abstain_with_gold_visible": 8,
+   "answered_unanswerable": 2,
+   "unanswerable": 35
+  },
+  "multihoprag|rrf": {
+   "answerable": 100,
+   "gold_not_retrieved": 1,
+   "gold_cut_by_budget": 5,
+   "gold_visible": 94,
+   "abstained": 31,
+   "all_gold_visible": 18,
+   "refused_with_all_gold_visible": 2,
+   "false_abstain_with_gold_visible": 26,
+   "answered_unanswerable": 0,
+   "unanswerable": 35
+  },
+  "multihoprag|rrf_bge": {
+   "answerable": 100,
+   "gold_not_retrieved": 1,
+   "gold_cut_by_budget": 7,
+   "gold_visible": 92,
+   "abstained": 30,
+   "all_gold_visible": 15,
+   "refused_with_all_gold_visible": 3,
+   "false_abstain_with_gold_visible": 26,
+   "answered_unanswerable": 0,
+   "unanswerable": 35
+  },
+  "multihoprag|rrf_bge_two_pass": {
+   "answerable": 100,
+   "gold_not_retrieved": 1,
+   "gold_cut_by_budget": 7,
+   "gold_visible": 92,
+   "abstained": 9,
+   "all_gold_visible": 15,
+   "refused_with_all_gold_visible": 0,
+   "false_abstain_with_gold_visible": 5,
+   "answered_unanswerable": 2,
+   "unanswerable": 35
+  },
+  "pdf-got|bm25_only": {
+   "answerable": 31,
+   "gold_not_retrieved": 14,
+   "gold_cut_by_budget": 1,
+   "gold_visible": 16,
+   "abstained": 15,
+   "all_gold_visible": 5,
+   "refused_with_all_gold_visible": 0,
+   "false_abstain_with_gold_visible": 2,
+   "answered_unanswerable": 0,
+   "unanswerable": 5
+  },
+  "pdf-got|dense_only": {
+   "answerable": 31,
+   "gold_not_retrieved": 0,
+   "gold_cut_by_budget": 0,
+   "gold_visible": 31,
+   "abstained": 3,
+   "all_gold_visible": 17,
+   "refused_with_all_gold_visible": 1,
+   "false_abstain_with_gold_visible": 3,
+   "answered_unanswerable": 0,
+   "unanswerable": 5
+  },
+  "pdf-got|engine_as_shipped": {
+   "answerable": 31,
+   "gold_not_retrieved": 1,
+   "gold_cut_by_budget": 0,
+   "gold_visible": 30,
+   "abstained": 3,
+   "all_gold_visible": 13,
+   "refused_with_all_gold_visible": 0,
+   "false_abstain_with_gold_visible": 2,
+   "answered_unanswerable": 0,
+   "unanswerable": 5
+  },
+  "pdf-got|rrf": {
+   "answerable": 31,
+   "gold_not_retrieved": 0,
+   "gold_cut_by_budget": 0,
+   "gold_visible": 31,
+   "abstained": 1,
+   "all_gold_visible": 16,
+   "refused_with_all_gold_visible": 0,
+   "false_abstain_with_gold_visible": 1,
+   "answered_unanswerable": 0,
+   "unanswerable": 5
+  },
+  "pdf-got|rrf_bge": {
+   "answerable": 31,
+   "gold_not_retrieved": 0,
+   "gold_cut_by_budget": 2,
+   "gold_visible": 29,
+   "abstained": 3,
+   "all_gold_visible": 14,
+   "refused_with_all_gold_visible": 1,
+   "false_abstain_with_gold_visible": 2,
+   "answered_unanswerable": 0,
+   "unanswerable": 5
+  },
+  "pdf-got|rrf_bge_two_pass": {
+   "answerable": 31,
+   "gold_not_retrieved": 0,
+   "gold_cut_by_budget": 1,
+   "gold_visible": 30,
+   "abstained": 3,
+   "all_gold_visible": 15,
+   "refused_with_all_gold_visible": 0,
+   "false_abstain_with_gold_visible": 2,
+   "answered_unanswerable": 0,
+   "unanswerable": 5
+  },
+  "pdf-quantum|bm25_only": {
+   "answerable": 31,
+   "gold_not_retrieved": 4,
+   "gold_cut_by_budget": 1,
+   "gold_visible": 26,
+   "abstained": 2,
+   "all_gold_visible": 0,
+   "refused_with_all_gold_visible": 0,
+   "false_abstain_with_gold_visible": 0,
+   "answered_unanswerable": 0,
+   "unanswerable": 5
+  },
+  "pdf-quantum|dense_only": {
+   "answerable": 31,
+   "gold_not_retrieved": 1,
+   "gold_cut_by_budget": 2,
+   "gold_visible": 28,
+   "abstained": 1,
+   "all_gold_visible": 0,
+   "refused_with_all_gold_visible": 0,
+   "false_abstain_with_gold_visible": 0,
+   "answered_unanswerable": 0,
+   "unanswerable": 5
+  },
+  "pdf-quantum|engine_as_shipped": {
+   "answerable": 31,
+   "gold_not_retrieved": 4,
+   "gold_cut_by_budget": 1,
+   "gold_visible": 26,
+   "abstained": 3,
+   "all_gold_visible": 0,
+   "refused_with_all_gold_visible": 0,
+   "false_abstain_with_gold_visible": 0,
+   "answered_unanswerable": 0,
+   "unanswerable": 5
+  },
+  "pdf-quantum|rrf": {
+   "answerable": 31,
+   "gold_not_retrieved": 1,
+   "gold_cut_by_budget": 1,
+   "gold_visible": 29,
+   "abstained": 0,
+   "all_gold_visible": 0,
+   "refused_with_all_gold_visible": 0,
+   "false_abstain_with_gold_visible": 0,
+   "answered_unanswerable": 0,
+   "unanswerable": 5
+  },
+  "pdf-quantum|rrf_bge": {
+   "answerable": 31,
+   "gold_not_retrieved": 2,
+   "gold_cut_by_budget": 0,
+   "gold_visible": 29,
+   "abstained": 3,
+   "all_gold_visible": 0,
+   "refused_with_all_gold_visible": 0,
+   "false_abstain_with_gold_visible": 2,
+   "answered_unanswerable": 0,
+   "unanswerable": 5
+  },
+  "pdf-quantum|rrf_bge_two_pass": {
+   "answerable": 31,
+   "gold_not_retrieved": 2,
+   "gold_cut_by_budget": 0,
+   "gold_visible": 29,
+   "abstained": 3,
+   "all_gold_visible": 0,
+   "refused_with_all_gold_visible": 0,
+   "false_abstain_with_gold_visible": 2,
+   "answered_unanswerable": 0,
+   "unanswerable": 5
+  },
+  "ragbench-covidqa|bm25_only": {
+   "answerable": 100,
+   "gold_not_retrieved": 17,
+   "gold_cut_by_budget": 0,
+   "gold_visible": 83,
+   "abstained": 20,
+   "all_gold_visible": 56,
+   "refused_with_all_gold_visible": 8,
+   "false_abstain_with_gold_visible": 12,
+   "answered_unanswerable": 0,
+   "unanswerable": 0
+  },
+  "ragbench-covidqa|dense_only": {
+   "answerable": 100,
+   "gold_not_retrieved": 2,
+   "gold_cut_by_budget": 0,
+   "gold_visible": 98,
+   "abstained": 19,
+   "all_gold_visible": 83,
+   "refused_with_all_gold_visible": 15,
+   "false_abstain_with_gold_visible": 19,
+   "answered_unanswerable": 0,
+   "unanswerable": 0
+  },
+  "ragbench-covidqa|engine_as_shipped": {
+   "answerable": 100,
+   "gold_not_retrieved": 2,
+   "gold_cut_by_budget": 0,
+   "gold_visible": 98,
+   "abstained": 20,
+   "all_gold_visible": 84,
+   "refused_with_all_gold_visible": 15,
+   "false_abstain_with_gold_visible": 19,
+   "answered_unanswerable": 0,
+   "unanswerable": 0
+  },
+  "ragbench-covidqa|rrf": {
+   "answerable": 100,
+   "gold_not_retrieved": 2,
+   "gold_cut_by_budget": 0,
+   "gold_visible": 98,
+   "abstained": 16,
+   "all_gold_visible": 82,
+   "refused_with_all_gold_visible": 12,
+   "false_abstain_with_gold_visible": 16,
+   "answered_unanswerable": 0,
+   "unanswerable": 0
+  },
+  "ragbench-covidqa|rrf_bge": {
+   "answerable": 100,
+   "gold_not_retrieved": 2,
+   "gold_cut_by_budget": 0,
+   "gold_visible": 98,
+   "abstained": 16,
+   "all_gold_visible": 85,
+   "refused_with_all_gold_visible": 12,
+   "false_abstain_with_gold_visible": 16,
+   "answered_unanswerable": 0,
+   "unanswerable": 0
+  },
+  "ragbench-covidqa|rrf_bge_two_pass": {
+   "answerable": 100,
+   "gold_not_retrieved": 2,
+   "gold_cut_by_budget": 0,
+   "gold_visible": 98,
+   "abstained": 18,
+   "all_gold_visible": 85,
+   "refused_with_all_gold_visible": 15,
+   "false_abstain_with_gold_visible": 18,
+   "answered_unanswerable": 0,
+   "unanswerable": 0
+  }
+ }
+}

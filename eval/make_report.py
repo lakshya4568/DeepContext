@@ -121,6 +121,15 @@ def headline(rt: pd.DataFrame, rg: pd.DataFrame, sy: pd.DataFrame) -> pd.DataFra
     return pd.DataFrame(rows)
 
 
+def _settings(rd: Path) -> dict:
+    p = rd / "run_settings.json"
+    return json.loads(p.read_text()) if p.exists() else {}
+
+
+def _reranker_label(rd: Path) -> str:
+    return _settings(rd).get("reranker") or C.RERANKER_NAME
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--results-dir", default=str(C.RESULTS_DIR))
@@ -153,7 +162,7 @@ def main() -> None:
         f"- Judge: `{args.judge}` (temperature 0) — generator: `{C.GENERATOR_MODEL}` (different model; both are Google models, so family bias is possible)"
     )
     out.append(
-        f"- Embeddings: `{C.EMBEDDING_MODEL}` {C.EMBEDDING_DIM}-d via Vertex AI (`{C.EMBEDDING_LOCATION}` endpoint); reranker: {C.RERANKER_NAME}\n"
+        f"- Embeddings: `{C.EMBEDDING_MODEL}` {C.EMBEDDING_DIM}-d via Vertex AI (`{C.EMBEDDING_LOCATION}` endpoint); reranker: {_reranker_label(rd)}\n"
     )
 
     out.append("## 1. Setup and versions\n")
@@ -185,11 +194,18 @@ def main() -> None:
         {m.get("index", {}).get("storage", "?").split(", schema")[0] for m in meta.values()}
     )
     n_schemas = len(meta)
-    pg_note = (
-        "On PostgreSQL the lexical channel is the product's Postgres full-text search (`ts_rank` over the first 8 "
-        "query terms), **not BM25**, and the dense channel is pgvector HNSW (approximate). `bm25_only` rows "
-        "therefore mean *Postgres full-text only*.\n"
-    )
+    if "Okapi BM25" in _settings(rd).get("lexical channel", ""):
+        pg_note = (
+            "On PostgreSQL the lexical channel is **Okapi BM25 computed over the stored tsvector** (k1 = 1.2, b = 0.75, Lucene IDF; "
+            "`LEXICAL_RANKING=bm25`, the fixed search), and the dense channel is pgvector HNSW (approximate). "
+            "`bm25_only` rows are this BM25 channel.\n"
+        )
+    else:
+        pg_note = (
+            "On PostgreSQL the lexical channel is the product's Postgres full-text search (`ts_rank` over the first 8 "
+            "query terms), **not BM25**, and the dense channel is pgvector HNSW (approximate). `bm25_only` rows "
+            "therefore mean *Postgres full-text only*.\n"
+        )
     sqlite_note = "Lexical channel = SQLite FTS5 `bm25()`; dense channel = exact cosine.\n"
     out.append(
         "Storage backend: "
@@ -200,10 +216,10 @@ def main() -> None:
         + (pg_note if "postgres" in backends else sqlite_note)
     )
     out.append(
-        "Ingestion: *fast* path only (`DocumentParser` + `ParentChildChunker`, child 300–600 tokens, parent 1000–2500, 15% overlap); no Docling, no local summariser, no model loaded on the host. Title (when present) is prepended to the chunk text and passed in the embedding prefix.\n"
+        "Ingestion: *fast* path only (`DocumentParser` + `ParentChildChunker`, child 300–600 tokens, parent 1000–2500, 15% overlap); no Docling, no local summariser, no model loaded on the host. Title (when present) is prepended to the chunk text and passed in the embedding prefix, except for the docs set and the two PDFs, where it goes only into the embedding prefix (long shared titles would otherwise trip the near-duplicate filter).\n"
     )
     out.append(
-        "### Harness deviations from the stock code (all inside `eval/`, `src/` untouched)\n"
+        "### Harness deviations from the stock code (inside `eval/`; the only `src/` changes are the three deliberate search fixes listed under Search/run settings above, switchable back with `LEXICAL_RANKING=ts_rank`, `DEDUP_MODE=prefix120`, `RRF_WEIGHT_LEXICAL=1.0`)\n"
     )
     out.append("""1. **Strict transport** (`eval/strict_clients.py`): Vertex AI (ADC) instead of API keys; no mock/hash embeddings, no Gemini→Groq→NVIDIA→mock failover, no silent heuristic-reranker fallback — a failure raises and the row is retried on the next run. The stock client would otherwise have produced hash embeddings in this environment.
 2. **Models**: Gemini 3.x only. `gemini-embedding-2` is served from the `global` endpoint (404 in `us-central1`) and accepts one content per request; Gemini 3.x chat models are also called via `global`.
@@ -420,6 +436,18 @@ def main() -> None:
                             "config": r["config"],
                             "answerable": int(r["n_answerable"]),
                             "judged": int(r["n_scored"]),
+                            "valid values F/R/CP/CR/FC": "/".join(
+                                str(int(r[f"{m}_n_valid"]))
+                                if f"{m}_n_valid" in r and pd.notna(r[f"{m}_n_valid"])
+                                else "–"
+                                for m in (
+                                    "faithfulness",
+                                    "answer_relevancy",
+                                    "context_precision",
+                                    "context_recall",
+                                    "factual_correctness_f1",
+                                )
+                            ),
                             **{lbl: ci_cell(r, m) for m, lbl in cols2 if m in r and pd.notna(r[m])},
                         }
                         for _, r in g.iterrows()
@@ -571,6 +599,15 @@ def main() -> None:
         out.append(md_table(rgb[keep].round(3)))
 
     out.append("\n## 7. System: tokens, cost, latency\n")
+    if not (rd / "raw_latency.jsonl").exists():
+        out.append(
+            "> **Live latency pass: NOT RUN in this results directory** (it needs a live reranker; the self-hosted reranker tunnel was unavailable). "
+            "No latency percentiles are reported; the token and cost columns below come from the main run's recorded usage.\n"
+        )
+    if not (rd / "thinking_flag_check.json").exists():
+        out.append(
+            "> **Thinking-flag check: NOT RUN in this results directory** (same reason). The earlier small-sample result is in `smoke/thinking_flag_check.json`.\n"
+        )
     out.append(
         "Tokens are from the main run; $ uses list prices in `eval/config.py` (Gemini API standard tier; Vertex billing may differ). The hosted reranker's price is not published in the repo, so its tokens are reported but excluded from $.\n"
     )
