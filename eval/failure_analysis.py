@@ -113,7 +113,7 @@ def reranker_evidence(ret: list[dict[str, Any]]) -> list[str]:
         )
         beyond = [x for x in rows if x[3] > 24 or x[4] > 24]
         out.append(
-            f"- the reranker only reorders the top 24 candidates; {len(beyond)} queries have their first relevant doc outside that window in at least one config (no reranker effect possible)."
+            f"- the reranker scores every fused candidate (up to 100) and keeps the best 24 in reranked order; {len(beyond)} queries have their first relevant doc beyond rank 24 in at least one config (it can still be promoted, but only if the reranker scores it highly)."
         )
         multi = [x for x in rows if len(x[1]["relevant"]) > 1]
         if multi:

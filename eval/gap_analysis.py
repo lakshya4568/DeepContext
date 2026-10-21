@@ -83,7 +83,7 @@ def retrieval_sections(ret: list[dict[str, Any]], out: list[str], data: dict[str
     )
 
     # B. reranker window
-    out.append("## B. Reranker limits (it only reorders the top 24 candidates)\n")
+    out.append("## B. What the reranker receives (it scores every fused candidate, up to 100, and keeps the best 24)\n")
     rows = []
     for (ds, tag), cfgs in by.items():
         if "rrf" not in cfgs:
@@ -100,9 +100,9 @@ def retrieval_sections(ret: list[dict[str, Any]], out: list[str], data: dict[str
             else:
                 fixable += 1
         rows.append([ds, n, pct(fixable, n), pct(outside, n), pct(missing, n)])
-    out.append(table(["dataset", "n", "correct page in top 24 (reranker can help)",
-                      "correct page found but beyond rank 24 (reranker cannot help)",
-                      "not in top 100 at all"], rows))  # fmt: skip
+    out.append(table(["dataset", "n", "correct page already in fused top 24",
+                      "correct page at fused rank 25–100 (reranker still scores it and can promote it)",
+                      "not in the fused top 100 (reranker never sees it)"], rows))  # fmt: skip
 
     # C. where the first correct page lands, per config
     out.append("## C. Where does the first correct page land? (share of questions)\n")

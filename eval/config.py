@@ -36,6 +36,7 @@ RERANKER_NAME = "bge-reranker-v2-m3 (hosted, EcoHash API)"
 
 # --- Retrieval depths ------------------------------------------------------------------
 RETRIEVAL_DEPTH = 100  # ranked chunks per config; enough for Recall@100
+RERANK_DEPTH = int(os.environ.get("EVAL_RERANK_DEPTH", "0"))  # 0 = score all fused candidates (shipped)
 GENERATION_TOP_K = 6  # same top_k the shipped /v1/query hybrid path uses
 RANK_K_HIT = (1, 3, 5, 8)
 RANK_K_RECALL = (5, 10, 100)

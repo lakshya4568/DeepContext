@@ -392,13 +392,17 @@ class DeepContextAdapter:
                 return candidates
             # rrf_bge: mirror RetrievalEngine (pool = min(24, n), BGE blend, consensus guard);
             # candidates beyond the reranked pool keep their RRF order so Recall@100 is defined.
-            pool = min(24, max(C.GENERATION_TOP_K, len(candidates)))
+            # The shipped engine scores EVERY fused candidate (up to FIRST_STAGE_LIMIT = 100) and keeps
+            # the best `pool` = 24 in reranked order. EVAL_RERANK_DEPTH (study only) scores just the
+            # first N fused candidates; 0 = score all (shipped behaviour).
+            scored = candidates[: C.RERANK_DEPTH] if C.RERANK_DEPTH else candidates
+            pool = min(24, max(C.GENERATION_TOP_K, len(scored)))
         with stage_scope("rerank"):
             reranked = await Reranker.rerank(
-                query=query, candidates=candidates, top_k=pool, strategy="ecohash",
+                query=query, candidates=scored, top_k=pool, strategy="ecohash",
                 embedding_model=C.EMBEDDING_MODEL, embedding_dim=C.EMBEDDING_DIM,
             )  # fmt: skip
-            reranked = protect_consensus(candidates, reranked, top_k=pool)
+            reranked = protect_consensus(scored, reranked, top_k=pool)
         seen = {c["id"] for c in reranked}
         return reranked + [c for c in candidates if c["id"] not in seen]
 

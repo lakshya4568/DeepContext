@@ -361,6 +361,41 @@ def main() -> None:
         ]
         out.append(md_table(pd.DataFrame(rows_ba, columns=hdr)))
 
+    rdp = rd / "rerank_depth.csv"
+    if rdp.exists():
+        dd = pd.read_csv(rdp)
+        out.append("## 3c. How many candidates should the reranker score? (rrf_bge, nDCG@10)\n")
+        out.append(
+            "The shipped engine sends **all** fused candidates (up to 100) to the reranker and keeps the best 24. Here the reranker scores only the first N. "
+            "Same questions for every column. Last row group: median reranker call time in seconds (includes the trip to the self-hosted GPU; compare depths only). "
+            "Full table with Hit@5, MRR and paired Δ: `RERANK_DEPTH.md`.\n"
+        )
+        order = [
+            "no rerank (merged list)",
+            "first 12 candidates",
+            "first 24 candidates",
+            "first 48 candidates",
+            "all (shipped, up to 100)",
+        ]
+        short = ["no rerank", "12", "24", "48", "all (shipped)"]
+        rows_dd = []
+        for ds in sorted(dd["dataset"].unique()):
+            g = dd[dd["dataset"] == ds].set_index("depth")
+            cells = [ds, int(g["n"].iloc[0])]
+            for lab in order:
+                cells.append(f"{g.loc[lab]['ndcg@10']:.3f}" if lab in g.index else "–")
+            lat = [g.loc[lab]["rerank_p50_s"] for lab in order[1:] if lab in g.index]
+            cells.append(" / ".join("–" if x != x else f"{x:.1f}" for x in lat))
+            rows_dd.append(cells)
+        out.append(
+            md_table(
+                pd.DataFrame(
+                    rows_dd, columns=["dataset", "n", *short, "rerank p50 s (12/24/48/all)"]
+                )
+            )
+        )
+        out.append("")
+
     out.append("## 4. Retrieval (document level)\n")
     cols = [
         ("hit@1", "Hit@1"),

@@ -2,7 +2,7 @@
 
 generated from files in `eval/results_final`; every number below is read from them.
 
-- Branch `fix/search-gaps` @ `638ef1f` (base `feat/rag-quality-generation`), working tree dirty at report time
+- Branch `fix/search-gaps` @ `b525f70` (base `feat/rag-quality-generation`), working tree dirty at report time
 - Judge: `gemini-3.7-flash` (temperature 0) — generator: `gemini-3.8-flash` (different model; both are Google models, so family bias is possible)
 - Embeddings: `gemini-embedding-2` 768-d via Vertex AI (`global` endpoint); reranker: BAAI/bge-reranker-v2-m3 (self-hosted on Colab GPU via EVAL_RERANK_URL)
 
@@ -161,6 +161,21 @@ Original code = ts_rank word search, drop-by-first-120-characters, equal votes. 
 | pdf-quantum | 0.518 | 0.481 | 0.537 | +0.056 [+0.019, +0.097] | 0.460 | 0.478 | +0.018 [-0.013, +0.052] | 0.410 | 0.395 | -0.015 [-0.043, +0.012] |
 | ragbench-covidqa | 0.850 | 0.712 | 0.851 | +0.139 [+0.106, +0.172] | 0.743 | 0.855 | +0.112 [+0.085, +0.141] | 0.744 | 0.836 | +0.092 [+0.063, +0.121] |
 | scifact | 0.900 | 0.702 | 0.867 | +0.164 [+0.132, +0.198] | 0.744 | 0.843 | +0.100 [+0.075, +0.124] | 0.738 | 0.827 | +0.089 [+0.062, +0.117] |
+
+## 3c. How many candidates should the reranker score? (rrf_bge, nDCG@10)
+
+The shipped engine sends **all** fused candidates (up to 100) to the reranker and keeps the best 24. Here the reranker scores only the first N. Same questions for every column. Last row group: median reranker call time in seconds (includes the trip to the self-hosted GPU; compare depths only). Full table with Hit@5, MRR and paired Δ: `RERANK_DEPTH.md`.
+
+| dataset | n | no rerank | 12 | 24 | 48 | all (shipped) | rerank p50 s (12/24/48/all) |
+|---|---|---|---|---|---|---|---|
+| docsqa | 35 | 0.826 | 0.822 | 0.820 | 0.827 | 0.825 | 0.7 / 1.7 / 3.4 / 8.5 |
+| fiqa | 150 | 0.606 | 0.600 | 0.597 | 0.584 | 0.577 | 0.4 / 0.8 / 2.0 / 4.6 |
+| multihoprag | 265 | 0.814 | 0.827 | 0.832 | 0.837 | 0.837 | 0.5 / 1.0 / 2.7 / 7.1 |
+| pdf-got | 31 | 0.722 | 0.695 | 0.672 | 0.665 | 0.648 | 0.7 / 1.3 / 2.9 / 7.6 |
+| pdf-quantum | 31 | 0.537 | 0.508 | 0.506 | 0.482 | 0.478 | 0.8 / 1.7 / 3.9 / 10.5 |
+| ragbench-covidqa | 242 | 0.851 | 0.856 | 0.856 | 0.856 | 0.855 | 0.4 / 0.8 / 1.8 / 4.4 |
+| scifact | 100 | 0.873 | 0.869 | 0.863 | 0.860 | 0.860 | 0.5 / 1.1 / 2.6 / 6.4 |
+
 
 ## 4. Retrieval (document level)
 
