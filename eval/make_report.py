@@ -601,8 +601,9 @@ def main() -> None:
     out.append("\n## 7. System: tokens, cost, latency\n")
     if not (rd / "raw_latency.jsonl").exists():
         out.append(
-            "> **Live latency pass: NOT RUN in this results directory** (it needs a live reranker; the self-hosted reranker tunnel was unavailable). "
-            "No latency percentiles are reported; the token and cost columns below come from the main run's recorded usage.\n"
+            "> **End-to-end live latency pass (with answer generation): NOT RUN.** It was attempted twice, but the answer model (`gemini-3.8-flash`) was rate-limited at the time "
+            "(minutes per call, 429 errors), so the timings would have measured the throttling, not the system; those partial rows were discarded. "
+            "Latency of the retrieval stack alone (embedding, search, fusion, reranker) was measured live and is in §7b. The token and cost columns below come from the main run's recorded usage.\n"
         )
     if not (rd / "thinking_flag_check.json").exists():
         out.append(
@@ -636,6 +637,14 @@ def main() -> None:
         ]
         out.append(md_table(sy[cols3].round(2)))
 
+    rl = read_csv(rd / "table_latency_retrieval.csv")
+    if not rl.empty:
+        out.append("\n### 7b. Retrieval-stack latency (live, uncached, one query at a time)\n")
+        out.append(
+            "Wall time of query embedding + database search + fusion + hosted reranker, with every model cache bypassed (`raw_latency_retrieval.jsonl`). "
+            "No answer generation is included. The reranker call goes over the internet to a self-hosted GPU (a tunnel), so reranked rows include that network path and are not production latency.\n"
+        )
+        out.append(md_table(rl.round(3)))
     out.append("\n## 8. Statistics\n")
     out.append(
         "Paired tests on identical queries (baseline → variant; positive = variant better, except abstention rows): paired bootstrap (10k, seed 0) and Wilcoxon signed-rank; effect size = Cohen's d_z.\n"

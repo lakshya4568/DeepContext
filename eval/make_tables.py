@@ -591,6 +591,34 @@ def significance_table(
     return df
 
 
+# ------------------------------------------------------------------------------ retrieval latency
+def retrieval_latency_table(rows: list[dict[str, Any]]) -> pd.DataFrame:
+    """Live (uncached) latency of embedding + search (+ fusion + hosted reranker) per config."""
+    groups: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
+    for r in rows:
+        if not r.get("error") and "latency_s" in r:
+            groups[(r["dataset"], r["config"])].append(r)
+    recs = []
+    for (ds, cfg), rs in groups.items():
+        lat = [r["latency_s"] for r in rs]
+        rec: dict[str, Any] = {"dataset": ds, "config": cfg, "n": len(rs),
+                               "p50_s": percentile(lat, 50), "p95_s": percentile(lat, 95)}  # fmt: skip
+        for stage in ("retrieval", "rerank"):
+            vals = [
+                r["trace_summary"][stage]["latency_s"] for r in rs if stage in r["trace_summary"]
+            ]
+            rec[f"{stage}_p50_s"] = percentile(vals, 50) if vals else float("nan")
+        rec["calls_with_retries"] = sum(
+            1 for r in rs if any(v.get("retries", 0) for v in r["trace_summary"].values())
+        )
+        recs.append(rec)
+    df = pd.DataFrame(recs)
+    if df.empty:
+        return df
+    df["_o"] = df["config"].map({c: i for i, c in enumerate(CONFIG_ORDER)})
+    return df.sort_values(["dataset", "_o"]).drop(columns="_o").reset_index(drop=True)
+
+
 # ------------------------------------------------------------------------------ markdown
 ABLATION_METRICS = ["hit@1", "hit@5", "recall@10", "recall@100", "mrr", "map", "ndcg@10"]
 
@@ -717,6 +745,10 @@ def main() -> None:
         from eval.pdf_sets import write_label_audits
 
         write_label_audits(rdir)
+    rl = retrieval_latency_table(read_jsonl(rdir / "raw_latency_retrieval.jsonl"))
+    if not rl.empty:
+        rl.to_csv(rdir / "table_latency_retrieval.csv", index=False)
+        print(f"table_latency_retrieval.csv: {len(rl)} rows")
     rgbt = rgb_table(rgb)
     if not rgbt.empty:
         rgbt.to_csv(rdir / "table_rgb.csv", index=False)

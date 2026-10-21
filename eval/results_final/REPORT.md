@@ -2,7 +2,7 @@
 
 generated from files in `eval/results_final`; every number below is read from them.
 
-- Branch `fix/search-gaps` @ `05f6622` (base `feat/rag-quality-generation`), working tree dirty at report time
+- Branch `fix/search-gaps` @ `638ef1f` (base `feat/rag-quality-generation`), working tree dirty at report time
 - Judge: `gemini-3.7-flash` (temperature 0) — generator: `gemini-3.8-flash` (different model; both are Google models, so family bias is possible)
 - Embeddings: `gemini-embedding-2` 768-d via Vertex AI (`global` endpoint); reranker: BAAI/bge-reranker-v2-m3 (self-hosted on Colab GPU via EVAL_RERANK_URL)
 
@@ -40,6 +40,16 @@ Ingestion: *fast* path only (`DocumentParser` + `ParentChildChunker`, child 300�
 8. **One-pass baseline** = the product's `PromptAssembler` prompt + one Gemini call, with the (empty) memory lookup stubbed to avoid a no-op embedding call.
 9. **Latency**: cached model calls replay their recorded first-call latency; **latency percentiles come only from the separate live pass (`raw_latency.jsonl`)**.
 10. RAGAS `ResponseRelevancy` uses `strictness=1` (a temperature-0 judge returns identical candidates, so the default 3 only triples cost).
+
+
+**Thinking-flag check on `gemini-3.8-flash`** (`thinking_flag_check.json`):
+
+| enable_thinking flag | dataset | queries | generation calls | calls hitting MAX_TOKENS | mean thinking tokens | two-pass refusals |
+|---|---|---|---|---|---|---|
+| honoured (harness default) | docsqa | 20 | 40 | 0 | 9.1 | 0 |
+| honoured (harness default) | multihoprag | 12 | 23 | 0 | 0.0 | 3 |
+| ignored (stock client) | docsqa | 20 | 35 | 1 | 269.1 | 2 |
+| ignored (stock client) | multihoprag | 12 | 18 | 6 | 404.8 | 4 |
 
 ## 2. Datasets
 
@@ -527,9 +537,7 @@ Abstention = the system's refusal sentence, an empty output, or a short answer b
 
 ## 7. System: tokens, cost, latency
 
-> **Live latency pass: NOT RUN in this results directory** (it needs a live reranker; the self-hosted reranker tunnel was unavailable). No latency percentiles are reported; the token and cost columns below come from the main run's recorded usage.
-
-> **Thinking-flag check: NOT RUN in this results directory** (same reason). The earlier small-sample result is in `smoke/thinking_flag_check.json`.
+> **End-to-end live latency pass (with answer generation): NOT RUN.** It was attempted twice, but the answer model (`gemini-3.8-flash`) was rate-limited at the time (minutes per call, 429 errors), so the timings would have measured the throttling, not the system; those partial rows were discarded. Latency of the retrieval stack alone (embedding, search, fusion, reranker) was measured live and is in §7b. The token and cost columns below come from the main run's recorded usage.
 
 Tokens are from the main run; $ uses list prices in `eval/config.py` (Gemini API standard tier; Vertex billing may differ). The hosted reranker's price is not published in the repo, so its tokens are reported but excluded from $.
 
@@ -565,6 +573,46 @@ Tokens are from the main run; $ uses list prices in `eval/config.py` (Gemini API
 | ragbench-covidqa | rrf_bge | 100 | 1116.77 | 129.86 | 0.0 | 1.32 |
 | ragbench-covidqa | rrf_bge_two_pass | 100 | 1035.47 | 217.27 | 0.0 | 1.59 |
 | ragbench-covidqa | engine_as_shipped | 100 | 1157.69 | 216.45 | 0.0 | 2.02 |
+
+
+### 7b. Retrieval-stack latency (live, uncached, one query at a time)
+
+Wall time of query embedding + database search + fusion + hosted reranker, with every model cache bypassed (`raw_latency_retrieval.jsonl`). No answer generation is included. The reranker call goes over the internet to a self-hosted GPU (a tunnel), so reranked rows include that network path and are not production latency.
+
+| dataset | config | n | p50_s | p95_s | retrieval_p50_s | rerank_p50_s | calls_with_retries |
+|---|---|---|---|---|---|---|---|
+| docsqa | dense_only | 30 | 0.441 | 0.793 | 0.433 |  | 0 |
+| docsqa | bm25_only | 30 | 0.007 | 0.023 |  |  | 0 |
+| docsqa | rrf | 30 | 0.62 | 2.886 | 0.598 |  | 0 |
+| docsqa | rrf_bge | 30 | 3.83 | 5.424 | 0.537 | 3.082 | 0 |
+| fiqa | dense_only | 30 | 0.622 | 0.987 | 0.425 |  | 0 |
+| fiqa | bm25_only | 30 | 0.534 | 1.063 |  |  | 0 |
+| fiqa | rrf | 30 | 0.976 | 1.329 | 0.419 |  | 0 |
+| fiqa | rrf_bge | 30 | 3.269 | 3.777 | 0.413 | 2.053 | 0 |
+| hotpotqa | dense_only | 30 | 0.589 | 2.895 | 0.463 |  | 0 |
+| hotpotqa | bm25_only | 30 | 0.154 | 0.245 |  |  | 0 |
+| hotpotqa | rrf | 30 | 0.58 | 0.675 | 0.414 |  | 0 |
+| hotpotqa | rrf_bge | 30 | 2.315 | 6.531 | 0.42 | 1.69 | 0 |
+| multihoprag | dense_only | 30 | 0.574 | 1.622 | 0.536 |  | 0 |
+| multihoprag | bm25_only | 30 | 0.173 | 0.253 |  |  | 0 |
+| multihoprag | rrf | 30 | 0.619 | 1.429 | 0.433 |  | 0 |
+| multihoprag | rrf_bge | 30 | 3.544 | 10.921 | 0.459 | 2.856 | 0 |
+| pdf-got | dense_only | 30 | 0.503 | 0.982 | 0.48 |  | 0 |
+| pdf-got | bm25_only | 30 | 0.044 | 0.065 |  |  | 0 |
+| pdf-got | rrf | 30 | 0.5 | 1.294 | 0.441 |  | 0 |
+| pdf-got | rrf_bge | 30 | 3.569 | 5.937 | 0.489 | 2.927 | 0 |
+| pdf-quantum | dense_only | 30 | 0.533 | 1.386 | 0.52 |  | 0 |
+| pdf-quantum | bm25_only | 30 | 0.023 | 0.032 |  |  | 0 |
+| pdf-quantum | rrf | 30 | 0.51 | 0.701 | 0.464 |  | 0 |
+| pdf-quantum | rrf_bge | 30 | 4.295 | 14.538 | 0.48 | 3.652 | 0 |
+| ragbench-covidqa | dense_only | 29 | 0.452 | 0.518 | 0.428 |  | 0 |
+| ragbench-covidqa | bm25_only | 30 | 0.012 | 0.02 |  |  | 0 |
+| ragbench-covidqa | rrf | 30 | 0.461 | 0.729 | 0.435 |  | 0 |
+| ragbench-covidqa | rrf_bge | 30 | 2.69 | 4.476 | 0.476 | 2.163 | 0 |
+| scifact | dense_only | 30 | 0.532 | 1.3 | 0.465 |  | 0 |
+| scifact | bm25_only | 30 | 0.095 | 0.15 |  |  | 0 |
+| scifact | rrf | 30 | 0.584 | 0.887 | 0.454 |  | 0 |
+| scifact | rrf_bge | 30 | 3.258 | 8.347 | 0.455 | 2.614 | 0 |
 
 
 ## 8. Statistics
