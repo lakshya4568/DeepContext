@@ -1,0 +1,50 @@
+{
+ "scifact|q300|dfull|train": {
+  "source": "HF mirror BeIR/scifact @ b3b5335604 + BeIR/scifact-qrels @ 2938d17dc3",
+  "license": "claims/annotations CC BY 4.0; abstracts ODC-By 1.0 (S2ORC) \u2014 allenai/scifact LICENSE.md",
+  "split": "train",
+  "queries_available": 809,
+  "queries_used": 300,
+  "corpus_total_docs": 5183,
+  "corpus_used_docs": 5183,
+  "relevant_docs_in_used_corpus": 281,
+  "relevant_docs_missing_from_corpus": 0,
+  "sampling": "full corpus; 300/809 queries sampled (seed=42)",
+  "n_queries_with_relevance_labels": 300,
+  "index": {
+   "backend": "postgres",
+   "storage": "PostgreSQL database deepcontext_eval, schema scifact_ff1b0ff0ff, hnsw.ef_search=100",
+   "n_docs": 5183,
+   "n_parents": 5185,
+   "n_children": 5470,
+   "approx_embed_tokens": 2131509,
+   "embedding_model": "gemini-embedding-2",
+   "embedding_dim": 768,
+   "chunker": "ParentChildChunker (child 300-600 tok, parent 1000-2500 tok, 15% overlap)"
+  }
+ },
+ "fiqa|q300|dfull|dev": {
+  "source": "HF mirror BeIR/fiqa @ 979c07a7cb + BeIR/fiqa-qrels @ 252958f2d6",
+  "license": "HF BeIR card: cc-by-sa-4.0 (packaging); FiQA-2018 upstream terms not stated \u2014 UNVERIFIED",
+  "split": "dev",
+  "queries_available": 500,
+  "queries_used": 300,
+  "corpus_total_docs": 57638,
+  "corpus_used_docs": 57638,
+  "relevant_docs_in_used_corpus": 711,
+  "relevant_docs_missing_from_corpus": 0,
+  "sampling": "full corpus; 300/500 queries sampled (seed=42)",
+  "n_queries_with_relevance_labels": 300,
+  "index": {
+   "backend": "postgres",
+   "storage": "PostgreSQL database deepcontext_eval, schema fiqa_9c931e585a, hnsw.ef_search=100",
+   "n_docs": 57600,
+   "n_parents": 57600,
+   "n_children": 59979,
+   "approx_embed_tokens": 11582849,
+   "embedding_model": "gemini-embedding-2",
+   "embedding_dim": 768,
+   "chunker": "ParentChildChunker (child 300-600 tok, parent 1000-2500 tok, 15% overlap)"
+  }
+ }
+}
