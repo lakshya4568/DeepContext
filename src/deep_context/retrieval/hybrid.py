@@ -14,16 +14,22 @@ from deep_context.storage.base import StorageInterface
 def reciprocal_rank_fusion(
     ranked_lists: list[list[dict[str, Any]]],
     k: int = 60,
+    weights: list[float] | None = None,
 ) -> list[tuple[str, float]]:
     """
     Combines multiple ranked lists into a single ranking using Reciprocal Rank Fusion.
-    Score = sum(1.0 / (k + rank)) across all lists where the item appears.
+    Score = sum(weight / (k + rank)) across all lists where the item appears.
+    ``weights`` gives each list its own vote (one per list); the default is an equal vote of 1.0.
     """
+    if weights is None:
+        weights = [1.0] * len(ranked_lists)
+    if len(weights) != len(ranked_lists):
+        raise ValueError(f"expected {len(ranked_lists)} weights (one per list), got {len(weights)}")
     scores: dict[str, float] = {}
-    for ranked_list in ranked_lists:
+    for weight, ranked_list in zip(weights, ranked_lists, strict=True):
         for rank, item in enumerate(ranked_list, start=1):
             cid = item["id"]
-            scores[cid] = scores.get(cid, 0.0) + 1.0 / (k + rank)
+            scores[cid] = scores.get(cid, 0.0) + weight / (k + rank)
 
     return sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
 
@@ -103,7 +109,12 @@ class HybridRetriever:
         bm25_lists = ranked_lists[:n_queries]
         vector_lists = ranked_lists[n_queries:]
 
-        fused = reciprocal_rank_fusion(ranked_lists, k=settings.rrf_k)
+        fused = reciprocal_rank_fusion(
+            ranked_lists,
+            k=settings.rrf_k,
+            weights=[settings.rrf_weight_lexical] * n_queries
+            + [settings.rrf_weight_dense] * n_queries,
+        )
         fused_score_map = {cid: score for cid, score in fused}
         fused_ids = [cid for cid, _ in fused[:limit]]
 
@@ -181,7 +192,11 @@ async def hybrid_search(
     if query_embedding is not None:
         bm25_hits = await storage.search_bm25(query, filters=target_filters, limit=k)
         vec_hits = await storage.search_vector(query_embedding, filters=target_filters, limit=k)
-        fused = reciprocal_rank_fusion([bm25_hits, vec_hits], k=settings.rrf_k)
+        fused = reciprocal_rank_fusion(
+            [bm25_hits, vec_hits],
+            k=settings.rrf_k,
+            weights=[settings.rrf_weight_lexical, settings.rrf_weight_dense],
+        )
         fused_score_map = {cid: score for cid, score in fused}
         fused_ids = [cid for cid, _ in fused[:k]]
         all_hits = {h["id"]: h for h in (bm25_hits + vec_hits)}

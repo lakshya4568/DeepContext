@@ -176,6 +176,9 @@ class Settings(BaseSettings):
     default_retrieval_mode: str = Field(default="hybrid", alias="DEFAULT_RETRIEVAL_MODE")
     reranker_model: str = Field(default="ecohash_hybrid", alias="RERANKER_MODEL")
     rrf_k: int = Field(default=60, alias="RRF_K")
+    # Votes of the keyword list and the dense list in RRF; 1.0 each is the plain, equal-vote fusion.
+    rrf_weight_lexical: float = Field(default=1.0, alias="RRF_WEIGHT_LEXICAL")
+    rrf_weight_dense: float = Field(default=1.0, alias="RRF_WEIGHT_DENSE")
     default_top_k: int = Field(default=8, alias="DEFAULT_TOP_K")
     first_stage_limit: int = Field(default=100, alias="FIRST_STAGE_LIMIT")
     max_retrieval_retries: int = Field(default=1, alias="MAX_RETRIEVAL_RETRIES")

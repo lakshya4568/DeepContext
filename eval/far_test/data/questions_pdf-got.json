@@ -1,0 +1,47 @@
+[
+ {
+  "id": "pdf-got-t14-2",
+  "pdf": "pdf-got",
+  "entity": "Jon Snow",
+  "question": "How old was Rickon Stark, whom Jon Snow counted among Eddard Stark's trueborn children to secure the direwolf pups?",
+  "answer": "Rickon was three years old.",
+  "a_page": 22,
+  "b_page": 125,
+  "part_a": [
+   22
+  ],
+  "part_b": [
+   125
+  ]
+ },
+ {
+  "id": "pdf-got-t14-5",
+  "pdf": "pdf-got",
+  "entity": "Lord Hoster Tully",
+  "question": "How many years had passed between Lord Hoster Tully's daughters wedding Ned Stark and Jon Arryn at Riverrun and Catelyn lying in her bedchamber after Ned's lovemaking?",
+  "answer": "Fifteen years.",
+  "a_page": 28,
+  "b_page": 57,
+  "part_a": [
+   28
+  ],
+  "part_b": [
+   57
+  ]
+ },
+ {
+  "id": "pdf-got-t14-6",
+  "pdf": "pdf-got",
+  "entity": "Ser Willem Darry",
+  "question": "What wedding gift was presented by Magister Illyrio to the young princess who had once lived under the care of Ser Willem Darry in Braavos?",
+  "answer": "Magister Illyrio Mopatis gave Daenerys Targaryen three stone dragon's eggs from the Shadow Lands beyond Asshai, as well as fine velvets and damasks in a Great Cedar chest.",
+  "a_page": 33,
+  "b_page": 101,
+  "part_a": [
+   33
+  ],
+  "part_b": [
+   101
+  ]
+ }
+]

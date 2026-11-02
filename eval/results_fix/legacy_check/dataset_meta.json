@@ -1,0 +1,26 @@
+{
+ "scifact|qall|dfull": {
+  "source": "HF mirror BeIR/scifact @ b3b5335604 + BeIR/scifact-qrels @ 2938d17dc3",
+  "license": "claims/annotations CC BY 4.0; abstracts ODC-By 1.0 (S2ORC) \u2014 allenai/scifact LICENSE.md",
+  "split": "test",
+  "queries_available": 300,
+  "queries_used": 300,
+  "corpus_total_docs": 5183,
+  "corpus_used_docs": 5183,
+  "relevant_docs_in_used_corpus": 283,
+  "relevant_docs_missing_from_corpus": 0,
+  "sampling": "full corpus; all queries",
+  "n_queries_with_relevance_labels": 300,
+  "index": {
+   "backend": "postgres",
+   "storage": "PostgreSQL database deepcontext_eval, schema scifact_ff1b0ff0ff, hnsw.ef_search=100",
+   "n_docs": 5183,
+   "n_parents": 5185,
+   "n_children": 5470,
+   "approx_embed_tokens": 2131509,
+   "embedding_model": "gemini-embedding-2",
+   "embedding_dim": 768,
+   "chunker": "ParentChildChunker (child 300-600 tok, parent 1000-2500 tok, 15% overlap)"
+  }
+ }
+}

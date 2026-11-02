@@ -1,0 +1,17 @@
+[
+ {
+  "id": "pdf-quantum-t5-0",
+  "pdf": "pdf-quantum",
+  "entity": "collisional frequency shift in fermionic atoms",
+  "question": "What mathematical model studied in the thesis can be applied to analyze the collisional frequency shift in fermionic atoms, and what specific scattering length parameter can be measured via clock shifts according to that model's framework?",
+  "answer": "The collisional frequency shift in fermionic atoms is analyzed using the two-orbital SU(N)-symmetric Hubbard Hamiltonian (or many-body Hamiltonian), and according to this framework, the scattering length parameter $a_{eg}^+$ can be measured via clock shifts.",
+  "a_page": 30,
+  "b_page": 79,
+  "part_a": [
+   30
+  ],
+  "part_b": [
+   79
+  ]
+ }
+]

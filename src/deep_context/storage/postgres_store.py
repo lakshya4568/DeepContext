@@ -280,17 +280,24 @@ class PostgresStore(StorageInterface):
 
             if self._has_pg_search:
                 try:
+                    # pg_search >= 0.20: BM25 indexes are ordinary indexes (USING paradedb); the old
+                    # paradedb.create_bm25() procedure no longer exists. The tokenizer mirrors the English
+                    # tsvector analysis (stemming, stop words) so the two channels differ only in ranking.
                     await conn.execute("""
-                        CALL paradedb.create_bm25(
-                            index_name => 'idx_chunks_bm25',
-                            table_name => 'chunks',
-                            key_field => 'id',
-                            text_fields => '{content: {}, summary_text: {}}'
-                        );
+                        CREATE INDEX IF NOT EXISTS idx_chunks_bm25 ON chunks USING paradedb (
+                            id,
+                            (content::pdb.simple('stemmer=english', 'stopwords_language=english', 'ascii_folding=true')),
+                            (summary_text::pdb.simple('stemmer=english', 'stopwords_language=english', 'ascii_folding=true'))
+                        ) WITH (key_field = 'id');
                     """)
                     logger.info("Created or verified ParadeDB BM25 index idx_chunks_bm25.")
                 except Exception as e_bm25_idx:
-                    logger.debug("ParadeDB BM25 index creation notice: %s", e_bm25_idx)
+                    # Do not fail silently: without the index every search would try ParadeDB first and fall back.
+                    self._has_pg_search = False
+                    logger.warning(
+                        "ParadeDB BM25 index could not be created; lexical search uses the FTS fallback: %s",
+                        e_bm25_idx,
+                    )
 
         logger.info("Initialized Postgres database with pgvector, FTS, and HNSW indexes.")
 
@@ -1078,19 +1085,35 @@ class PostgresStore(StorageInterface):
             # 1. Try ParadeDB BM25 search if extension is enabled
             if self._has_pg_search:
                 try:
-                    where_sql = " AND ".join(clauses)
-                    p_query = plain_term if plain_term else clean_query
-                    bm25_params = list(params[3:])  # Skip plain_term, or_terms, phrase_term
+                    p_query = clean_query  # the whole query: the index tokenizer already drops stop words
+                    # Own parameter numbering ($1 = the query text): the stock clauses above number their
+                    # parameters for the fallback statement and cannot be reused here.
+                    bm25_clauses = [
+                        "c.level = 'child'",
+                        "d.tenant_id = $2",
+                        "d.permission_scope && $3",
+                    ]
+                    bm25_params: list[Any] = [p_query, filters.tenant_id, filters.permission_scope]
+                    if filters.document_ids:
+                        bm25_clauses.append(f"d.id = ANY(${len(bm25_params) + 1}::uuid[])")
+                        bm25_params.append(filters.document_ids)
+                    if filters.doc_types:
+                        bm25_clauses.append(f"d.doc_type = ANY(${len(bm25_params) + 1}::text[])")
+                        bm25_params.append(filters.doc_types)
+                    if filters.section_prefix:
+                        bm25_clauses.append(f"c.section_path ILIKE ${len(bm25_params) + 1} || '%'")
+                        bm25_params.append(filters.section_prefix)
                     bm25_sql = f"""
                         SELECT c.id, c.document_id, c.parent_chunk_id, c.content, c.section_path,
                                c.page_number, c.summary_text, d.title as document_title, d.source_uri,
-                               paradedb.score(c.id) AS score
+                               pdb.score(c.id) AS score
                         FROM chunks c
                         JOIN documents d ON d.id = c.document_id
-                        WHERE {where_sql} AND chunks @@@ paradedb.parse(${len(bm25_params) + 1})
+                        WHERE {" AND ".join(bm25_clauses)}
+                          AND (c.content ||| $1::text OR c.summary_text ||| $1::text)
                         ORDER BY score DESC, c.created_at DESC LIMIT {limit};
                     """
-                    bm25_rows = await conn.fetch(bm25_sql, *bm25_params, p_query)
+                    bm25_rows = await conn.fetch(bm25_sql, *bm25_params)
                     if bm25_rows:
                         return [
                             {
@@ -1110,15 +1133,16 @@ class PostgresStore(StorageInterface):
                             for r in bm25_rows
                         ]
                 except Exception as e_pdb:
-                    logger.debug("ParadeDB query notice: %s. Falling back to enhanced FTS.", e_pdb)
+                    logger.warning("ParadeDB BM25 query failed (%s); using the FTS fallback.", e_pdb)
 
             # 2. Enhanced Dual-Channel FTS + Trigram + Exact Identifier Matching
             where_sql = " AND ".join(clauses)
             trgm_score_clause = "similarity(c.content, $1) * 2.0" if self._has_pg_trgm else "0.0"
+            ident_n = len(params) + 1
+            params.append(ident_term)  # bound, never interpolated into the SQL text ('' when absent)
             ident_match_clause = (
-                f"(CASE WHEN length('{ident_term}') > 0 AND (c.content ILIKE '%{ident_term}%' OR COALESCE(c.summary_text, '') ILIKE '%{ident_term}%') THEN 8.0 ELSE 0.0 END)"
-                if ident_term
-                else "0.0"
+                f"(CASE WHEN length(${ident_n}) > 0 AND (c.content ILIKE '%' || ${ident_n} || '%' "
+                f"OR COALESCE(c.summary_text, '') ILIKE '%' || ${ident_n} || '%') THEN 8.0 ELSE 0.0 END)"
             )
 
             sql = f"""
@@ -1137,7 +1161,7 @@ class PostgresStore(StorageInterface):
                     (length($1) > 0 AND (COALESCE(c.search_tsv, c.tsv) @@ plainto_tsquery('english', $1) OR (c.summary_tsv IS NOT NULL AND c.summary_tsv @@ plainto_tsquery('english', $1)))) OR
                     (length($2) > 0 AND (COALESCE(c.search_tsv, c.tsv) @@ to_tsquery('english', $2) OR (c.summary_tsv IS NOT NULL AND c.summary_tsv @@ to_tsquery('english', $2)))) OR
                     (length($3) > 0 AND (c.content ILIKE '%' || $3 || '%' OR COALESCE(c.summary_text, '') ILIKE '%' || $3 || '%'))
-                    {" OR (c.content ILIKE '%" + ident_term + "%')" if ident_term else ""}
+                    OR (length(${ident_n}) > 0 AND c.content ILIKE '%' || ${ident_n} || '%')
                 )
                 ORDER BY score DESC, c.created_at DESC LIMIT {limit};
             """

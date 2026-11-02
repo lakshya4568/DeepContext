@@ -1,0 +1,201 @@
+{
+ "ragbench-covidqa|qall|dfull": {
+  "source": "HF galileo-ai/ragbench (covidqa, test)",
+  "license": "CC BY 4.0 (per HF dataset card)",
+  "queries_available": 246,
+  "queries_used": 242,
+  "queries_dropped_no_relevant_passage": 4,
+  "corpus_used_docs": 902,
+  "sampling": "all test rows",
+  "reference_caveat": "RAGBench 'response' is an LLM-generated answer (not human gold); reference-based RAGAS metrics are therefore only a proxy.",
+  "n_queries_with_relevance_labels": 242,
+  "index": {
+   "backend": "postgres",
+   "storage": "PostgreSQL database deepcontext_eval, schema ragbench_covidqa_4f4740b162, hnsw.ef_search=100",
+   "n_docs": 902,
+   "n_parents": 902,
+   "n_children": 902,
+   "approx_embed_tokens": 135318,
+   "embedding_model": "gemini-embedding-2",
+   "embedding_dim": 768,
+   "chunker": "ParentChildChunker (child 300-600 tok, parent 1000-2500 tok, 15% overlap)"
+  }
+ },
+ "scifact|qall|dfull": {
+  "source": "HF mirror BeIR/scifact @ b3b5335604 + BeIR/scifact-qrels @ 2938d17dc3",
+  "license": "claims/annotations CC BY 4.0; abstracts ODC-By 1.0 (S2ORC) \u2014 allenai/scifact LICENSE.md",
+  "split": "test",
+  "queries_available": 300,
+  "queries_used": 300,
+  "corpus_total_docs": 5183,
+  "corpus_used_docs": 5183,
+  "relevant_docs_in_used_corpus": 283,
+  "relevant_docs_missing_from_corpus": 0,
+  "sampling": "full corpus; all queries",
+  "n_queries_with_relevance_labels": 300,
+  "index": {
+   "backend": "postgres",
+   "storage": "PostgreSQL database deepcontext_eval, schema scifact_ff1b0ff0ff, hnsw.ef_search=100",
+   "n_docs": 5183,
+   "n_parents": 5185,
+   "n_children": 5470,
+   "approx_embed_tokens": 2131509,
+   "embedding_model": "gemini-embedding-2",
+   "embedding_dim": 768,
+   "chunker": "ParentChildChunker (child 300-600 tok, parent 1000-2500 tok, 15% overlap)"
+  }
+ },
+ "multihoprag|q300|dfull": {
+  "source": "HF yixuantt/MultiHopRAG (MultiHopRAG.json + corpus.json)",
+  "license": "ODC-By (per HF dataset card)",
+  "queries_available": 2556,
+  "queries_used": 300,
+  "corpus_total_docs": 609,
+  "corpus_used_docs": 609,
+  "sampling": "stratified by question_type, seed=42; full 609-article corpus",
+  "null_queries_used": 35,
+  "n_queries_with_relevance_labels": 265,
+  "index": {
+   "backend": "postgres",
+   "storage": "PostgreSQL database deepcontext_eval, schema multihoprag_03296ea13e, hnsw.ef_search=100",
+   "n_docs": 609,
+   "n_parents": 897,
+   "n_children": 3466,
+   "approx_embed_tokens": 1946593,
+   "embedding_model": "gemini-embedding-2",
+   "embedding_dim": 768,
+   "chunker": "ParentChildChunker (child 300-600 tok, parent 1000-2500 tok, 15% overlap)"
+  }
+ },
+ "fiqa|qall|dfull": {
+  "source": "HF mirror BeIR/fiqa @ 979c07a7cb + BeIR/fiqa-qrels @ 252958f2d6",
+  "license": "HF BeIR card: cc-by-sa-4.0 (packaging); FiQA-2018 upstream terms not stated \u2014 UNVERIFIED",
+  "split": "test",
+  "queries_available": 648,
+  "queries_used": 648,
+  "corpus_total_docs": 57638,
+  "corpus_used_docs": 57638,
+  "relevant_docs_in_used_corpus": 1706,
+  "relevant_docs_missing_from_corpus": 0,
+  "sampling": "full corpus; all queries",
+  "n_queries_with_relevance_labels": 648,
+  "index": {
+   "backend": "postgres",
+   "storage": "PostgreSQL database deepcontext_eval, schema fiqa_9c931e585a, hnsw.ef_search=100",
+   "n_docs": 57600,
+   "n_parents": 57600,
+   "n_children": 59979,
+   "approx_embed_tokens": 11582849,
+   "embedding_model": "gemini-embedding-2",
+   "embedding_dim": 768,
+   "chunker": "ParentChildChunker (child 300-600 tok, parent 1000-2500 tok, 15% overlap)"
+  }
+ },
+ "docsqa|qall|dfull": {
+  "source": "repo documentation on branch eval/public-benchmarks (README.md, AGENTS.md, RERANKER_UPGRADE.md, Rag eval.md, docs/ARCHITECTURE.md, docs/CACHE_SCHEDULER_AGENTIC.md, docs/CRITICAL_ASSESSMENT_AND_SCOPE.md, docs/PRD.md, docs/RAG_QUALITY_NEXT.md, docs/SYSTEM_HANDOFF.md, docs/TECH_STACK.md, docs/VERIFICATION_AND_SOURCES.md)",
+  "license": "repository documentation (Apache-2.0 repo)",
+  "queries_available": 44,
+  "queries_used": 44,
+  "corpus_used_docs": 177,
+  "sampling": "all items; sections = markdown H1-H3 blocks >= 80 chars",
+  "gold_authoring": "questions and answers authored by the harness author (an AI assistant) from the docs; every evidence quote is machine-verified verbatim; answers were NOT human-reviewed",
+  "n_queries_with_relevance_labels": 35,
+  "index": {
+   "backend": "postgres",
+   "storage": "PostgreSQL database deepcontext_eval, schema docsqa_7c20e221ae, hnsw.ef_search=100",
+   "n_docs": 177,
+   "n_parents": 177,
+   "n_children": 193,
+   "approx_embed_tokens": 50368,
+   "embedding_model": "gemini-embedding-2",
+   "embedding_dim": 768,
+   "chunker": "ParentChildChunker (child 300-600 tok, parent 1000-2500 tok, 15% overlap)"
+  }
+ },
+ "pdf-quantum|qall|dfull": {
+  "source": "documents/quantum_computing_dissertation.pdf + tests/eval_quantum_dataset.json (project files)",
+  "license": "copyrighted work supplied by the project owner; text is not redistributed",
+  "queries_available": 36,
+  "queries_used": 36,
+  "corpus_used_docs": 296,
+  "corpus_total_docs": 296,
+  "sampling": "all 36 items (5 unanswerable); one document per PDF page",
+  "label_provenance": "queries, reference answers and expected_pages were written for this project before the benchmark; page labels were not human-audited and are imprecise",
+  "label_audit": {
+   "dataset": "pdf-quantum",
+   "answerable_items": 31,
+   "facts_total": 107,
+   "mean_fact_word_coverage_on_expected_pages": 0.739,
+   "share_facts_supported_ge_0.8": 0.561,
+   "items_with_all_facts_supported": 7,
+   "heuristic": "share of an expected fact's content words (len>3) found on the union of the expected pages; supported = share >= 0.8"
+  },
+  "n_queries_with_relevance_labels": 31,
+  "index": {
+   "backend": "postgres",
+   "storage": "PostgreSQL database deepcontext_eval, schema pdf_quantum_d884d45a2a, hnsw.ef_search=100",
+   "n_docs": 296,
+   "n_parents": 296,
+   "n_children": 472,
+   "approx_embed_tokens": 232824,
+   "embedding_model": "gemini-embedding-2",
+   "embedding_dim": 768,
+   "chunker": "ParentChildChunker (child 300-600 tok, parent 1000-2500 tok, 15% overlap)"
+  }
+ },
+ "pdf-got|qall|dfull": {
+  "source": "Eval 1.pdf + tests/eval_dataset.json (project files)",
+  "license": "copyrighted work supplied by the project owner; text is not redistributed",
+  "queries_available": 36,
+  "queries_used": 36,
+  "corpus_used_docs": 753,
+  "corpus_total_docs": 755,
+  "sampling": "all 36 items (5 unanswerable); one document per PDF page",
+  "label_provenance": "queries, reference answers and expected_pages were written for this project before the benchmark; page labels were not human-audited and are imprecise",
+  "label_audit": {
+   "dataset": "pdf-got",
+   "answerable_items": 31,
+   "facts_total": 95,
+   "mean_fact_word_coverage_on_expected_pages": 0.8,
+   "share_facts_supported_ge_0.8": 0.6,
+   "items_with_all_facts_supported": 9,
+   "heuristic": "share of an expected fact's content words (len>3) found on the union of the expected pages; supported = share >= 0.8"
+  },
+  "n_queries_with_relevance_labels": 31,
+  "index": {
+   "backend": "postgres",
+   "storage": "PostgreSQL database deepcontext_eval, schema pdf_got_92ba6a0609, hnsw.ef_search=100",
+   "n_docs": 753,
+   "n_parents": 753,
+   "n_children": 978,
+   "approx_embed_tokens": 452243,
+   "embedding_model": "gemini-embedding-2",
+   "embedding_dim": 768,
+   "chunker": "ParentChildChunker (child 300-600 tok, parent 1000-2500 tok, 15% overlap)"
+  }
+ },
+ "hotpotqa|q300|d30000": {
+  "source": "HF mirror BeIR/hotpotqa @ a7e8bab212 + BeIR/hotpotqa-qrels @ b15429e924",
+  "license": "CC BY-SA 4.0 \u2014 hotpotqa.github.io",
+  "split": "test",
+  "queries_available": 7405,
+  "queries_used": 300,
+  "corpus_total_docs": 5233329,
+  "corpus_used_docs": 30000,
+  "relevant_docs_in_used_corpus": 599,
+  "relevant_docs_missing_from_corpus": 0,
+  "sampling": "seed=42: all 599 relevant docs + 29401 uniformly sampled distractors (Algorithm R); 300/7405 queries sampled (seed=42)",
+  "n_queries_with_relevance_labels": 300,
+  "index": {
+   "backend": "postgres",
+   "storage": "PostgreSQL database deepcontext_eval, schema hotpotqa_7a10e099be, hnsw.ef_search=100",
+   "n_docs": 30000,
+   "n_parents": 30000,
+   "n_children": 30002,
+   "approx_embed_tokens": 2445959,
+   "embedding_model": "gemini-embedding-2",
+   "embedding_dim": 768,
+   "chunker": "ParentChildChunker (child 300-600 tok, parent 1000-2500 tok, 15% overlap)"
+  }
+ }
+}

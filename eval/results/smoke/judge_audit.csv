@@ -1,0 +1,749 @@
+dataset,config,qid,query,answer,context_snippet,metric,judge_model,judge_score,claude_faithfulness,claude_correctness,human_label
+ragbench-covidqa,rrf_bge_two_pass,r0026,What CNS functions are changed by mutations in the KATNAL1 gene?,"Based on the provided facts, mutations in the *Katnal1* gene change the following CNS functions and characteristics:
+
+* **Neuronal development and structure:** Deficits in neuronal migration and neuronal morphology.
+* **Ciliary function:** Defects in ependymal ciliary function (specifically involving the motile cilia of the ventricular ependymal cells).
+* **Behavioral functions:** Deficits and changes in learning and memory, reactions to anxiogenic situations (anxiety), sleep, and circadian rhythms. 
+
+*(Note: If you are seeking additional specific CNS functions beyond these cellular, structural, and behavioral aspects, those details are missing from the provided facts.)*","Title: A missense mutation in Katnal1 underlies behavioural, neurological and ciliary anomalies
+Passage: In summary the data presented here clearly demonstrate that KATNAL1 plays an important role in a variety of neuronal processes including neuronal migration, neuronal morphology and ependymal ciliary function. The downstream effect of these defects leads in turn to a number of behavioural changes including in learning and memory, reaction to anxiogenic situations and circadian rhythms. These data therefore highlight how perturbations in KATNAL1 may play a role in neuronal dysfunction and demonstrates that the enzyme is a novel candidate in the study of behavioural and neurodevelopmental disorders. ||| Title: A missense mutation in Katnal1 underlies behavioural, neurological and ciliary anomalies
+Passage: and ciliary function deficits suggesting KATNAL1 plays an essential role in these ",faithfulness,gemini-3.7-flash,1.0,1,1,
+docsqa,rrf_bge_two_pass,f03,Why does the corrective RAG loop depend on LangChain?,"Based on the provided context, the corrective RAG loop **does not** depend on LangChain. 
+
+The context explicitly states that the platform features a ""100% Hand-Crafted Core: Zero LangChain, zero LlamaIndex, zero LangGraph,"" and that the corrective agentic RAG state machine is ""hand-built (no LangGraph / Airflow / Celery dependencies)"" using ""plain Python functions over an explicit `RAGState` dataclass.""","README.md › ⚡ Deep Context Platform > ⚡ Core Features > 7. Corrective Agentic RAG State Machine
+
+### 7. Corrective Agentic RAG State Machine
+
+A hand-built LangGraph-equivalent corrective loop following the CRAG pattern (arXiv:2401.15884):
+
+```
+retrieve → grade_documents ──relevant──→ generate_answer → END
+                │ irrelevant (rewrite_count < max)
+          rewrite_question → retrieve → grade_documents
+                │ exhausted
+            abstain (safe fallback)
+```
+
+- Deterministic relevance grading against `AGENTIC_GRADE_THRESHOLD`.
+- Query rewriting reuses the existing LLM rewriter with a deterministic offline fallback.
+- Generation reuses the grounded two-pass generator and evidence verifier.
+
+--- ||| docs/CACHE_SCHEDULER_AGENTIC.md › Cache, Scheduler, and Corrective Agentic RAG > 3. Corrective Agentic RAG State Machine (src/deepcontext/agentic/graph.py)
+
+## 3. Corrective ",faithfulness,gemini-3.7-flash,1.0,1,1,
+ragbench-covidqa,rrf_bge,r0062,What are examples of proinflammatory cytokines?,"Based on the provided context, examples of pro-inflammatory cytokines include:
+
+* **MCP-1** (monocyte chemoattractant protein-1) [1]
+* **TNF-α** [1]
+* **IL-1β** [1]
+* **IL-6** [1]
+* **IL-12** [2]
+* **IL-23** [2]
+* **IL-27** (noted as having both pro-inflammatory and anti-inflammatory properties) [2]","Title: Comprehensive Analysis of the Safety Profile of a Single-Stranded RNA Nano-Structure Adjuvant
+Passage: Inflammation-associated cytokines include MCP-1, TNF-α, IL-1β, IL-6, IL12p70, and IL-10 . MCP-1, which is monocyte chemoattractant protein-1, recruit monocytes during infection to induce inflammation . TNF-α induces inflammation and activates lymphocytes and leukocytes . IL-1β is produced by monocytes and macrophages and plays an important role in inflammatory regulation . IL-6 promotes the synthesis of acute-phase proteins, such as CRP, and is produced at the site of inflammation . Overexpression of these pro-inflammatory cytokines may cause excessive inflammation or autoimmune diseases . In this study, there were no statistically significant differences in the levels of the pro-inflammatory cytokines MCP-1, TNF-α, ||| Title: A bibliometric analysis of IL-35 research from 2009 t",faithfulness,gemini-3.7-flash,1.0,1,1,
+ragbench-covidqa,rrf_bge_two_pass,r0070,Why  have bats received attention in recent years?,"Based on the provided facts, bats have received attention for the following reasons:
+
+* Several studies have highlighted their prominent role as pathogen-reservoirs, with viruses being the most studied because of their potential to act as human pathogens.
+* They host more viruses per species than rodents, which makes them an interesting system for public health research and disease ecology.
+* Environmental changes, deforestation, and growing urbanization have led to increased interactions between bats, humans, and livestock.
+* It has become important to study the ecology and zoonotic potential of bat viruses in order to analyze the potential health risks they pose to humans.
+
+*(Note: The provided evidence is missing a direct, explicit statement using the specific phrase ""in recent years"" to explain why bats have received attention.)*","Title: Bat Flies and Their Microparasites: Current Knowledge and Distribution
+Passage: Bats are the second most diverse mammalian group after rodents, with ∼1,390 recognized species across 227 genera . Many bat species play keystone roles in ecosystems, where they are essential to pollination, seed dispersal, and pest control . Several studies have also highlighted their prominent role as pathogen-reservoirs ; viruses being the best studied due to their potential as human pathogens . Bats host more viruses per species than rodents, making them an interesting system for both disease ecology and public health research . ||| Title: Bat Astroviruses: Towards Understanding the Transmission Dynamics of a Neglected Virus Family
+Passage: after hibernation, may even cause virus persistence in the affected colony . The roosting of certain bat species in gatherings of thousands if not millions of i",faithfulness,gemini-3.7-flash,0.875,1,1,
+docsqa,rrf_bge_two_pass,m03,"What stays unchanged in the BGE upgrade's blend and consensus handling, and what does the decision rule say to do if BGE wins on Hit@1 and nDCG@5?","In the BGE upgrade's blend and consensus handling, the following stay unchanged:
+- The blend logic (`_blend_with_rrf: 0.60 RRF + 0.40 raw`)
+- Consensus protection (`protect_consensus: top-10 dual hits`)
+
+If BGE beats the heuristic on Hit@1 and nDCG@5, the decision rule says to make `local_cross_encoder` the default.","RERANKER_UPGRADE.md › DeepContext Reranker Upgrade: Heuristic → Real Cross-Encoder > 6. What to compare
+
+## 6. What to compare
+
+| Metric | Why it matters |
+|---|---|
+| **Hit@1** | Does the *best* chunk land at rank 1? This is where your heuristic failed (32.3%). |
+| **MRR** | How early does the first correct chunk appear? |
+| **nDCG@5** | Overall ranking quality in the top 5. |
+| **Factual F1** | Does better retrieval translate to better answers? |
+| **Faithfulness** | Should stay ≥ 86% — generation is already strong. |
+| **p95 latency** | BGE adds ~200ms per query; ensure p95 stays under your budget. |
+
+**Decision rule:**
+
+| If BGE... | Then... |
+|---|---|
+| Beats heuristic on Hit@1 **and** nDCG@5 | Make `local_cross_encoder` the default |
+| Beats heuristic on Hit@5 but not Hit@1 | Keep heuristic default; use BGE only for paraphrase-heavy queries via routing |
+| Loses to heuristic on yo",faithfulness,gemini-3.7-flash,1.0,1,1,
+docsqa,rrf_bge,d06,What is the default value of AGENTIC_MAX_REWRITES?,"Based on the provided context, the default value of `AGENTIC_MAX_REWRITES` is `2`.","docs/CACHE_SCHEDULER_AGENTIC.md › Cache, Scheduler, and Corrective Agentic RAG > 3. Corrective Agentic RAG State Machine (src/deepcontext/agentic/graph.py) > Configuration
+
+### Configuration
+
+```bash
+AGENTIC_MAX_REWRITES=2          # bounded corrective loop
+AGENTIC_GRADE_THRESHOLD=0.30    # min term-overlap ratio for relevance
+```
+
+--- ||| docs/VERIFICATION_AND_SOURCES.md › Verification & Sources > 2. What was corrected after checking the source
+
+## 2. What was corrected after checking the source
+
+| Original claim | What the repo/paper actually say | Why it matters |
+|---|---|---|
+| ""Prime Agent uses a persistent IPython kernel and Python-based harness"" (implying the whole system is Python) | The **control plane is TypeScript** (`package.json`, `tsconfig.json`, `biome.json` at repo root). Python/IPython is only the **model-facing execution surface**. The daemon, supervisor, session runti",faithfulness,gemini-3.7-flash,1.0,1,1,
+docsqa,rrf_bge,p08,How does the cache keep per-user personalization without putting who is asking into its keys?,"According to the documentation, user IDs are deliberately excluded from the cache key material. Instead, personalization is resolved inside the pipeline via **embedding and reranker preferences**, which *are* included in the cache key payload (along with `model`, `embedding_dim`, `top_k`, `query`, `tenant_id`, sorted `permission_scope`, and sorted `document_ids`).","docs/CACHE_SCHEDULER_AGENTIC.md › Cache, Scheduler, and Corrective Agentic RAG > 1. Response Cache Layer (src/deepcontext/cache.py) > Key design
+
+### Key design
+
+Keys are `{CACHE_NAMESPACE}:{operation}:{sha256(canonical_json)}` where the JSON
+payload includes every field that can change the answer:
+
+- `query`, `tenant_id`, sorted `permission_scope`, sorted `document_ids`
+- `top_k`, `model`, `embedding_model`, `embedding_dim`, `reranker`
+
+Sorted lists make keys stable regardless of input ordering. User IDs are
+deliberately excluded from key material — personalization is resolved inside
+the pipeline via embedding/reranker preferences that _are_ in the key. ||| docs/PRD.md › Product Requirements Document > 5. Target users and personas
+
+## 5. Target users and personas
+
+- **You, as the primary developer/operator.** The system is designed to be run and extended by one person first;
+  multi-use",faithfulness,gemini-3.7-flash,1.0,1,1,
+docsqa,rrf_bge_two_pass,p06,How does the corrective RAG grader decide a retrieved document is relevant?,"Based on the supported facts, the corrective RAG state machine decides if a document is relevant by using deterministic relevance grading against `AGENTIC_GRADE_THRESHOLD`. Additionally, this occurs as part of a corrective-retrieval step that grades evidence sufficiency prior to generation.
+
+However, details regarding the exact mathematical formula, score inputs, or specific calculation method used to compare retrieved documents against `AGENTIC_GRADE_THRESHOLD` are missing from the evidence.","README.md › ⚡ Deep Context Platform > ⚡ Core Features > 7. Corrective Agentic RAG State Machine
+
+### 7. Corrective Agentic RAG State Machine
+
+A hand-built LangGraph-equivalent corrective loop following the CRAG pattern (arXiv:2401.15884):
+
+```
+retrieve → grade_documents ──relevant──→ generate_answer → END
+                │ irrelevant (rewrite_count < max)
+          rewrite_question → retrieve → grade_documents
+                │ exhausted
+            abstain (safe fallback)
+```
+
+- Deterministic relevance grading against `AGENTIC_GRADE_THRESHOLD`.
+- Query rewriting reuses the existing LLM rewriter with a deterministic offline fallback.
+- Generation reuses the grounded two-pass generator and evidence verifier.
+
+--- ||| docs/CACHE_SCHEDULER_AGENTIC.md › Cache, Scheduler, and Corrective Agentic RAG > 3. Corrective Agentic RAG State Machine (src/deepcontext/agentic/graph.py)
+
+## 3. Corrective ",faithfulness,gemini-3.7-flash,1.0,1,0.5,
+docsqa,rrf_bge_two_pass,p03,What stops a stale answer from being served after a source document is removed?,"A stale answer is prevented from being served by the following mechanisms:
+
+- **Namespace invalidation:** When documents are deleted (via `DELETE /v1/documents[/{id}]`), namespace invalidation occurs on the 'rag' namespace. This ensures that stale citations cannot survive re-ingestion.
+- **TTL-based expiry:** Cached responses also expire automatically through TTL-based expiry (`CACHE_TTL`, which defaults to 300s).","README.md › ⚡ Deep Context Platform > ⚡ Core Features > 5. Response Cache Layer (Redis or In-Memory)
+
+### 5. Response Cache Layer (Redis or In-Memory)
+
+Whole-answer caching at the RAG pipeline level (`question → answer + citations`), comparable to production agentic-RAG cache services:
+
+- **Stable keys:** SHA-256 of canonical JSON over query + tenant + permissions + filters + model config.
+- **Redis-backed** when `CACHE_URL` is set; automatic in-memory fallback otherwise.
+- **TTL-based expiry** (`CACHE_TTL`, default 300s) and namespace invalidation on document deletion.
+- Only support-checked answers are cached; `/v1/retrieve` and `/v1/query` responses expose a `cache_hit` flag. ||| docs/CACHE_SCHEDULER_AGENTIC.md › Cache, Scheduler, and Corrective Agentic RAG > 1. Response Cache Layer (src/deepcontext/cache.py) > Behavior
+
+### Behavior
+
+- `/v1/retrieve` caches sufficient retrieval resul",faithfulness,gemini-3.7-flash,1.0,1,1,
+docsqa,rrf_bge_two_pass,m01,"After the blend regression, which config setting now holds the RRF weight and what is its default?","The config setting that now holds the RRF weight is `reranker_blend_rrf_weight` (located in `src/deep_context/core/config.py`, and also settable via the environment variable `RERANKER_BLEND_RRF_WEIGHT`). 
+
+Its default value is 0.60.","docs/RAG_QUALITY_NEXT.md › DeepContext RAG Quality Next Steps > Status as of this commit > Fixed: reranker blend regression (root cause identified and reverted)
+
+### Fixed: reranker blend regression (root cause identified and reverted)
+
+A later commit on this branch (`50fff08`) changed the reranker consensus blend from:
+
+```text
+0.60 * norm_rrf + 0.40 * norm_raw, consensus_boost = 0.15 for top-3
+```
+
+to:
+
+```text
+0.70 * norm_rrf + 0.30 * norm_raw, consensus_boost = 0.20 (top-3) / 0.08 (top-6)
+```
+
+On the identical 755-page GoT corpus and identical 36-query `tests/eval_dataset.json`,
+this dropped full-pipeline Hit@5 from **87.1% to 61.3%**, with these category-level
+losses:
+
+| Category | Before (0.60/0.40) | After (0.70/0.30) | Delta |
+|---|---:|---:|---:|
+| Direct Factual Hit@5 | 100.0% | 75.0% | -25 |
+| Citation/Appendix Hit@5 | 100.0% | 75.0% | -25 |
+| Multi-Hop Hit@5 | 87.5% | 62.5% |",faithfulness,gemini-3.7-flash,1.0,1,1,
+ragbench-covidqa,rrf_bge,r0163,What is Denmark's estimated mean percentage [95% credible interval] of total population infected as of 28th March?,"Based on the provided context, the estimated percentage of the total population infected for Denmark is listed as 1.1%. However, the 95% credible interval and confirmation of the specific date (as of 28th March) are missing from the provided evidence.","Title: Estimating the number of infections and the impact of non-
+Passage: Denmark 1.1% ||| Title: Estimating the number of infections and the impact of non-
+Passage: representing between 1.88% and 11.43% ofthe population. The proportion of the population infected ||| Title: Estimating the number of infections and the impact of non-
+Passage: Country % of total population infected ||| Title: Estimating the number of infections and the impact of non-
+Passage: Denmark measures cough or fever.29 12/3/2020 ||| Title: Estimating the number of infections and the impact of non-
+Passage: 26. Wikipedia. 2020 coronavirus pandemic in Denmark. Wikimedia Foundation ||| Title: Reporting errors in infectious disease outbreaks, with an application to Pandemic Influenza A/H1N1
+Passage: The results of the simulations are given in Figure 1 and 2. Consistent with our theoretical results we observe that when ",faithfulness,gemini-3.7-flash,1.0,1,1,
+ragbench-covidqa,rrf_bge_two_pass,r0022,What percentage of population was affected?,"Because the specific disease, event, or geographic population targeted by your question is missing from the evidence, the exact percentage depends on the context:
+
+* One group represents between 1.88% and 11.43% of the population.
+* Approximately 2% of the world's population is chronically infected with HCV.
+* For influenza, 36.6% of workers were absent from duty, which was considered an unbiased estimate of the clinical attack rate.","Title: Estimating the number of infections and the impact of non-
+Passage: representing between 1.88% and 11.43% ofthe population. The proportion of the population infected ||| Title: The Role of Type III Interferons in Hepatitis C Virus Infection and Therapy
+Passage: Worldwide 92-149 million people, representing approximately 2% of the world's population, are chronically infected with HCV , one of the causative agents of viral hepatitis. HCV is a blood borne virus and transmission occurs parenterally, mainly by reusing injection material, insufficient sterilization of medical tools, or by transfusion of unscreened blood or blood products. As screening of blood products is a standard procedure nowadays in most countries, people who inject drugs have the highest risk of contracting hepatitis C. In fact, over 60% of injecting drug users are positive for HCVantibodies . ||| Title: Quantifyi",faithfulness,gemini-3.7-flash,0.6667,1,1,
+docsqa,rrf_bge_two_pass,d05,Which cache backend is used when CACHE_URL is not set?,"When `CACHE_URL` is not set, the in-memory backend is used as the default or fallback.","docs/CACHE_SCHEDULER_AGENTIC.md › Cache, Scheduler, and Corrective Agentic RAG > 1. Response Cache Layer (src/deepcontext/cache.py) > Backends
+
+### Backends
+
+| Backend                 | When used                                            | Notes                                                          |
+| ----------------------- | ---------------------------------------------------- | -------------------------------------------------------------- |
+| Redis (`redis.asyncio`) | `CACHE_URL` is set (e.g. `redis://localhost:6379/0`) | Uses `SETEX` for TTL expiry; SCAN-based namespace invalidation |
+| In-memory               | Default / fallback                                   | Process-local dict with monotonic-clock TTL; zero config       |
+
+The backend is resolved lazily on first use. If the `redis` package is not
+installed or the connection fails, the cache degrades gracefully to in-mem",faithfulness,gemini-3.7-flash,1.0,1,1,
+docsqa,rrf_bge_two_pass,p02,Which mechanism keeps chunks that both lexical and dense search ranked highly from being dropped after reranking?,"The mechanism used is ""consensus protection"" (also referred to as RRF rank consensus or RRF blend).","docs/PRD.md › Product Requirements Document > 7. Functional requirements > 7.1 Retrieval & RAG
+
+### 7.1 Retrieval & RAG
+
+- **FR1.** Hybrid retrieval combining BM25/full-text and dense vector search, fused with Reciprocal Rank Fusion
+  (RRF), is the default retrieval mechanism.
+- **FR2.** Parent-child chunking is the default ingestion strategy (child 300–600 tokens for matching, parent
+  1,000–2,500 tokens sent to the model), with structure-aware splitting (headings/sections/tables/AST for code)
+  taking precedence over fixed-size splitting wherever the source format has real structure.
+- **FR3.** A cross-encoder reranker sits between first-stage retrieval (top 50–100) and generation (top 5–10).
+- **FR4.** A corrective-retrieval step grades evidence sufficiency before generation; on a weak grade, the system
+  rewrites the query and retries at least once before it is allowed to answer with",faithfulness,gemini-3.7-flash,0.0,0.5,0.5,
+docsqa,rrf_bge_two_pass,d12,By how much did the purpose-trained RLM-Qwen3-8B beat its base model?,The purpose-trained RLM-Qwen3-8B beat its base model (base Qwen3-8B) by 28.3% (or 28.3% on average).,"docs/CRITICAL_ASSESSMENT_AND_SCOPE.md › Critical Assessment & Realistic Scope > 2. Is RLM actually production-ready? A direct read of the evidence you asked me to check
+
+## 2. Is RLM actually production-ready? A direct read of the evidence you asked me to check
+
+You specifically asked me to check RLM's prior iterations on GitHub and the wider internet before building on it.
+Here's the unvarnished version of what that check found (full detail in `VERIFICATION_AND_SOURCES.md`):
+
+- **It's genuinely new.** The originating blog post is from October 2025; the full paper was submitted 31 December
+  2025 and last revised in May 2026. Prime Agent, the flagship product built around it, is likewise a matter of
+  months old relative to today's date (17 August 2026).
+- **The paper's own headline results are strong** — median improvements of 26% over context compaction, 130% over
+  CodeAct-with-sub-ca",faithfulness,gemini-3.7-flash,1.0,1,1,
+multihoprag,rrf_bge,q2201,"Which celebrity, known for experiencing significant events away from media scrutiny, was recognized by 'The Independent - Life and Style' as Time's Person of the Year, has been rumored to be romantically linked with a Chiefs TE according to 'CBSSports.com', and was also spotted supporting at Arrowhead Stadium as reported by 'The Age'?","Based on the provided context:
+
+- **Taylor Swift** was recognized in *The Independent - Life and Style* as *Time*’s 2023 Person of the Year, is known for keeping significant parts of her life away from media scrutiny (such as her notoriously private past relationship with Joe Alwyn), and has been romantically linked to Kansas City Chiefs tight end Travis Kelce.
+- There is **no mention or evidence** in the provided text regarding reports from *CBSSports.com* or *The Age*, nor any mention of her being spotted supporting at Arrowhead Stadium from those sources.","Taylor Swift is Time’s Person of the Year
+
+The Independent - Life and Style (2023-12-06). Stay ahead of the trend in fashion and beyond with our free weekly Lifestyle Edit newsletter Stay ahead of the trend in fashion and beyond with our free weekly Lifestyle Edit newsletter Please enter a valid email address Please enter a valid email address SIGN UP I would like to be emailed about offers, events and updates from The Independent. Read our privacy notice Thanks for signing up to the
+
+Lifestyle Edit email {{ #verifyErrors }} {{ message }} {{ /verifyErrors }} {{ ^verifyErrors }} Something went wrong. Please try again later {{ /verifyErrors }}
+
+Taylor Swift has officially been named Time’s 2023 Person of the Year.
+
+On Wednesday 6 December, the magazine announced Swift had earned the honour after an “editors’ assessment of the individual who most shaped the headlines over the previous 12 mo",faithfulness,gemini-3.7-flash,1.0,1,1,
+docsqa,rrf_bge,p02,Which mechanism keeps chunks that both lexical and dense search ranked highly from being dropped after reranking?,"Based on the provided context, this is handled by **consensus protection** (along with the **RRF blend** / **RRF rank consensus** factor).","docs/PRD.md › Product Requirements Document > 7. Functional requirements > 7.1 Retrieval & RAG
+
+### 7.1 Retrieval & RAG
+
+- **FR1.** Hybrid retrieval combining BM25/full-text and dense vector search, fused with Reciprocal Rank Fusion
+  (RRF), is the default retrieval mechanism.
+- **FR2.** Parent-child chunking is the default ingestion strategy (child 300–600 tokens for matching, parent
+  1,000–2,500 tokens sent to the model), with structure-aware splitting (headings/sections/tables/AST for code)
+  taking precedence over fixed-size splitting wherever the source format has real structure.
+- **FR3.** A cross-encoder reranker sits between first-stage retrieval (top 50–100) and generation (top 5–10).
+- **FR4.** A corrective-retrieval step grades evidence sufficiency before generation; on a weak grade, the system
+  rewrites the query and retries at least once before it is allowed to answer with",faithfulness,gemini-3.7-flash,0.0,0.5,0.5,
+docsqa,rrf_bge_two_pass,p05,Which answers are allowed into the whole-answer cache?,"Based on the supported facts, the only answers allowed into the cache must meet the following conditions:
+
+- Only support-checked answers are cached.
+- For `/v1/query`, only answers that passed the evidence-support gate are cached.
+- Answers from the RLM-engine are never cached.","README.md › ⚡ Deep Context Platform > ⚡ Core Features > 5. Response Cache Layer (Redis or In-Memory)
+
+### 5. Response Cache Layer (Redis or In-Memory)
+
+Whole-answer caching at the RAG pipeline level (`question → answer + citations`), comparable to production agentic-RAG cache services:
+
+- **Stable keys:** SHA-256 of canonical JSON over query + tenant + permissions + filters + model config.
+- **Redis-backed** when `CACHE_URL` is set; automatic in-memory fallback otherwise.
+- **TTL-based expiry** (`CACHE_TTL`, default 300s) and namespace invalidation on document deletion.
+- Only support-checked answers are cached; `/v1/retrieve` and `/v1/query` responses expose a `cache_hit` flag. ||| docs/CACHE_SCHEDULER_AGENTIC.md › Cache, Scheduler, and Corrective Agentic RAG > 1. Response Cache Layer (src/deepcontext/cache.py) > Behavior
+
+### Behavior
+
+- `/v1/retrieve` caches sufficient retrieval resul",faithfulness,gemini-3.7-flash,1.0,1,1,
+docsqa,rrf_bge,m01,"After the blend regression, which config setting now holds the RRF weight and what is its default?","Based on the provided context, the config setting that holds the RRF weight is `reranker_blend_rrf_weight` (in `src/deep_context/core/config.py`), and its default value is `0.60`.","docs/RAG_QUALITY_NEXT.md › DeepContext RAG Quality Next Steps > Status as of this commit > Fixed: reranker blend regression (root cause identified and reverted)
+
+### Fixed: reranker blend regression (root cause identified and reverted)
+
+A later commit on this branch (`50fff08`) changed the reranker consensus blend from:
+
+```text
+0.60 * norm_rrf + 0.40 * norm_raw, consensus_boost = 0.15 for top-3
+```
+
+to:
+
+```text
+0.70 * norm_rrf + 0.30 * norm_raw, consensus_boost = 0.20 (top-3) / 0.08 (top-6)
+```
+
+On the identical 755-page GoT corpus and identical 36-query `tests/eval_dataset.json`,
+this dropped full-pipeline Hit@5 from **87.1% to 61.3%**, with these category-level
+losses:
+
+| Category | Before (0.60/0.40) | After (0.70/0.30) | Delta |
+|---|---:|---:|---:|
+| Direct Factual Hit@5 | 100.0% | 75.0% | -25 |
+| Citation/Appendix Hit@5 | 100.0% | 75.0% | -25 |
+| Multi-Hop Hit@5 | 87.5% | 62.5% |",faithfulness,gemini-3.7-flash,1.0,1,1,
+docsqa,rrf_bge_two_pass,d03,What is the default value of AGENTIC_GRADE_THRESHOLD?,The default value of AGENTIC_GRADE_THRESHOLD is 0.30.,"docs/CACHE_SCHEDULER_AGENTIC.md › Cache, Scheduler, and Corrective Agentic RAG > 3. Corrective Agentic RAG State Machine (src/deepcontext/agentic/graph.py) > Configuration
+
+### Configuration
+
+```bash
+AGENTIC_MAX_REWRITES=2          # bounded corrective loop
+AGENTIC_GRADE_THRESHOLD=0.30    # min term-overlap ratio for relevance
+```
+
+--- ||| README.md › ⚡ Deep Context Platform > ⚡ Core Features > 7. Corrective Agentic RAG State Machine
+
+### 7. Corrective Agentic RAG State Machine
+
+A hand-built LangGraph-equivalent corrective loop following the CRAG pattern (arXiv:2401.15884):
+
+```
+retrieve → grade_documents ──relevant──→ generate_answer → END
+                │ irrelevant (rewrite_count < max)
+          rewrite_question → retrieve → grade_documents
+                │ exhausted
+            abstain (safe fallback)
+```
+
+- Deterministic relevance grading against `AGENTIC_GRADE_THRESHOLD`.
+- Quer",faithfulness,gemini-3.7-flash,1.0,1,1,
+ragbench-covidqa,rrf_bge,r0188,One way to understand the impact of interventions?,"Based on the provided context, one way to see how interventions affect outcomes is by ""[f]ollowing the hierarchy from bottom to top,"" which provides a full framework to observe their impact. Additionally, effects can be examined by looking at different interventions ""when used as the only covariate in the model.""","Title: Estimating the number of infections and the impact of non-
+Passage: interventions. ||| Title: Estimating the number of infections and the impact of non-
+Passage: Following the hierarchy from bottom to top gives us a full framework to see how interventions affect ||| Title: Estimating the number of infections and the impact of non-
+Passage: interventions became effective. ||| Title: Estimating the number of infections and the impact of non-
+Passage: Figure 15: Effects of different interventions when used as the only covariate in the model. ||| Title: Estimating the number of infections and the impact of non-
+Passage: from that date onwards). ||| Title: Estimating the number of infections and the impact of non-
+Passage: underreporting as well as systematic and country-specific changes in testing.",faithfulness,gemini-3.7-flash,1.0,1,0.5,
+ragbench-covidqa,rrf_bge,r0057,What are the most common methods of inhaled delivery of medications?,"Based on the provided context, the most common modes (methods) of inhaled delivery are **metered dose inhalers** and **dry powder inhalers**.","Title: RNAi Therapeutic Platforms for Lung Diseases
+Passage: The use of aerosols to deliver medication to the lungs has a long history. Administration by inhalation is a popular and non-invasive method of delivering agents into the lungs. There are several inhalation devices available for the delivery of drugs into the lungs. Metered dose inhalers and dry powder inhalers are the most common modes of inhaled delivery. MDIs are the most commonly used inhalers for several lung diseases, such as asthma, bronchitis, and chronic obstructive pulmonary disease , and a spacer is an external device that is attached to an MDI to allow for better drug delivery by enhanced ||| Title: Targeted Versus Continuous Delivery of Volatile Anesthetics During Cholinergic Bronchoconstriction
+Passage: multiple agents, and operational simplicity of the U-PAC vaporizer provides an ideal method for the delivery of ",faithfulness,gemini-3.7-flash,1.0,1,1,
+docsqa,rrf_bge,d14,How many questions does the Rag eval guide suggest for an initial prototype?,"Based on the provided context, the guide suggests creating a dataset with roughly 30–50 questions for an initial prototype.","Rag eval.md › how can I evaluate my rag model, some python modules that can help me to evaluate my rag model best of them > Build a proper evaluation dataset
+
+## Build a proper evaluation dataset
+
+Do not evaluate only five manually selected questions. Create a dataset with roughly:
+
+- 30–50 questions for an initial prototype.
+- 100–300 questions for a more reliable comparison.
+- 10–20% adversarial or unanswerable questions.
+
+Include different categories:
+
+```json
+{
+  ""question"": ""What is the cancellation policy?"",
+  ""reference"": ""Users can cancel within 14 days."",
+  ""relevant_doc_ids"": [""policy_03""],
+  ""difficulty"": ""easy"",
+  ""category"": ""policy""
+}
+```
+
+Include:
+
+- Direct fact questions.
+- Multi-hop questions requiring multiple chunks.
+- Questions containing ambiguous terms.
+- Questions with paraphrased wording.
+- Questions whose answer is not present in the knowledge base.
+- Questions t",faithfulness,gemini-3.7-flash,1.0,1,1,
+multihoprag,rrf_bge_two_pass,q0331,"What company is at the center of claims involving manipulation of search results to maximize ad revenue according to Megan Grey in 'The Age', ranking local search results based on relevance, distance, and prominence as reported by 'The Verge', and is accused by a news publisher in a class action antitrust suit covered by 'TechCrunch' for harming their bottom line through anticompetitive practices?","Based on the provided facts, the company at the center of the claim by Megan Grey (Gray) in *The Age*—alleging that it manipulates search queries/Search to maximise ad revenue—is Google.
+
+However, the remaining details requested are missing from the evidence:
+- There is no provided evidence regarding reports by *The Verge* that the company ranks local search results based on relevance, distance, and prominence.
+- There is no provided evidence regarding reports by *TechCrunch* concerning a news publisher's class action antitrust suit accusing the company of harming their bottom line through anticompetitive practices.","Is Google Search better than the rest? And is that fair?
+
+The Age (2023-10-22). The process of this test did remind me how much data Google collects — not just my searches but anything I say to a smart speaker, any search result or ad that I click — which will be a point in favour of DuckDuckGo for some, even if it didn’t perform as well and is harder to read. The data collection does also mean that Google (not just search but also mobile widgets and other services) personalises to me more effectively. Loading Bing has overhauled its layout over the past year to be very graphic and augmented by generative AI explanations from its chatbot. I like the idea of being able to ask follow-up questions in searches this way, but in practice it’s not really there yet. In a search for “kids BMX bike green” (Google did pretty well and DuckDuckGo ignored the green part), Bing Chat offered a compariso",faithfulness,gemini-3.7-flash,0.6,1,1,
+docsqa,rrf_bge,p07,Why is a high faithfulness score alone not enough to trust a RAG system?,"Based on the provided context, a high faithfulness score alone is not enough to trust a RAG system for the following reasons:
+
+1. **A generation-only improvement can mask a retrieval regression:** Faithfulness can improve on the generation side even when retrieval performance significantly drops. In one documented case, generation-side faithfulness doubled (from 43% to 86.2%) while full-pipeline Hit@5 dropped from 87.1% to 61.3% due to a reranker blend regression. Looking at faithfulness or abstention numbers alone would not make this retrieval failure obvious. Therefore, retrieval metrics (such as Hit@5 and nDCG@5) must be evaluated alongside faithfulness [4].
+2. **High faithfulness can coexist with low correctness:** When retrieved context is incomplete or incorrect, a system can achieve high faithfulness while still exhibiting low correctness [1].","Rag eval.md › how can I evaluate my rag model, some python modules that can help me to evaluate my rag model best of them > Interpret failures correctly
+
+## Interpret failures correctly
+
+| Observed result | Likely problem |
+| :-- | :-- |
+| Low context recall | Poor embeddings, bad chunking, insufficient $k$, missing documents |
+| Low context precision | Too many irrelevant chunks, weak reranker, excessive $k$ |
+| High context scores but low faithfulness | Prompting or generation problem |
+| High faithfulness but low correctness | Retrieved context is incomplete or incorrect |
+| High correctness but low answer relevancy | Answer is overly verbose or poorly focused |
+| Good offline scores but poor user feedback | Evaluation dataset does not represent real usage |
+| Good retrieval but hallucinated citations | Citation extraction or answer-generation problem |
+| Good scores on easy questions",faithfulness,gemini-3.7-flash,1.0,1,1,
+multihoprag,rrf_bge,q0076,"Does the article from Wired suggest that Sony headphones do not offer the best value in their class during the Walmart Cyber Monday Deals, while the article from Music Business Worldwide indicates that Artists are seeking deals that offer more control and better economics, or do both articles suggest a common trend in seeking value and control in their respective fields?","Based on the provided context:
+
+* **Sony Headphones Value:** The article covering the Walmart Cyber Monday deals contradicts the claim that Sony headphones do not offer good value; it explicitly states that with the sale, Sony's working-class noise cancelers ""offer some of the best value in their class from one of the top names in the business.""
+* **Music Business Worldwide / Artist Deals:** There is no evidence or mention of an article from *Music Business Worldwide* or trends regarding artists seeking control and economics in the provided text.","This versatile multi-piece soundbar system from JBL (8/10 Wired Recommends) not only offers some of the best Dolby Atmos immersion you can buy but it’s also got a cool trick: fully wireless surround sound speakers. You can set them up behind you or even use them as Bluetooth speakers, then connect back to the main bar for charging and playback.
+
+Klipsch has a talent for crafting soundbars that put the sound first, often without a lot of frills, and the Cinema 600 is an excellent example. Built from a speaker-like MDF cabinet and paired with a massive 10-inch subwoofer driver, this system has a penchant for clear and powerful sound that’s as good for music as it is for cinematic punch.
+
+Photograph: Polk Audio
+
+Polk’s Audio Signa 4 (7/10, WIRED Recommends) was already one of the most affordable Dolby Atmos soundbars of its kind, offering true up-firing drivers, a wireless subwoofer for bee",faithfulness,gemini-3.7-flash,0.5,0.67,0.5,
+ragbench-covidqa,rrf_bge,r0008,What animal models exist for both the asymptomatic carriage of PUUV and SNV?,"Based on the provided context, the animal models that exist for the asymptomatic carriage of PUUV and SNV are their native carrier rodents:
+* The bank vole (*Myodes glareolus*) for PUUV
+* The deer mouse (*P. maniculatus*) for SNV","Title: Hantaviruses in the Americas and Their Role as Emerging Pathogens
+Passage: Testing models of pathogenesis can be done more effectively when there is an animal model that mimics key aspects of the disease. There is no such model that closely mimics HFRS, but animal models exist for both the asymptomatic carriage of PUUV and SNV by their native carrier rodents, the bank vole Myodes glareolus and the deer mouse P. maniculatus; as well as a Syrian hamster model using ANDV or the related Maporal virus from Venezuela, for which an HCPS-mimetic disease is observed . ||| Title: The mouse and ferret models for studying the novel avian-origin human influenza A (H7N9) virus
+Passage: the trachea, lung, brain, heart, liver, spleen, kidney, stomach, intestine, and olfactory bulb. All nine animals were observed for clinical signs and weighed daily as an indicator of disease. Nasal and throat swa",faithfulness,gemini-3.7-flash,1.0,1,1,
+multihoprag,rrf_bge_two_pass,q0076,"Does the article from Wired suggest that Sony headphones do not offer the best value in their class during the Walmart Cyber Monday Deals, while the article from Music Business Worldwide indicates that Artists are seeking deals that offer more control and better economics, or do both articles suggest a common trend in seeking value and control in their respective fields?","Based on the supported facts, WIRED states that Sony's working-class noise cancelers offer some of the best value in their class with their sale. 
+
+However, the rest of the requested details are missing from the evidence:
+- It is missing whether the WIRED article mentions Walmart Cyber Monday Deals or suggests that Sony headphones do not offer the best value during those specific deals.
+- There is no evidence regarding an article from Music Business Worldwide indicating that artists are seeking deals offering more control and better economics.
+- There is no evidence to determine whether both articles suggest a common trend in seeking value and control in their respective fields.","This versatile multi-piece soundbar system from JBL (8/10 Wired Recommends) not only offers some of the best Dolby Atmos immersion you can buy but it’s also got a cool trick: fully wireless surround sound speakers. You can set them up behind you or even use them as Bluetooth speakers, then connect back to the main bar for charging and playback.
+
+Klipsch has a talent for crafting soundbars that put the sound first, often without a lot of frills, and the Cinema 600 is an excellent example. Built from a speaker-like MDF cabinet and paired with a massive 10-inch subwoofer driver, this system has a penchant for clear and powerful sound that’s as good for music as it is for cinematic punch.
+
+Photograph: Polk Audio
+
+Polk’s Audio Signa 4 (7/10, WIRED Recommends) was already one of the most affordable Dolby Atmos soundbars of its kind, offering true up-firing drivers, a wireless subwoofer for bee",faithfulness,gemini-3.7-flash,1.0,1,0,
+docsqa,rrf_bge,m02,"Which two layers does the Rag eval guide say a RAG evaluation should be split into, and which Python library does it suggest starting with?","According to the *Rag eval* guide, a RAG evaluation should be split into the following **two layers**:
+1. **Retrieval quality**
+2. **Answer quality**
+
+The guide suggests starting with the Python library **Ragas** for metric-based evaluation.","Rag eval.md › how can I evaluate my rag model, some python modules that can help me to evaluate my rag model best of them
+
+# how can I evaluate my rag model, some python modules that can help me to evaluate my rag model best of them
+
+The best practical setup is to evaluate your RAG system in **two layers**: retrieval quality and answer quality. For Python, I recommend starting with **Ragas** for metric-based evaluation, then adding **DeepEval** if you want pytest/CI integration and broader LLM testing. Ragas provides metrics for evaluating RAG components systematically rather than relying only on manual “vibe checks.”[^1] ||| docs/CACHE_SCHEDULER_AGENTIC.md › Cache, Scheduler, and Corrective Agentic RAG > 1. Response Cache Layer (src/deepcontext/cache.py)
+
+## 1. Response Cache Layer (`src/deep_context/cache.py`)
+
+Caches whole RAG responses (""question → answer + citations"") at the pipelin",faithfulness,gemini-3.7-flash,1.0,1,1,
+docsqa,rrf_bge_two_pass,d06,What is the default value of AGENTIC_MAX_REWRITES?,"Based on the provided facts, the default value of AGENTIC_MAX_REWRITES is 2.","docs/CACHE_SCHEDULER_AGENTIC.md › Cache, Scheduler, and Corrective Agentic RAG > 3. Corrective Agentic RAG State Machine (src/deepcontext/agentic/graph.py) > Configuration
+
+### Configuration
+
+```bash
+AGENTIC_MAX_REWRITES=2          # bounded corrective loop
+AGENTIC_GRADE_THRESHOLD=0.30    # min term-overlap ratio for relevance
+```
+
+--- ||| docs/VERIFICATION_AND_SOURCES.md › Verification & Sources > 2. What was corrected after checking the source
+
+## 2. What was corrected after checking the source
+
+| Original claim | What the repo/paper actually say | Why it matters |
+|---|---|---|
+| ""Prime Agent uses a persistent IPython kernel and Python-based harness"" (implying the whole system is Python) | The **control plane is TypeScript** (`package.json`, `tsconfig.json`, `biome.json` at repo root). Python/IPython is only the **model-facing execution surface**. The daemon, supervisor, session runti",faithfulness,gemini-3.7-flash,1.0,1,1,
+ragbench-covidqa,rrf_bge,r0108,What was the primary threatening clinical finding in patients infected with SARS-CoV and MERS-CoV?,"Based on the provided context, the primary threatening clinical findings include:
+
+* **SARS-CoV:** It induced pneumonia through the respiratory tract, with patients presenting with fever and respiratory symptoms (and occasionally diarrhea and vomiting). About 20–30% of SARS patients required mechanical ventilation, and it carried a case fatality rate of about 9%.
+* **MERS-CoV:** It primarily manifests as a lower respiratory tract disease involving fever, cough, breathing difficulties, and pneumonia that may progress to **acute respiratory distress syndrome (ARDS)**, **multiorgan failure**, and death (in 20% to 40% of infected individuals).","Title: Emerging Infections and Pertinent Infections Related to Travel for Patients with Primary Immunodeficiencies
+Passage: Severe acute respiratory syndrome coronavirus and the Middle East respiratory syndrome coronavirus are two zoonotic coronaviruses. The SARS pandemic in 2002-2003 resulted in 8096 reported cases in 27 countries. No further SARS cases were reported after the pandemic except isolated cases linked to laboratory accidents. Patients usually presented with fever and respiratory symptoms, but occasionally had diarrhea and vomiting. About 20-30% of SARS patients required mechanical ventilation, with a case fatality rate of about 9% . ||| Title: Molecular and serological investigation of 2019-nCoV infected patients: implication of multiple shedding routes
+Passage: Like SARS-CoV, 2019-nCoV induced pneumonia through respiratory tract by clinical observation. Therefore, the pres",faithfulness,gemini-3.7-flash,1.0,1,1,
+docsqa,rrf_bge,d10,"According to the reranker upgrade guide, what Hit@1 value shows where the heuristic reranker failed?","According to the reranker upgrade guide, the Hit@1 value showing where the heuristic reranker failed is **32.3%**.","RERANKER_UPGRADE.md › DeepContext Reranker Upgrade: Heuristic → Real Cross-Encoder > 6. What to compare
+
+## 6. What to compare
+
+| Metric | Why it matters |
+|---|---|
+| **Hit@1** | Does the *best* chunk land at rank 1? This is where your heuristic failed (32.3%). |
+| **MRR** | How early does the first correct chunk appear? |
+| **nDCG@5** | Overall ranking quality in the top 5. |
+| **Factual F1** | Does better retrieval translate to better answers? |
+| **Faithfulness** | Should stay ≥ 86% — generation is already strong. |
+| **p95 latency** | BGE adds ~200ms per query; ensure p95 stays under your budget. |
+
+**Decision rule:**
+
+| If BGE... | Then... |
+|---|---|
+| Beats heuristic on Hit@1 **and** nDCG@5 | Make `local_cross_encoder` the default |
+| Beats heuristic on Hit@5 but not Hit@1 | Keep heuristic default; use BGE only for paraphrase-heavy queries via routing |
+| Loses to heuristic on yo",faithfulness,gemini-3.7-flash,1.0,1,1,
+multihoprag,rrf_bge_two_pass,q2251,Does the 'Fortune' article suggest that the foundation of FTX's success is the same as the 'TechCrunch' articles' implication that Sam Bankman-Fried's actions were based on fraudulent intentions?,"Based on the provided facts, the specific detail of whether the *Fortune* article suggests that the foundation of FTX's success is the same as the *TechCrunch* article's implication regarding fraudulent intentions is missing from the evidence. 
+
+However, the provided facts detail the following regarding each article's coverage:
+
+**From the *Fortune* article:**
+* Prosecutor Thane Rehn claimed that Sam Bankman-Fried's supposedly thriving exchange and jet-setting lifestyle was ""all of that, all of it, was built on lies.""
+* Defense attorney Mark Cohen argued that Bankman-Fried acted in good faith, built a very innovative and successful company, and did not steal money or defraud anyone.
+* The article reports that the question of whether Bankman-Fried acted in good faith or was a fraud lies with the jury.
+
+**From the *TechCrunch* article:**
+* FTX's rise is described as occurring through roughly $2 billion in capital from more than 80 investors, mainstream recognition, branding deals, and partnerships, before discussing the trial concerning his guilt regarding fraud and conspiracy charges.
+* Bankman-Fried pleaded not guilty to all counts and maintained that he ""didn't ever try to commit fraud on anyone.""","Is Sam Bankman-Fried a bad ‘man’ or a good ‘boy’? Lawyers swap opening statements before first witnesses take the stand
+
+Fortune (2023-10-04). Who is Sam Bankman-Fried, the former CEO of crypto exchange FTX? Is he a liar and a fraud? Or did he act in good faith, and like many a startup founder, fly too close to the sun?
+
+That answer ultimately lies with the jury, which was selected on Wednesday morning before lawyers for the government and then Bankman-Fried swapped two very different stories of the former crypto mogul’s sudden rise and almost instantaneous fall.
+
+Here’s what happened on the second day of the trial, which featured pointed allegations, a friend from MIT, and an audience replete with big names, including Bankman-Fried’s professorial parents and Damian Williams, U.S. attorney for the Southern District of New York.
+
+A conscious criminal…
+
+The prosecution’s account of the all",faithfulness,gemini-3.7-flash,0.9,1,0,
+docsqa,rrf_bge_two_pass,d09,Which model does the reranker upgrade guide propose as the real trained cross-encoder?,The reranker upgrade guide proposes BAAI/bge-reranker-v2-m3 as the real trained cross-encoder to replace the heuristic reranker.,"RERANKER_UPGRADE.md › DeepContext Reranker Upgrade: Heuristic → Real Cross-Encoder
+
+# DeepContext Reranker Upgrade: Heuristic → Real Cross-Encoder
+
+**Branch:** `feat/rag-quality-generation`  
+**Target:** Replace the hand-written n-gram/overlap ""CrossEncoderReranker"" with a real trained cross-encoder (`BAAI/bge-reranker-v2-m3`) while keeping the hybrid RRF + consensus-protection pipeline intact.
+
+--- ||| RERANKER_UPGRADE.md › DeepContext Reranker Upgrade: Heuristic → Real Cross-Encoder > 4. Code changes > 4.1 Add the new reranker class
+
+### 4.1 Add the new reranker class
+
+**File:** `src/deep_context/retrieval/reranker.py`
+
+Add this import at the top:
+
+```python
+from sentence_transformers import CrossEncoder
+```
+
+Add this class after `CrossEncoderReranker` and before `GeminiSemanticReranker`:
+
+```python
+_bge_model: CrossEncoder | None = None
+
+def _get_bge_reranker() -> CrossEncoder:
+    """"",faithfulness,gemini-3.7-flash,1.0,1,1,
+docsqa,rrf_bge_two_pass,p01,Why was the retrieval regression easy to miss even though answers looked better?,"The retrieval regression was easy to miss because generation-side faithfulness improved over the same period (increasing from 43% to 86.2%), which masked the regression when looking at abstention or faithfulness numbers alone.","Rag eval.md › how can I evaluate my rag model, some python modules that can help me to evaluate my rag model best of them > Interpret failures correctly
+
+## Interpret failures correctly
+
+| Observed result | Likely problem |
+| :-- | :-- |
+| Low context recall | Poor embeddings, bad chunking, insufficient $k$, missing documents |
+| Low context precision | Too many irrelevant chunks, weak reranker, excessive $k$ |
+| High context scores but low faithfulness | Prompting or generation problem |
+| High faithfulness but low correctness | Retrieved context is incomplete or incorrect |
+| High correctness but low answer relevancy | Answer is overly verbose or poorly focused |
+| Good offline scores but poor user feedback | Evaluation dataset does not represent real usage |
+| Good retrieval but hallucinated citations | Citation extraction or answer-generation problem |
+| Good scores on easy questions",faithfulness,gemini-3.7-flash,1.0,1,1,
+multihoprag,rrf_bge,q0338,"Does the Yahoo News article praise the Biden administration's effectiveness on climate issues, while the Engadget article suggests that society is being positively impacted by the interconnectedness of climate change, the modern internet, and authoritarianism?","No. 
+
+Based on the provided context:
+* The **Yahoo News article** does not praise the Biden administration's effectiveness. Instead, it highlights that climate scientist Peter Kalmus views the Biden administration as ""clueless on climate"" and is frustrated with President Biden, believing the Inflation Reduction Act does too little to shut out the fossil fuel industry and that the Paris Agreement's trajectory will lead to catastrophic global heating.
+* The **Engadget article** does not suggest a positive impact; rather, it states that accelerating climate change, the modern internet, and authoritarianism's recent renaissance are ""influencing and amplifying one another's negative impacts, to the detriment of us all.""","A scientist reckons with climate grief
+
+Yahoo News (2023-12-24). BELFAST, Maine — How does it feel to be a climate scientist in 2023?
+
+Let’s set the scene. Hundreds of picnickers are sprawled across a lawn speckled with colorful blankets. Yachts bob in the bay. Guitars blare, children wrestle and dancers twirl across a concert lawn in the golden glow of a dying summer night.
+
+It’s a picture-perfect August evening for the seaside town of Belfast’s “Summer Nights” concert series.
+
+Off to the side, Peter Kalmus sits alone. His eyes are closed. His toes are tucked beneath his body. He’s catching an occasional side-eye from onlookers.
+
+“When I’m meditating, I don’t feel anxious,” Kalmus later says, explaining that he strives for two hours of meditation a day to keep his climate anxiety at bay. Otherwise, “it’s completely overwhelming.”
+
+Many of us avoid thinking too deeply about the worst sce",faithfulness,gemini-3.7-flash,1.0,1,1,
+ragbench-covidqa,rrf_bge,r0028,What is this disease  characterized by ?,"Because your question does not specify which disease you are asking about, here is how the diseases mentioned in the provided text are characterized:
+
+* **Still's disease:** Characterized by a fever of approximately 39°C lasting for more than seven days, arthralgias or arthritis lasting two weeks or longer, and a non-pruritic, salmon-pink macular and/or maculopapular rash. It may also present with a sore throat, lymph node swelling, hepatomegaly and/or splenomegaly with abnormal liver function studies [1].
+* **Juvenile idiopathic inflammatory myopathies:** Characterized by symmetric proximal weakness, characteristic rashes, and other systemic features [2].
+* **Middle East Respiratory Syndrome (MERS):** In humans, it is mostly known as a lower respiratory tract disease involving fever, cough, breathing difficulties, and pneumonia (which can progress to acute respiratory distress syndrome, multiorgan failure, and death), though it has also been detected in mild or influenza-like illnesses and asymptomatic cases [4]. 
+* **Rheumatoid Arthritis (RA):** Joint pain is noted as its major symptom [3].","Title: Relapsing macrophage activating syndrome in a 15-year-old girl with Still's disease: a case report
+Passage: Still's disease was described for the first time in children by George Still in 1896. It is characterized by a fever of approximately 39°C which continues for more than seven days, arthralgias or arthritis of two weeks duration or longer, and macular and/or maculopapular rash which is non-pruritic and salmon pink in color. Sore throat, lymph node swelling, hepatomegaly and/or splenomegaly with abnormal liver function studies, may also be present . Typically, laboratory studies show an elevated ESR, which is accompanied by leukocytosis with the predominance of granulocytes. Normocytic normochromic anemia with hemoglobin values less than 10 g/dl and reactive ||| Title: Environmental factors preceding illness onset differ in phenotypes of the juvenile idiopathic inflammatory my",faithfulness,gemini-3.7-flash,1.0,1,1,
+ragbench-covidqa,rrf_bge_two_pass,r0028,What is this disease  characterized by ?,"Because the question does not specify which disease is being referred to, here are the diseases in the provided text that are described as being ""characterized by"" specific features:
+
+* **Still's disease:** Characterized by:
+  * A fever of approximately 39°C that continues for more than seven days.
+  * Arthralgias or arthritis lasting two weeks or longer.
+  * A macular and/or maculopapular rash that is non-pruritic and salmon pink in color. 
+  *(Sore throat, lymph node swelling, and hepatomegaly and/or splenomegaly with abnormal liver function studies may also be present).*
+
+* **Juvenile idiopathic inflammatory myopathies:** Characterized by:
+  * Symmetric proximal weakness.
+  * Characteristic rashes.
+  * Other systemic features.","Title: Relapsing macrophage activating syndrome in a 15-year-old girl with Still's disease: a case report
+Passage: Still's disease was described for the first time in children by George Still in 1896. It is characterized by a fever of approximately 39°C which continues for more than seven days, arthralgias or arthritis of two weeks duration or longer, and macular and/or maculopapular rash which is non-pruritic and salmon pink in color. Sore throat, lymph node swelling, hepatomegaly and/or splenomegaly with abnormal liver function studies, may also be present . Typically, laboratory studies show an elevated ESR, which is accompanied by leukocytosis with the predominance of granulocytes. Normocytic normochromic anemia with hemoglobin values less than 10 g/dl and reactive ||| Title: Environmental factors preceding illness onset differ in phenotypes of the juvenile idiopathic inflammatory my",faithfulness,gemini-3.7-flash,0.875,1,1,
+docsqa,rrf_bge_two_pass,m05,Name the memory store for immutable constraints and the one for session history.,"Based on the supported facts:
+
+- The memory store for immutable runtime safety and behavior constraints is **memory_policy**.
+- The memory store for session history (as well as outcome summaries and interaction traces) is **memory_episode**.","README.md › ⚡ Deep Context Platform > ⚡ Core Features > 3. 4-Store Typed Memory System
+
+### 3. 4-Store Typed Memory System
+
+Durable memory is partitioned to prevent cross-contamination:
+
+- **`memory_policy`:** Immutable runtime safety and behavior constraints.
+- **`memory_preference`:** User-scoped persistent preferences (e.g. preferred embedding model, output dimension, reranker, and LLM).
+- **`memory_fact`:** Verified semantic world/user facts promoted through confidence scoring.
+- **`memory_episode`:** Session history, outcome summaries, and interaction traces. ||| docs/PRD.md › Product Requirements Document > 9. Data model overview
+
+## 9. Data model overview
+
+See `docs/DATA_MODEL.sql` for the full, runnable Postgres schema. Core tables:
+
+- `documents`, `chunks` — ingestion output, with parent/child linkage and metadata (source, section path, page,
+  permissions, timestamp)
+- `memory_",faithfulness,gemini-3.7-flash,1.0,1,1,
+docsqa,rrf_bge_two_pass,d07,What daily token quota does Groq's on-demand free tier enforce?,"Groq's on-demand free tier enforces a quota of 200,000 tokens/day (TPD).","docs/SYSTEM_HANDOFF.md › Deep Context Platform: Complete System Evolution & Engineering Handoff > 2. Chronological Iterations & Problem Diagnoses > Iteration 5: Groq Rate Limit (429 / 200k TPD) Quota Signaling
+
+### Iteration 5: Groq Rate Limit (429 / 200k TPD) Quota Signaling
+- **Problem:** Groq's on-demand free tier enforces a 200,000 tokens/day (TPD) quota. When reached, requests fail with `429 - Rate limit reached on tokens per day (TPD). Please try again in Xm Ys`.
+- **Implementation:**
+  - **Parser (`parse_rate_limit_error` in `llm_client.py`):**
+    - Parses `retry_after` (e.g. `2m 5s`), `limit`, `used`, and `quota_type` (TPD vs TPM).
+    - Stores global state in `LLMClient.global_rate_limit`.
+  - **API Endpoint (`GET /v1/quota/status` in `routes_rag.py`):**
+    - Returns structured JSON for frontend and background monitoring.
+  - **UI Header Quota Pill:**
+    - Displays `● Groq AP",faithfulness,gemini-3.7-flash,1.0,1,1,
+multihoprag,rrf_bge_two_pass,q0141,"After the Polygon report on Valve's updates to the Steam Deck hardware published on November 9, 2023, and the Engadget review of the Steam Deck OLED version published on the same date, was the reporting on Valve's improvements to the Steam Deck hardware consistent?","Yes, the reporting was consistent. Both reports characterized the Steam Deck OLED as an improved refresh rather than a Steam Deck 2, noting that it maintains the same core performance, raw power, and optimization targets for developers. 
+
+Both outlets also consistently reported the following hardware improvements:
+* **Display:** An HDR OLED screen with a peak brightness of 1,000 nits (compared to 400 nits on the original).
+* **Battery:** Longer/better battery life.
+* **Connectivity:** Improved/faster Wi-Fi and Bluetooth (Engadget noted improved Wi-Fi and Bluetooth antennas, while Polygon noted faster Wi-Fi and a stand-alone Bluetooth module).
+* **Weight:** A lighter build (Engadget specified it is about 30 grams less).
+
+Additionally, Engadget reported that the device's thumbsticks, haptics, thermals, and chip were better, achieving its performance targets through a more efficient die-shrunk custom AMD APU.","Steam Deck OLED review: It's just better
+
+Engadget (2023-11-09). The first thing to know about the Steam Deck OLED is that it’s not the Steam Deck 2. The Steam Deck OLED is a mid-cycle refresh from Valve, similar to the Switch OLED upgrade, but there’s a lot more going on internally here. Its screen is better, its battery life is better, its thumbsticks are better, the haptics are better, and its chip and thermals are better. One thing that hasn’t changed is its form factor — this is still one of the biggest babies on the handheld block.
+
+The new Steam Deck’s main upgrade is its OLED screen, which replaces the original LCD and, crucially, has native support for HDR and faster frame rates. The OLED also has smaller bezels, making the display larger at 7.4 inches, compared with the original 7-inch screen.
+
+Valve Valve Steam Deck OLED SCORE 89 Engadget 89 Critics - Not yet scored N/A Users ",faithfulness,gemini-3.7-flash,1.0,1,1,
+docsqa,rrf_bge,p01,Why was the retrieval regression easy to miss even though answers looked better?,"Based on the provided context, the retrieval regression was easy to miss because **generation-side faithfulness improved** over the exact same period (rising from 43% to 86.2%). 
+
+Because of this improvement in generation quality, the retrieval drop was not obvious when looking at faithfulness or abstention metrics alone.","Rag eval.md › how can I evaluate my rag model, some python modules that can help me to evaluate my rag model best of them > Interpret failures correctly
+
+## Interpret failures correctly
+
+| Observed result | Likely problem |
+| :-- | :-- |
+| Low context recall | Poor embeddings, bad chunking, insufficient $k$, missing documents |
+| Low context precision | Too many irrelevant chunks, weak reranker, excessive $k$ |
+| High context scores but low faithfulness | Prompting or generation problem |
+| High faithfulness but low correctness | Retrieved context is incomplete or incorrect |
+| High correctness but low answer relevancy | Answer is overly verbose or poorly focused |
+| Good offline scores but poor user feedback | Evaluation dataset does not represent real usage |
+| Good retrieval but hallucinated citations | Citation extraction or answer-generation problem |
+| Good scores on easy questions",faithfulness,gemini-3.7-flash,1.0,1,1,
+multihoprag,rrf_bge,q0331,"What company is at the center of claims involving manipulation of search results to maximize ad revenue according to Megan Grey in 'The Age', ranking local search results based on relevance, distance, and prominence as reported by 'The Verge', and is accused by a news publisher in a class action antitrust suit covered by 'TechCrunch' for harming their bottom line through anticompetitive practices?","Based on the provided context, the company at the center of the claims according to Megan Gray/Grey in *The Age* is **Google** (which she alleged manipulates search queries/results to maximize ad revenue). 
+
+However, the provided evidence contains **no mention** of reports by *The Verge* regarding ranking local search results based on ""relevance, distance, and prominence,"" nor does it mention a class action antitrust suit filed by a ""news publisher"" covered by *TechCrunch* for harming their bottom line.","Is Google Search better than the rest? And is that fair?
+
+The Age (2023-10-22). The process of this test did remind me how much data Google collects — not just my searches but anything I say to a smart speaker, any search result or ad that I click — which will be a point in favour of DuckDuckGo for some, even if it didn’t perform as well and is harder to read. The data collection does also mean that Google (not just search but also mobile widgets and other services) personalises to me more effectively. Loading Bing has overhauled its layout over the past year to be very graphic and augmented by generative AI explanations from its chatbot. I like the idea of being able to ask follow-up questions in searches this way, but in practice it’s not really there yet. In a search for “kids BMX bike green” (Google did pretty well and DuckDuckGo ignored the green part), Bing Chat offered a compariso",faithfulness,gemini-3.7-flash,1.0,1,1,
+ragbench-covidqa,rrf_bge_two_pass,r0023,"Is oral swab for detecting 2019-nCOV infection, sufficient?","Based on the supported facts, the presence of viral antigen in oral swabs was used as a detection standard for 2019-nCoV, and two consecutive negative oral swabs taken within a 24-hour interval were officially considered to indicate viral clearance by patients. 
+
+However, whether oral swabs alone are sufficient or if other specimen types and shedding routes are required for accurate detection is missing from the provided evidence.","Title: Molecular and serological investigation of 2019-nCoV infected patients: implication of multiple shedding routes
+Passage: Like SARS-CoV, 2019-nCoV induced pneumonia through respiratory tract by clinical observation. Therefore, the presence of viral antigen in oral swabs was used as detection standard for 2019-nCoV. Similarly, two times of oral swabs negative in a 24-h interval was considered as viral clearance by patients officially. ||| Title: Pandemic (H1N1) 2009 Risk for Frontline Health Care Workers
+Passage: swabs were only taken when patients were symptomatic. Previously, virus isolation has been the gold standard for infl uenza detection but RT-PCR is now considered to be more sensitive and specifi c. A previous study by some of the current authors has shown that seroconversion occurs in 80%-90% of serum samples if they are tested a suffi cient time after infection . Nasal sw",faithfulness,gemini-3.7-flash,1.0,1,0,
+docsqa,rrf_bge_two_pass,m06,"Which request fields feed the cache key, and which identifier is deliberately left out?","Based on the provided facts, the request fields that feed the cache key are:
+- `query`
+- `tenant_id`
+- sorted `permission_scope`
+- sorted `document_ids`
+- `top_k`
+- `model`
+- `embedding_model`
+- `embedding_dim`
+- `reranker`
+
+The identifier that is deliberately left out (excluded) is the user ID.","docs/CACHE_SCHEDULER_AGENTIC.md › Cache, Scheduler, and Corrective Agentic RAG > 1. Response Cache Layer (src/deepcontext/cache.py) > Key design
+
+### Key design
+
+Keys are `{CACHE_NAMESPACE}:{operation}:{sha256(canonical_json)}` where the JSON
+payload includes every field that can change the answer:
+
+- `query`, `tenant_id`, sorted `permission_scope`, sorted `document_ids`
+- `top_k`, `model`, `embedding_model`, `embedding_dim`, `reranker`
+
+Sorted lists make keys stable regardless of input ordering. User IDs are
+deliberately excluded from key material — personalization is resolved inside
+the pipeline via embedding/reranker preferences that _are_ in the key. ||| README.md › ⚡ Deep Context Platform > ⚡ Core Features > 5. Response Cache Layer (Redis or In-Memory)
+
+### 5. Response Cache Layer (Redis or In-Memory)
+
+Whole-answer caching at the RAG pipeline level (`question → answer + citations`),",faithfulness,gemini-3.7-flash,1.0,1,1,
+docsqa,rrf_bge_two_pass,p07,Why is a high faithfulness score alone not enough to trust a RAG system?,"A high faithfulness score alone is not enough to trust a RAG system for the following reasons:
+
+* **It does not guarantee correctness:** A high faithfulness score can occur alongside low correctness if the context that was retrieved is incorrect or incomplete.
+* **It can hide retrieval regressions:** A high faithfulness score (or a generation-only improvement) can mask a regression in the retrieval component. 
+* **Faithfulness does not reflect retrieval performance:** Retrieval regressions are not always obvious from faithfulness or abstention numbers by themselves, as faithfulness can actually improve even when retrieval metrics (such as Hit@5) experience a significant drop.","Rag eval.md › how can I evaluate my rag model, some python modules that can help me to evaluate my rag model best of them > Interpret failures correctly
+
+## Interpret failures correctly
+
+| Observed result | Likely problem |
+| :-- | :-- |
+| Low context recall | Poor embeddings, bad chunking, insufficient $k$, missing documents |
+| Low context precision | Too many irrelevant chunks, weak reranker, excessive $k$ |
+| High context scores but low faithfulness | Prompting or generation problem |
+| High faithfulness but low correctness | Retrieved context is incomplete or incorrect |
+| High correctness but low answer relevancy | Answer is overly verbose or poorly focused |
+| Good offline scores but poor user feedback | Evaluation dataset does not represent real usage |
+| Good retrieval but hallucinated citations | Citation extraction or answer-generation problem |
+| Good scores on easy questions",faithfulness,gemini-3.7-flash,1.0,1,1,
+ragbench-covidqa,rrf_bge_two_pass,r0108,What was the primary threatening clinical finding in patients infected with SARS-CoV and MERS-CoV?,"Based on the provided facts, the clinical findings for each are:
+
+* **SARS:** Patients usually presented with fever and respiratory symptoms, and approximately 20–30% required mechanical ventilation.
+* **MERS:** In humans, it is mostly known as a lower respiratory tract disease involving fever, cough, breathing difficulties, and pneumonia. This may progress to acute respiratory distress syndrome, multiorgan failure, and death in 20% to 40% of infected individuals.
+
+**Missing details:** The provided evidence does not explicitly identify what the single ""primary threatening clinical finding"" was across patients infected with SARS-CoV and MERS-CoV.","Title: Emerging Infections and Pertinent Infections Related to Travel for Patients with Primary Immunodeficiencies
+Passage: Severe acute respiratory syndrome coronavirus and the Middle East respiratory syndrome coronavirus are two zoonotic coronaviruses. The SARS pandemic in 2002-2003 resulted in 8096 reported cases in 27 countries. No further SARS cases were reported after the pandemic except isolated cases linked to laboratory accidents. Patients usually presented with fever and respiratory symptoms, but occasionally had diarrhea and vomiting. About 20-30% of SARS patients required mechanical ventilation, with a case fatality rate of about 9% . ||| Title: Molecular and serological investigation of 2019-nCoV infected patients: implication of multiple shedding routes
+Passage: Like SARS-CoV, 2019-nCoV induced pneumonia through respiratory tract by clinical observation. Therefore, the pres",faithfulness,gemini-3.7-flash,1.0,1,0.5,
+docsqa,rrf_bge,d08,What character budget was set for planner synthesis context to avoid Groq TPM overflows?,"Based on the provided context, the synthesis context in `planner.py` was budgeted to **12,000 chars** (~3,000 tokens) to prevent Groq TPM overflows.","docs/SYSTEM_HANDOFF.md › Deep Context Platform: Complete System Evolution & Engineering Handoff > 2. Chronological Iterations & Problem Diagnoses > Iteration 5: Groq Rate Limit (429 / 200k TPD) Quota Signaling
+
+### Iteration 5: Groq Rate Limit (429 / 200k TPD) Quota Signaling
+- **Problem:** Groq's on-demand free tier enforces a 200,000 tokens/day (TPD) quota. When reached, requests fail with `429 - Rate limit reached on tokens per day (TPD). Please try again in Xm Ys`.
+- **Implementation:**
+  - **Parser (`parse_rate_limit_error` in `llm_client.py`):**
+    - Parses `retry_after` (e.g. `2m 5s`), `limit`, `used`, and `quota_type` (TPD vs TPM).
+    - Stores global state in `LLMClient.global_rate_limit`.
+  - **API Endpoint (`GET /v1/quota/status` in `routes_rag.py`):**
+    - Returns structured JSON for frontend and background monitoring.
+  - **UI Header Quota Pill:**
+    - Displays `● Groq AP",faithfulness,gemini-3.7-flash,1.0,1,1,
+multihoprag,rrf_bge_two_pass,q0338,"Does the Yahoo News article praise the Biden administration's effectiveness on climate issues, while the Engadget article suggests that society is being positively impacted by the interconnectedness of climate change, the modern internet, and authoritarianism?","No. 
+
+Based on the provided facts:
+- The Yahoo News article does not praise the Biden administration's effectiveness; instead, it states that Peter Kalmus thinks ""the Biden administration is clueless on climate,"" has ""grown increasingly frustrated with President Joe Biden,"" and believes Biden's climate bill ""does too little to shut out the fossil fuel industry."" Evidence that the article praises the administration's effectiveness on climate issues is missing.
+- The Engadget article does not suggest society is being positively impacted; instead, it states that Holly Jean Buck explores how accelerating climate change, the modern internet, and authoritarianism's recent renaissance influence and amplify one another's negative impacts ""to the detriment of us all."" Evidence that the article suggests society is being positively impacted by their interconnectedness is missing.","A scientist reckons with climate grief
+
+Yahoo News (2023-12-24). BELFAST, Maine — How does it feel to be a climate scientist in 2023?
+
+Let’s set the scene. Hundreds of picnickers are sprawled across a lawn speckled with colorful blankets. Yachts bob in the bay. Guitars blare, children wrestle and dancers twirl across a concert lawn in the golden glow of a dying summer night.
+
+It’s a picture-perfect August evening for the seaside town of Belfast’s “Summer Nights” concert series.
+
+Off to the side, Peter Kalmus sits alone. His eyes are closed. His toes are tucked beneath his body. He’s catching an occasional side-eye from onlookers.
+
+“When I’m meditating, I don’t feel anxious,” Kalmus later says, explaining that he strives for two hours of meditation a day to keep his climate anxiety at bay. Otherwise, “it’s completely overwhelming.”
+
+Many of us avoid thinking too deeply about the worst sce",faithfulness,gemini-3.7-flash,1.0,1,1,
+docsqa,rrf_bge,d02,What full-pipeline Hit@5 did the GoT benchmark show before and after the 0.70/0.30 blend change?,"On the 755-page GoT corpus and 36-query evaluation, the full-pipeline Hit@5 was:
+
+* **Before the change (0.60/0.40 blend):** 87.1%
+* **After the change (0.70/0.30 blend):** 61.3%","docs/RAG_QUALITY_NEXT.md › DeepContext RAG Quality Next Steps > Status as of this commit > Fixed: reranker blend regression (root cause identified and reverted)
+
+### Fixed: reranker blend regression (root cause identified and reverted)
+
+A later commit on this branch (`50fff08`) changed the reranker consensus blend from:
+
+```text
+0.60 * norm_rrf + 0.40 * norm_raw, consensus_boost = 0.15 for top-3
+```
+
+to:
+
+```text
+0.70 * norm_rrf + 0.30 * norm_raw, consensus_boost = 0.20 (top-3) / 0.08 (top-6)
+```
+
+On the identical 755-page GoT corpus and identical 36-query `tests/eval_dataset.json`,
+this dropped full-pipeline Hit@5 from **87.1% to 61.3%**, with these category-level
+losses:
+
+| Category | Before (0.60/0.40) | After (0.70/0.30) | Delta |
+|---|---:|---:|---:|
+| Direct Factual Hit@5 | 100.0% | 75.0% | -25 |
+| Citation/Appendix Hit@5 | 100.0% | 75.0% | -25 |
+| Multi-Hop Hit@5 | 87.5% | 62.5% |",faithfulness,gemini-3.7-flash,1.0,1,1,

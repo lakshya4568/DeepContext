@@ -1,0 +1,13 @@
+{
+ "branch": "fix/search-gaps (search fixes P1-P3) on top of eval/public-benchmarks",
+ "code commit": "dd82fa6 (see git log)",
+ "original-code baseline": "eval/results/ (commit 71cb773 for the harness; ts_rank word search, prefix-120 dedup, equal RRF votes)",
+ "lexical channel": "Okapi BM25 over the Postgres tsvector (k1=1.2, b=0.75, Lucene IDF)",
+ "duplicate removal": "exact normalised-text hash (DEDUP_MODE=content_hash)",
+ "RRF votes (dense:lexical)": "1.0 : 0.1 (RRF_WEIGHT_LEXICAL=0.1, chosen on dev questions)",
+ "generator": "gemini-3.8-flash",
+ "judge": "gemini-3.7-flash (temperature 0)",
+ "embeddings": "gemini-embedding-2, 768-d, Vertex AI global endpoint",
+ "reranker": "BAAI/bge-reranker-v2-m3 (self-hosted on Colab GPU via EVAL_RERANK_URL)",
+ "storage": "PostgreSQL 15 + pgvector, database deepcontext_eval"
+}

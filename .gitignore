@@ -17,3 +17,13 @@ build/
 *.sqlite
 .env
 !.env.example
+
+# Benchmark harness local artifacts (embeddings/LLM caches, downloaded datasets, indexes)
+eval/cache/
+*.log
+# variant B outputs (summaries of source documents, possibly copyrighted PDFs): local until reviewed
+eval/results_variant_b/
+# ParadeDB lexical-channel runs (rows of the PDF sets carry queries derived from copyrighted PDFs): local until reviewed
+eval/results_paradedb/
+# Runs of the benchmark on main's own code (PDF-set rows carry book-derived queries): local until reviewed
+eval/results_main/

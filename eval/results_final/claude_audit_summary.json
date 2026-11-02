@@ -1,0 +1,65 @@
+{
+ "labeller": "Claude (Anthropic model) - NOT human labels",
+ "n_items": 50,
+ "n_labelled": 50,
+ "faithfulness": {
+  "n": 50,
+  "claude_mean": 0.99,
+  "gemini_judge_mean": 0.9881111111111112,
+  "mean_abs_diff": 0.021888888888888892,
+  "pearson_r": -0.05101590696630643,
+  "spearman_rho": -0.05262210490598266,
+  "binary_agreement_at_0.5": 1.0,
+  "judge_more_lenient_share": 0.02,
+  "judge_stricter_share": 0.0
+ },
+ "correctness": {
+  "n": 44,
+  "claude_mean": 0.7954545454545454,
+  "gemini_judge_mean": 0.17227272727272727,
+  "mean_abs_diff": 0.6231818181818182,
+  "pearson_r": 0.3319703915760559,
+  "spearman_rho": 0.35416910482506203,
+  "binary_agreement_at_0.5": 0.29545454545454547,
+  "judge_more_lenient_share": 0.0,
+  "judge_stricter_share": 0.7727272727272727
+ },
+ "correctness_rubric": {
+  "n": 50,
+  "claude_mean": 0.78,
+  "gemini_judge_mean": 0.77,
+  "mean_abs_diff": 0.05,
+  "pearson_r": 0.9096941392421188,
+  "spearman_rho": 0.9211517165005538,
+  "binary_agreement_at_0.5": 0.94,
+  "judge_more_lenient_share": 0.04,
+  "judge_stricter_share": 0.06
+ },
+ "faithfulness_by_dataset": {
+  "docsqa": {
+   "n": 10,
+   "claude_mean": 1.0,
+   "gemini_judge_mean": 1.0
+  },
+  "multihoprag": {
+   "n": 12,
+   "claude_mean": 1.0,
+   "gemini_judge_mean": 0.9791666666666666
+  },
+  "pdf-got": {
+   "n": 6,
+   "claude_mean": 1.0,
+   "gemini_judge_mean": 0.9888888888888889
+  },
+  "pdf-quantum": {
+   "n": 10,
+   "claude_mean": 1.0,
+   "gemini_judge_mean": 0.9833333333333334
+  },
+  "ragbench-covidqa": {
+   "n": 12,
+   "claude_mean": 0.9583333333333334,
+   "gemini_judge_mean": 0.9907407407407408
+  }
+ }
+}

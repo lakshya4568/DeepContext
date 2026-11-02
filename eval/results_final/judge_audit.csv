@@ -1,0 +1,467 @@
+dataset,config,qid,query,answer,context_snippet,metric,judge_model,judge_score,rubric_verdict,rubric_score,claude_faithfulness,claude_correctness,human_label
+ragbench-covidqa,rrf_bge_two_pass,r0072,What is the transmission of MERS-CoV is defined as?,"Based on the provided facts, the transmission of MERS-CoV is defined as:
+
+* Sporadic
+* Intra-familial
+* Often healthcare associated
+* Inefficient
+* Requiring close and prolonged contact","Title: MERS coronavirus: diagnostics, epidemiology and transmission
+Passage: MERS-CoV was found and characterized because of its apparent association with severe, and therefore more obvious, illness in humans; we were the canaries in the coal mine. Sero-assays and prospective cohort studies have yet to determine the extent to which milder or asymptomatic cases contribute to MERS-CoV transmission chains. However, transmission of MERS-CoV is defined as sporadic , intra-familial, often healthcare associated, inefficient and requiring close and prolonged contact In a household study, 14 of 280 contacts of 26 MERS-CoV positive index patients were RNA or antibody positive; the rate of general transmission, even in outbreaks is around 3 % ||| Title: MERS coronavirus: diagnostics, epidemiology and transmission
+Passage: of ""contact"" during these interviews has been defined for one study . Despite",faithfulness,gemini-3.7-flash,1.0,correct,1.0,1.0,1.0,
+docsqa,engine_as_shipped,m08,Name two of the compounding bugs that caused the Page 616 miss.,"Two of the compounding bugs are:
+
+1. **Score Inversion in Cross-Encoder Reranker**: SQLite FTS5 `bm25()` returns negative scores whereas dense cosine similarity yields positive values; multiplying raw scores by 0.4 resulted in BM25 matches receiving negative scores and being buried beneath irrelevant vector matches.
+2. **Punctuation & Curly Quotes in FTS**: Quotes containing punctuation and unicode curly quotes caused naive splitting to fail FTS5 word boundaries.
+
+*(Note: The supported facts also identify **Multi-Page Parent Chunking Page Attribution** and **Agentic Planner Conversational Drift** as compounding bugs).*","### Iteration 2: Needle-in-a-Haystack Diagnostic Lab & Page 616 Deep-Dive
+- **Problem:** User reported that searching for the exact line from Page 616 of `Eval 1.pdf` (*“They seem ferocious enough,” Ser Kevan said.*) was completely missed by the pipeline.
+- **Root Cause Analysis (4 Compounding Bugs Identified):**
+  1. **Score Inversion in Cross-Encoder Reranker:**
+     - SQLite FTS5 `bm25()` returns negative scores (e.g. $-17.41$), whereas dense cosine similarity returns positive values ($+0.59$).
+     - The reranker multiplied raw score by $0.4$, assigning deep negative scores ($-6.96$) to BM25 matches and burying them under irrelevant vector matches ($+0.23$).
+  2. **Punctuation & Curly Quotes in FTS:**
+     - Quotes like `“They seem ferocious enough,”` contain unicode curly quotes and punctuation. Naive splitting created tokens `“They` and `enough,”`, failing FTS5 word boundaries.
+  3",faithfulness,gemini-3.7-flash,1.0,correct,1.0,1.0,1.0,
+multihoprag,rrf_bge,q0161,"Between the TechCrunch report on Sam Bankman-Fried's trial and the subsequent report by the same source on the prosecution's allegations against him, was there consistency in the portrayal of the charges he is facing?","Based on the provided context, only one TechCrunch report is included; there is no ""subsequent report by the same source"" provided to compare. (The only other report provided is from *The Verge*). 
+
+Within the single provided TechCrunch report, the charges are consistently described as:
+* Alleged ""fraud and money laundering"" while leading FTX and Alameda.
+* ""Seven counts tied to fraud and money laundering."" 
+
+Because the second TechCrunch report is not provided, there is insufficient evidence to determine consistency between two separate TechCrunch reports.","SBF Trial: The latest updates from the FTX collapse’s courtroom drama
+
+TechCrunch (2023-10-06). SBF trial: Everything to know from the FTX courtroom ahead of his testimony Sam Bankman-Fried is in court for alleged fraud and money laundering while leading crypto exchange FTX and sister company Alameda. Here’s our latest coverage as the case nears its end.
+
+The trial of Bankman-Fried, the former CEO and co-founder of collapsed crypto exchange FTX, is entering its next chapter as proceedings resume Thursday. As confirmed during a teleconference Wednesday, SBF will be taking the stand, along with a handful of other witnesses as the onus shifts toward the defense after the prosecution brought its case to its conclusion.
+
+As former federal prosecutor Josh Naftalis told TechCrunch, SBF taking to the stand in his own trial is a “Hail Mary” ahead of a verdict and potential sentencing for seven co",faithfulness,gemini-3.7-flash,1.0,abstained,0.0,1.0,0.0,
+ragbench-covidqa,rrf_bge_two_pass,r0164,"In addition to oral swabs, which tests detected the presence of 2019-nCOV virus?","Based on the provided facts, in addition to oral swabs, the presence of the 2019-nCoV virus (viral RNA) was detected in:
+
+* **Anal swabs** (where a large amount of viral RNA was detected, with an observed possible shift from oral positive during early infection to anal swab positive during late infection)
+* **A stool sample** (in a case reported from the United States)","Title: Molecular and serological investigation of 2019-nCoV infected patients: implication of multiple shedding routes
+Passage: In the first investigation, we aimed to test whether viral positive can be found in anal swab and blood as well as oral swabs. We conducted a molecular investigation to patients in Wuhan pulmonary hospital, who were detected as oral swabs positive for 2019-nCoV upon admission. We collected blood, oral swabs and anal swabs for 2019-nCoV qPCR test using previously established method . ||| Title: Molecular and serological investigation of 2019-nCoV infected patients: implication of multiple shedding routes
+Passage: through routine surveillance, and thus pose a threat to other people. In contrast, we found viral antibodies in near all patients, indicating serology should be considered for 2019-nCoV epidemiology. A possible shift from oral positive during early infec",faithfulness,gemini-3.7-flash,1.0,partial,0.5,0.5,0.5,
+multihoprag,rrf_bge,q2309,"Who is the individual whose trial, covered by sources like Fortune and TechCrunch, involves allegations of fraud and conspiracy, and who has claimed an inability to manage the rapid expansion of a cryptocurrency exchange and a trading firm?","Based on the provided context:
+
+* The individual whose trial involves allegations of fraud and conspiracy is **Sam Bankman-Fried** (former CEO and co-founder of the crypto exchange FTX and co-founder of trading firm Alameda Research). The coverage in the provided text is from **TechCrunch** (coverage by *Fortune* is not mentioned in the text).
+* Regarding the claim of being in over their heads during the rapid expansion of the companies, his defense attorney, Mark Cohen, depicted Bankman-Fried and his colleagues as being ""in over their heads"" and ""building the plane as they were flying it"" while navigating the challenges of running FTX, building out its systems, managing customer credit risk, and managing hundreds of employees as the exchange expanded.","SBF’s trial starts soon, but how did he — and FTX — get here?
+
+TechCrunch (2023-10-01). SBF’s trial has started, this is how he and FTX got here
+
+The highly anticipated criminal trial for Sam Bankman-Fried, former CEO of bankrupt crypto exchange FTX, started Tuesday to determine whether he’s guilty of seven counts of fraud and conspiracy. And as one former federal prosecutor put it: “The odds seem to be stacked against him at this point.”
+
+The 31-year-old co-founded FTX in 2019; within a few years the once third-largest crypto exchange’s valuation hit $32 billion at its peak. It’s now trying to claw back any funds to distribute to creditors.
+
+But how did the once third-largest crypto exchange get here?
+
+Before FTX, Bankman-Fried co-founded crypto-trading firm Alameda Research in 2017. He co-founded FTX in 2019 as a complement to Alameda, to help bring in revenue and liquidity for the tra",faithfulness,gemini-3.7-flash,1.0,correct,1.0,1.0,1.0,
+multihoprag,rrf_bge_two_pass,q2514,"Does 'The New York Times' article suggest that Emma Hayes is committed to her current role at Chelsea for the remainder of the season, in contrast to the 'Sporting News' article which discusses Graham Potter's tenure at Chelsea as being unsuccessful?","Based on *The New York Times* article, Emma Hayes is committed to her role at Chelsea for the remainder of the season; the article states that she will remain exclusively with the club through the end of their WSL campaign and the Champions League season, and quotes her stating, ""I’m here until the end... My full focus and attention is on what I do for Chelsea."" 
+
+However, details regarding the *Sporting News* article and its discussion of Graham Potter's tenure at Chelsea as being unsuccessful are missing from the provided evidence.","How U.S. Women’s Soccer Team Lured Emma Hayes Away From Chelsea
+
+The New York Times (2023-11-15). Chelsea Women had created a frenzy. On Nov. 4, the English club released a statement saying their coach Emma Hayes was leaving at the end of the season to “pursue a new opportunity outside of the Women’s Super League and club football.” Hayes had just entered her second decade in charge of the club, and few knew where she would land next.
+
+Advertisement
+
+That same day The Athletic, among others, reported that Hayes’ next job would be with the U.S. women’s national team, leading a four-time World Cup and Olympic gold medal-winning program into a new era. On Tuesday, U.S. Soccer made her appointment official.
+
+Hayes, who previously won six WSL titles in England, will become the 10th full-time coach of the U.S., but not until her final season with Chelsea is complete next May. Sporting director",faithfulness,gemini-3.7-flash,1.0,partial,0.5,1.0,0.5,
+multihoprag,engine_as_shipped,q1068,"Does the article from Business Today | Latest Stock Market And Economy News India suggest that a major attack against Israel requires intelligence support, while the article from Fortune claims that Israel controls the entry of food, fuel, and medical supplies into Gaza, indicating a difference in the focus of Israel's security and humanitarian control measures?","Based on the provided facts:
+
+* In the *Business Today* article, a user stated that no one can carry out such a major attack against Israel without intelligence support.
+* The *Fortune* article reports that the food, fuel, and medical supplies used by people in Gaza all first pass through Israel, and that Israel controls physical checkpoints that monitor the entry and exit of people and trucks, limiting the materials entering Gaza. Additionally, *Fortune* states that on October 10, 2023, Israel stopped allowing deliveries of food, fuel, and other supplies to Gaza's residents, halting all food, fuel, and medical supplies from entering the region.
+
+However, the requested detail regarding whether this indicates a difference in the focus of Israel's security and humanitarian control measures is missing from the evidence; neither article makes or suggests that claim.","&#039;Massive intel failure by Mossad&#039;: Hamas&#039; surprise attack on Israel shocks internet
+
+Business Today | Latest Stock Market And Economy News India (2023-10-07). Hamas' surprise attack on Israel has shocked many who are now questioning the country's famed intelligence agency Mossad, which is known for its intelligence-gathering capability. For some, the belief that Mossad was among the best in the spying world was shattered today when Hamas carried out the biggest coordinated attack in Israel and captured some territory in southern Israel. It is not the attack that has surprised people but the scale at which Hamas operated and got control of some military bases and soldiers.
+
+Also Read: Israel at war: Hamas cells, military compounds destroyed, US backs Tel Aviv; all you need to know
+
+Younis Tirawi, who reports on Palestinian Affairs, said that Hamas militants had taken over S",faithfulness,gemini-3.7-flash,1.0,incorrect,0.0,1.0,0.5,
+docsqa,rrf_bge_two_pass,d09,Which model does the reranker upgrade guide propose as the real trained cross-encoder?,"Based on the provided facts, the reranker upgrade guide proposes **'BAAI/bge-reranker-v2-m3'** as the real trained cross-encoder (used in the introduced `LocalCrossEncoderReranker` to replace the hand-written n-gram/overlap 'CrossEncoderReranker').","# DeepContext Reranker Upgrade: Heuristic → Real Cross-Encoder
+
+**Branch:** `feat/rag-quality-generation`  
+**Target:** Replace the hand-written n-gram/overlap ""CrossEncoderReranker"" with a real trained cross-encoder (`BAAI/bge-reranker-v2-m3`) while keeping the hybrid RRF + consensus-protection pipeline intact.
+
+--- ||| ### 4.1 Add the new reranker class
+
+**File:** `src/deep_context/retrieval/reranker.py`
+
+Add this import at the top:
+
+```python
+from sentence_transformers import CrossEncoder
+```
+
+Add this class after `CrossEncoderReranker` and before `GeminiSemanticReranker`:
+
+```python
+_bge_model: CrossEncoder | None = None
+
+def _get_bge_reranker() -> CrossEncoder:
+    """"""Lazy-load BGE-reranker-v2-m3 to avoid import-time model download.""""""
+    global _bge_model
+    if _bge_model is None:
+        _bge_model = CrossEncoder(""BAAI/bge-reranker-v2-m3"", max_length=512)
+    return _bge_model
+
+",faithfulness,gemini-3.7-flash,1.0,correct,1.0,1.0,1.0,
+multihoprag,rrf_bge,q1068,"Does the article from Business Today | Latest Stock Market And Economy News India suggest that a major attack against Israel requires intelligence support, while the article from Fortune claims that Israel controls the entry of food, fuel, and medical supplies into Gaza, indicating a difference in the focus of Israel's security and humanitarian control measures?","Based on the provided context:
+
+* **Business Today | Latest Stock Market And Economy News India** includes user commentary suggesting that ""no one can carry out such a major attack against Israel without intelligence support"" and questions who provided Hamas with that intelligence while asking if the Israeli army and Mossad were asleep.
+* **Fortune** states that Israel controls the entry and exit of people and trucks through two physical checkpoints, and that the food, fuel, and medical supplies used by people in Gaza first pass through Israel, with Israel limiting the kind and quantity of materials entering the territory (and halting them following the October 7 attack). 
+* **Difference in focus:** While both articles report these individual facts, the provided texts do not explicitly state or analyze that this indicates a difference in the focus of Israel's security and humanitarian control measures.","&#039;Massive intel failure by Mossad&#039;: Hamas&#039; surprise attack on Israel shocks internet
+
+Business Today | Latest Stock Market And Economy News India (2023-10-07). Hamas' surprise attack on Israel has shocked many who are now questioning the country's famed intelligence agency Mossad, which is known for its intelligence-gathering capability. For some, the belief that Mossad was among the best in the spying world was shattered today when Hamas carried out the biggest coordinated attack in Israel and captured some territory in southern Israel. It is not the attack that has surprised people but the scale at which Hamas operated and got control of some military bases and soldiers.
+
+Also Read: Israel at war: Hamas cells, military compounds destroyed, US backs Tel Aviv; all you need to know
+
+Younis Tirawi, who reports on Palestinian Affairs, said that Hamas militants had taken over S",faithfulness,gemini-3.7-flash,1.0,partial,0.5,1.0,0.5,
+ragbench-covidqa,rrf_bge_two_pass,r0070,Why  have bats received attention in recent years?,"Based on the supported facts, bats have received attention in recent years for the following reasons:
+
+* **Role as pathogen reservoirs:** Several studies have highlighted their prominent role as reservoirs for pathogens. 
+* **High viral diversity:** Bats host more viruses per species than rodents, which makes them an interesting system for research in disease ecology and public health.
+* **Human pathogen potential:** The viruses that bats host are the best studied specifically because of their potential to act as human pathogens.
+* **Avoidance of pathology:** Recent research advances have focused on the molecular mechanisms that allow bats to avoid disease from virulent pathogens.
+* **Impact of unique antiviral defenses:** Researchers have recently explored how the unique antiviral defenses of bats affect the viruses themselves. This research includes the implications for zoonotic emergence and the evolution of faster-transmitting viruses that can impact humans.","Title: Bat Flies and Their Microparasites: Current Knowledge and Distribution
+Passage: Bats are the second most diverse mammalian group after rodents, with ∼1,390 recognized species across 227 genera . Many bat species play keystone roles in ecosystems, where they are essential to pollination, seed dispersal, and pest control . Several studies have also highlighted their prominent role as pathogen-reservoirs ; viruses being the best studied due to their potential as human pathogens . Bats host more viruses per species than rodents, making them an interesting system for both disease ecology and public health research . ||| Title: Accelerated viral dynamics in bat cell lines, with implications for zoonotic emergence
+Passage: The experiments made use of cells from one bat species -the black flying fox -in which the interferon pathway is always on, and another -the Egyptian fruit bat -in whi",faithfulness,gemini-3.7-flash,1.0,correct,1.0,1.0,1.0,
+docsqa,rrf_bge,m02,"Which two layers does the Rag eval guide say a RAG evaluation should be split into, and which Python library does it suggest starting with?","Based on the provided guide, a RAG evaluation should be split into two layers:
+1. **Retrieval quality**
+2. **Answer quality**
+
+The guide suggests starting with **Ragas** as the Python library for metric-based evaluation.","# how can I evaluate my rag model, some python modules that can help me to evaluate my rag model best of them
+
+The best practical setup is to evaluate your RAG system in **two layers**: retrieval quality and answer quality. For Python, I recommend starting with **Ragas** for metric-based evaluation, then adding **DeepEval** if you want pytest/CI integration and broader LLM testing. Ragas provides metrics for evaluating RAG components systematically rather than relying only on manual “vibe checks.”[^1] ||| ## My recommendation
+
+For your AI/RAG projects, use this stack:
+
+| Requirement | Recommended tool |
+| :-- | :-- |
+| Offline RAG metrics | Ragas |
+| Automated regression tests | DeepEval |
+| Runtime traces | Phoenix |
+| Prompt/model experiments | Promptfoo |
+| Custom retrieval metrics | `scikit-learn`, `ranx`, or your own code |
+
+If you want only one library, choose **Ragas**. If you wan",faithfulness,gemini-3.7-flash,1.0,correct,1.0,1.0,1.0,
+ragbench-covidqa,engine_as_shipped,r0071,What is the result of all species tests of phage particles?,"Based on the supported facts, the result is that the phage particle is immunogenic without adjuvant in all species tested to date, which include:
+
+- Mice
+- Rats
+- Rabbits
+- Guinea pigs
+- Fish
+- Non-human primates
+- Humans","Title: Beyond phage display: non-traditional applications of the filamentous bacteriophage as a vaccine carrier, therapeutic biologic, and bioconjugation scaffold
+Passage: Although our understanding of the immune response against the filamentous phage pales in comparison to classical model antigens such as ovalbumin, recent work has begun to shed light on the immune mechanisms activated in response to phage vaccination . The phage particle is immunogenic without adjuvant in all species tested to date, including mice , rats , rabbits , guinea pigs , fish , non-human primates , and humans . Various routes of immunization have been employed, including oral administration as well as subcutaneous , intraperitoneal , intramuscular , intravenous , and intradermal injection ; no published study has directly ||| Title: Frequency and Fitness Consequences of Bacteriophage Φ6 Host Range Mutations
+Pa",faithfulness,gemini-3.7-flash,1.0,incorrect,0.0,1.0,0.0,
+ragbench-covidqa,rrf_bge_two_pass,r0218,what will the investigation of external subdomain reveal?,"Based on the provided facts, the investigation of the soluble variable external subdomain region will reveal:
+
+- Its receptor usage
+- Its interspecies transmission
+- Its pathogenesis","Title: Genomic characterization of the 2019 novel human-pathogenic coronavirus isolated from a patient with atypical pneumonia after visiting Wuhan
+Passage: subunit of 2019-nCoV shares around 70% identity to that of the two bat SARS-like CoVs and human SARS-CoV ), the core domain of RBD are highly conserved ). Most of the amino acid differences of RBD are located in the external subdomain, which is responsible for the direct interaction with the host receptor. Further investigation of this soluble variable external subdomain region will reveal its receptor usage, interspecies transmission and pathogenesis. Unlike 2019-nCoV and human SARS-CoV, most known bat SARSr-CoVs have two stretches of deletions in the spike receptor binding domain when compared with that of human SARS-CoV. But some ||| Title: Is countries’ transparency associated with gaps between countries’ self and external evalua",faithfulness,gemini-3.7-flash,1.0,partial,0.5,1.0,0.0,
+multihoprag,engine_as_shipped,q2494,"Does the TechCrunch article claim that Google's release of the Gemini Pro model was incomplete in comparison to the full Gemini Ultra model, while the TechCrunch article on anticompetitive behavior and The Verge article on app distribution both discuss Google's control over different aspects of their platform, with one addressing news content and ad revenue and the other focusing on app distribution and payment systems?","Based on the supported facts, the provided text does not contain a TechCrunch article claiming that Google's release of the Gemini Pro model was incomplete compared to the full Gemini Ultra model, nor does it contain an article from The Verge on app distribution. 
+
+However, the supported facts do show that:
+- A TechCrunch article on anticompetitive behavior discusses Google's alleged anticompetitive practices regarding news publishers' content, readers, and ad revenue.
+- Another TechCrunch article (not The Verge) discusses antitrust claims concerning the distribution of apps to Android users and the market for payment processing solutions and billing systems.","News publisher files class action antitrust suit against Google, citing AI’s harms to their bottom line
+
+TechCrunch (2023-12-15). A new class action lawsuit filed this week in the U.S. District Court in D.C. accuses Google and parent company Alphabet of anticompetitive behavior in violation of U.S. antitrust law, the Sherman Act, and others, on behalf of news publishers. The case, filed by Arkansas-based publisher Helena World Chronicle, argues that Google “siphons off” news publishers’ content, their readers and ad revenue through anticompetitive means. It also specifically cites new AI technologies like Google’s Search Generative Experience (SGE) and Bard AI chatbot as worsening the problem.
+
+In the complaint, Helena World Chronicle, which owns and publishes two weekly newspapers in Arkansas, argues that Google is “starving the free press” by sharing publishers’ content on Google, losi",faithfulness,gemini-3.7-flash,1.0,incorrect,0.0,1.0,0.0,
+ragbench-covidqa,rrf_bge,r0125,What is archazolid?,"Based on the provided context, **archazolid** (such as Archazolid A and B) is a natural compound that serves as a highly potent and specific inhibitor of vacuolar-type ATPases (v-ATPases). 
+
+Key details provided include:
+* **Origin and Production:** It was first isolated from the myxobacterium *Archangium gephyra* and can be produced either by fermentation or total synthesis.
+* **Mechanism of Action:** It inhibits v-ATPase at low nanomolar concentrations by binding to subunit c of the $V_o$ complex. Its biological activity is comparable to the v-ATPase inhibitors bafilomycin and concanamycin.
+* **Applications:** It can be used as a research tool to study the consequences of v-ATPase inhibition and as a lead for drug development.
+* **Pharmacological Effects in Cancer Research:** 
+  * Reduces the migration of different invasive tumor cells *in vitro* and inhibits cancer cell metastasis *in vivo* in a breast tumor mouse model.
+  * Activates pathways of cellular stress response and apoptosis in highly invasive tumor cells.
+  * Selectively induces the generation of tumor necrosis factor $\alpha$ in classically activated macrophages, which may indirectly promote tumor suppression.
+  * Increases tumor cell adhesion to endothelial cells by accumulating extracellular collagen.","Title: The vacuolar-type ATPase inhibitor archazolid increases tumor cell adhesion to endothelial cells by accumulating extracellular collagen
+Passage: years. Archazolid A and B are highly potent and specific inhibitors of v-ATPases . They were first isolated from the myxobacterium Archangium gephyra . These compounds inhibit v-ATPase at low nanomolar concentrations by binding to the subunit c of the V o complex. As their biological activity is comparable to the v-ATPase inhibitors bafilomycin and concanamycin , archazolids are natural compounds of high interest that can be used both as a tool to study the consequences of v-ATPase inhibition and as a lead for drug development. Archazolids can be either produced by fermentation or by total synthesis . ||| Title: The vacuolar-type ATPase inhibitor archazolid increases tumor cell adhesion to endothelial cells by accumulating extracellular c",faithfulness,gemini-3.7-flash,1.0,correct,1.0,1.0,1.0,
+ragbench-covidqa,engine_as_shipped,r0029,How do these exact processes ultimately restrict viral infectivity?,"Based on the provided facts, these processes restrict viral infectivity in the following ways:
+
+* **Inhibiting entry, exit, and essential replication pathways:** Antiviral mechanisms block viral replicative processes linked to viral entry and exit. Furthermore, antiviral restriction factors target shared, essential structures or pathways required for replication that viruses cannot easily mutate around.
+* **Opposing viral fusion (IFITM multiplexes):** IFITM multiplexes can stop the effective clustering of viral envelopes needed for IAV fusion. They also form a ""meshwork"" inside the membrane's outer leaflet that lowers fluidity, adds rigidity, and causes outward membrane curvature that directly opposes the forces generated by viral fusion machinery.
+* **Degrading viral components (TRIM79a):** TRIM79a limits TBEV replication by degrading NS5.
+
+*(Note: The provided evidence is missing a definition or clear context establishing what ""these exact processes"" specifically refers to in the question.)*","Title: Inhibiting the Ins and Outs of HIV Replication: Cell-Intrinsic Antiretroviral Restrictions at the Plasma Membrane
+Passage: These unavoidable processes are common to all enveloped viruses. Moreover, the lipid envelope is the one component of the virus particle that is not encoded by the virus itself. It is perhaps unsurprising that the mammalian host has evolved multiple antiviral mechanisms whose role is to inhibit viral replicative processes that are associated with entry and exit , necessitating either the evolution of directly encoded countermeasures by the virus, or other mechanisms of resistance or avoidance. Furthermore, these mechanisms are often regulated by type 1 interferons and pattern recognition responses, linking these factors to the wider antiviral immune response. ||| Title: Inhibiting the Ins and Outs of HIV Replication: Cell-Intrinsic Antiretroviral Restrictions ",faithfulness,gemini-3.7-flash,0.8889,correct,1.0,1.0,1.0,
+docsqa,rrf_bge_two_pass,d13,What share of an evaluation set does the Rag eval guide suggest should be adversarial or unanswerable?,"Based on the supported facts, the evaluation guide suggests that roughly 10–20% of the evaluation dataset should consist of adversarial or unanswerable questions.","## Build a proper evaluation dataset
+
+Do not evaluate only five manually selected questions. Create a dataset with roughly:
+
+- 30–50 questions for an initial prototype.
+- 100–300 questions for a more reliable comparison.
+- 10–20% adversarial or unanswerable questions.
+
+Include different categories:
+
+```json
+{
+  ""question"": ""What is the cancellation policy?"",
+  ""reference"": ""Users can cancel within 14 days."",
+  ""relevant_doc_ids"": [""policy_03""],
+  ""difficulty"": ""easy"",
+  ""category"": ""policy""
+}
+```
+
+Include:
+
+- Direct fact questions.
+- Multi-hop questions requiring multiple chunks.
+- Questions containing ambiguous terms.
+- Questions with paraphrased wording.
+- Questions whose answer is not present in the knowledge base.
+- Questions targeting outdated or conflicting documents.
+- Questions requiring citations.
+
+For unanswerable questions, test whether your model says something like:
+
+```text",faithfulness,gemini-3.7-flash,1.0,correct,1.0,1.0,1.0,
+multihoprag,rrf_bge_two_pass,q0079,"Did CBSSports.com change its reporting on the performance of Jessica Andrade by November 11, 2023, stating she has suffered two submission losses during her current three-fight winning streak?","Based on the supported facts, on November 11, 2023, CBSSports.com published an article previewing UFC 295, including Mackenzie Dern vs. Jessica Andrade. In that article, CBSSports.com reported that Andrade has lost her three most recent fights (all by stoppage) and stated that she has four career submission losses, two of which occurred during her current three-fight skid. 
+
+Regarding your specific question:
+- The evidence does not state that CBSSports.com claimed she was on a ""three-fight winning streak""; rather, it reported she was on a three-fight skid.
+- Details are missing regarding whether CBSSports.com changed its reporting on Jessica Andrade's performance by November 11, 2023.","UFC 295 predictions, best bets, odds: Tom Aspinall, Mackenzie Dern among top picks to consider
+
+CBSSports.com (2023-11-11). UFC 295 took a hit when heavyweight champion Jon Jones suffered an injury that forced him out of his planned title defense against Stipe Miocic. Despite the loss of the planned main event, the card features some compelling and evenly-matched fights, including a pair of championship bouts on top when the promotion returns to Madison Square Garden in New York.
+
+In the main event, the vacant light heavyweight title is up for grabs when former champion Jiri Prochazka clashes with former middleweight champion Alex Pereira. Prochazka never lost the belt but was forced to vacate due to a shoulder injury. An injury to Jamahal Hill, who won the title after Prochazka vacated, left the belt up for grabs once again, setting up this bout that sees Pereira as a slight -115 favori",faithfulness,gemini-3.7-flash,1.0,incorrect,0.0,1.0,0.5,
+docsqa,rrf_bge,m04,"Which reranking strategy uses the hosted BGE model, and what does it return?","Based on the provided context:
+
+* **Strategy:** The strategy that uses the hosted BGE model is **`ecohash`** (Hosted Neural), which uses the BGE-reranker-v2-m3 cross-encoder via the EcoHash API (`EcoHashReranker`).
+* **What it returns:** It returns reranked results with **calibrated probabilities** (using zero local compute/memory overhead).","## 5. Reranking: cross-encoder, self-hosted, small
+
+**Choice:** a self-hosted cross-encoder reranker (e.g., a BGE- or Qwen3-Reranker-family model in the ~0.5–4B
+range) called from the retrieval skill between first-stage retrieval and generation.
+
+**Source note:** the source brief cites a 2026 AIMultiple benchmark reporting one reranker raising Hit@1 from
+62.67% to 83%. This is a **single benchmark, single reranker, single dataset** result — treat it as ""reranking
+plausibly matters a lot here,"" not as a number that will reproduce on your corpus. Measure Hit@k on your own
+labeled subset (§4 of `PRD.md`) before and after adding a reranker; that's the number that should drive whether
+you keep it in the hot path.
+
+**Alternative considered:** a hosted reranker API (Cohere, Voyage). Reasonable if you'd rather not host a model at
+all; self-hosted is the default here mainly to keep the number of ",faithfulness,gemini-3.7-flash,1.0,correct,1.0,1.0,1.0,
+ragbench-covidqa,rrf_bge,r0201,How many times more likely was an infection found in patients over 85 years old?,"Based on univariate analysis in the provided context, the odds of being infected were **1.5 to 1.6 times higher** if a resident was older than 85. 
+
+*(Note: In a Flu+ context for residents older than 86, the odds of being infected were 1.5 times higher for women and 1.7 times higher for men).*","Title: Gastroenteritis and respiratory infection outbreaks in French nursing homes from 2007 to 2018: Morbidity and all-cause lethality according to the individual characteristics of residents
+Passage: Older age appeared to increase the likelihood of GE and influenza infection, with increasing rates among older residents. Age is a well-known factor for influenza and norovirus severity in the elderly and in nursing homes . For NoV, the highest incidence estimates was found in the �85 year-category . In our study, univariate analysis showed that the odds of being infected were 1.5 to 1.6 times higher if a resident was older than 85. Moreover, an adjusted analysis of GE outbreaks highlighted different effects among subgroups of residents according to sex and LOS. Indeed, multiple and/or repeated exposure to GE ||| Title: Gastroenteritis and respiratory infection outbreaks in French nursing ",faithfulness,gemini-3.7-flash,1.0,correct,1.0,1.0,1.0,
+docsqa,rrf_bge,d08,What character budget was set for planner synthesis context to avoid Groq TPM overflows?,"Based on the provided context, the synthesis context in the planner was budgeted to **12,000 characters** (~3,000 tokens) to prevent Groq TPM overflows.","### Iteration 5: Groq Rate Limit (429 / 200k TPD) Quota Signaling
+- **Problem:** Groq's on-demand free tier enforces a 200,000 tokens/day (TPD) quota. When reached, requests fail with `429 - Rate limit reached on tokens per day (TPD). Please try again in Xm Ys`.
+- **Implementation:**
+  - **Parser (`parse_rate_limit_error` in `llm_client.py`):**
+    - Parses `retry_after` (e.g. `2m 5s`), `limit`, `used`, and `quota_type` (TPD vs TPM).
+    - Stores global state in `LLMClient.global_rate_limit`.
+  - **API Endpoint (`GET /v1/quota/status` in `routes_rag.py`):**
+    - Returns structured JSON for frontend and background monitoring.
+  - **UI Header Quota Pill:**
+    - Displays `● Groq API Active` (green) or `⚠️ Groq Limit (Reset in Xm)` (pulsing rose).
+  - **UI Rate Limit Banner (`#rate-limit-banner`):**
+    - Prominently alerts user with exact countdown time and fallback notice.
+  - **CLI Rate",faithfulness,gemini-3.7-flash,1.0,correct,1.0,1.0,1.0,
+ragbench-covidqa,rrf_bge,r0062,What are examples of proinflammatory cytokines?,"Based on the provided context, examples of pro-inflammatory cytokines include:
+
+* **IL-12** [1]
+* **IL-23** [1]
+* **IL-27** (has both pro-inflammatory and anti-inflammatory properties) [1]
+* **IL-6** (has mainly pro-inflammatory effector function) [2, 3]
+* **MCP-1** [3]
+* **TNF-α** / **TNF** [3, 5]","Title: A bibliometric analysis of IL-35 research from 2009 to 2018
+Passage: IL-12 and IL-23 are both considered pro-inflammatory cytokines . As an effective T cell immunomodulator, IL-27 has anti-inflammatory and pro-inflammatory properties . Interleukin-35, however, was identified as an inhibitory cytokine in 2007 , indicating that IL-35 is quite different from other members of IL-12 family cytokines. . It has been shown that IL-35 inhibits the proliferation of T cells and induces the conversion of naïve T cells into iTr35 cells . IL-35 activated STAT1/STAT3 by means of an IL-35 receptor, and induced human B cells to transform into regulatory B-cells . After proinflammatory cytokines provoke inflammation, IL-35 can be upregulated ||| Title: Assessment of immune organ dysfunction in critical illness: utility of innate immune response markers
+Passage: Key cytokines: serum levels of IL-6, ",faithfulness,gemini-3.7-flash,1.0,correct,1.0,1.0,1.0,
+multihoprag,rrf_bge_two_pass,q1817,"What is the name of the service, covered by TechCrunch, that is temporarily free for users due to Apple's interference and is known for reverse-engineering the iMessage protocol to extend functionality to Android users?","The service is **Beeper Mini**. 
+
+According to the provided facts, Beeper Mini was covered by TechCrunch for bringing iMessage texts to Android users. It achieved this because its team reverse-engineered the iMessage protocol to extend iMessage functionality to Android devices. Additionally, the service became temporarily free due to the unstable and chaotic situation resulting from Apple's interference and attempts to shut it down.","Beeper reversed engineered iMessage to bring blue bubble texts to Android users
+
+TechCrunch (2023-12-05). The push to bring iMessage to Android users today adds a new contender. A startup called Beeper, which had been working on a multi-platform messaging aggregator, is now launching a new app called Beeper Mini which will allow Android users to send and receive end-to-end encrypted iMessage chats for just $1.99 per month. Beeper Mini was made possible because the team behind the app has managed to reverse-engineer the iMessage protocol, they say.
+
+“That’s the big breakthrough,” explains Beeper co-founder and CEO Eric Migicovsky, previously the founder of smartwatch startup Pebble. “We’re not actually a middleman anymore. The research that we’ve done is actually reverse-engineering the iMessage protocol, down to the lowest layer of the protocol. So Beeper Mini doesn’t use a Mac server as",faithfulness,gemini-3.7-flash,1.0,correct,1.0,1.0,1.0,
+docsqa,rrf_bge,m05,Name the memory store for immutable constraints and the one for session history.,"Based on the provided context:
+
+* The memory store for immutable constraints is **`memory_policy`** (Policy).
+* The memory store for session history is **`memory_episode`** (Episodic summary).","### 3. 4-Store Typed Memory System
+
+Durable memory is partitioned to prevent cross-contamination:
+
+- **`memory_policy`:** Immutable runtime safety and behavior constraints.
+- **`memory_preference`:** User-scoped persistent preferences (e.g. preferred embedding model, output dimension, reranker, and LLM).
+- **`memory_fact`:** Verified semantic world/user facts promoted through confidence scoring.
+- **`memory_episode`:** Session history, outcome summaries, and interaction traces. ||| ## 9. Data model overview
+
+See `docs/DATA_MODEL.sql` for the full, runnable Postgres schema. Core tables:
+
+- `documents`, `chunks` — ingestion output, with parent/child linkage and metadata (source, section path, page,
+  permissions, timestamp)
+- `memory_policy`, `memory_preference`, `memory_fact`, `memory_episode` — the four typed memory stores, each with
+  its own scope/TTL/confidence columns where applicabl",faithfulness,gemini-3.7-flash,1.0,correct,1.0,1.0,1.0,
+multihoprag,rrf_bge_two_pass,q2409,"Does TechCrunch describe Sam Bankman-Fried's actions in handling customer funds similarly to the way it portrays his pursuit of wealth, power, and influence, with both descriptions implying misconduct, or are the portrayals different?","Based on the provided facts, the requested details cannot be determined because TechCrunch's own description of Sam Bankman-Fried's handling of customer funds is missing from the evidence, as is any comparison by TechCrunch between his handling of those funds and his pursuit of wealth, power, and influence. 
+
+The supported facts only state that:
+- Sam Bankman-Fried is described as the disgraced entrepreneur accused of orchestrating the collapse of the cryptocurrency exchange FTX.
+- The prosecution depicted Bankman-Fried as someone who knowingly committed fraud to achieve great wealth, power, and influence.
+- The defense countered that the FTX founder acted in good faith, never intended to commit fraud or steal, and was basically in over his head.","Sam Altman backs teens’ startup, Google unveils the Pixel 8 and TikTok tests an ad-free tier
+
+TechCrunch (2023-10-07). Hiya, folks, and welcome to Week in Review (WiR), TechCrunch’s digest of the past week in tech news. It’s TC’s column that highlights the major stories over the past few days, and — we humbly submit — it’s a darn useful resource for folks on the go.
+
+This week, we cover Sam Altman backing a teen’s AI startup, Google’s hardware event (and first impressions of the Pixel 8 Pro), Flexport drama, and the ongoing FTX fallout. Also on the agenda: Gmail’s harsher rules to prevent spam, TikTok testing an ad-free subscription plan, and LinkedIn going big on AI tools. And that’s not all.
+
+If you haven’t, sign up here to get WiR in your inbox every Saturday. And if you have, our thanks. Now, let’s get on with the news.
+
+Most read
+
+Altman backs teen entrepreneurs: Sam Altman is among",faithfulness,gemini-3.7-flash,0.875,abstained,0.0,1.0,0.0,
+multihoprag,rrf_bge_two_pass,q0500,"Between the Sporting News report on NBA Rookie of the Year odds published on October 4, 2023, and the Sporting News report on line shopping in sports betting published on November 6, 2023, was the role of sportsbooks in setting betting lines and odds inconsistent?","Based on the provided facts, the details needed to determine whether the role of sportsbooks in setting betting lines and odds was inconsistent are missing. 
+
+Specifically:
+- In the October 4, 2023 Sporting News report, it is noted that NBA Rookie of the Year odds are posted at online sportsbooks within their NBA futures betting sections. However, this report does not explain how sportsbooks set lines and odds, making it impossible to determine if the two reports describe an inconsistent role.
+- In the November 6, 2023 Sporting News report, sportsbooks are described as employing oddsmakers and oddsmaking services to set lines and odds using computer models and algorithms, while other sports betting apps copy those lines. 
+- The November 6, 2023 report also states that sportsbooks adjust lines and odds based on public betting reaction and new information (such as injuries or roster moves) to balance action on both sides.","Line Shopping in Sports Betting - How to Find the Best Odds
+
+Sporting News (2023-11-06). Line shopping is the key that unlocks the best odds and lines at top sports betting sites.
+
+The process is as simple as checking the lines and odds for your prospective bet at multiple online sports betting sites. The result is quite often better odds and improved lines.
+
+What is line shopping, and why is it worth your time? Find the answers below in our complete guide to line shopping.
+
+How do sportsbooks set odds and lines?
+
+The best sportsbooks employ oddsmakers and oddsmaking services to set their lines and odds.
+
+Other sports betting apps simply copy those lines. The oddsmakers and oddsmaking services use computer models and algorithms that consider analytics, statistics, injury and roster news, performance, matchup data, and more to develop the lines and odds.
+
+Betting lines and odds are then s",faithfulness,gemini-3.7-flash,0.875,abstained,0.0,1.0,0.0,
+ragbench-covidqa,engine_as_shipped,r0055,How can present systems of surveillance be used?,"Based on the provided facts, present systems of surveillance can be used in the following ways:
+
+* **Disease Estimation and Tracking:** Information environment data (such as Google searches and Twitter feeds) can serve as proxies to directly estimate disease transmission within the population. Additionally, surveillance systems can generate practice-specific time-series and maps that display the spatio-temporal evolution of disease risk across an area of interest.
+* **Rapid Issue Identification:** Systems can utilize a traffic-light device as a visual aid to quickly identify potential gastrointestinal (GI) issues.
+* **Guiding Data and Decision-Making:** Surveillance data can be analyzed using models to improve data collection guidance and provide more precise estimates of system states, aiding in state-dependent decisions. 
+* **Target Assessment in Disease Programs:** Infection monitoring data from sentinel sites is currently used by parasite control programmes primarily to determine whether an arbitrarily set target is met.
+* **Planning Prevention and Control:** Sentinel influenza surveillance can provide public health authorities with information to better plan prevention and control measures, thereby minimizing the impact of the disease.
+* **Pathogen Detection and Outbreak Response:** Surveillance systems can identify novel or emergent pathogens in the community and promptly alert health authorities regarding the most affected individuals, allowing for better targeted programmatic responses.","Title: Characterizing Influenza surveillance systems performance: application of a Bayesian hierarchical statistical model to Hong Kong surveillance data
+Passage: Some researchers assume that data on the information environmentsuch as Google searches and Twitter feedscan be used as proxies that directly estimate disease transmission in the population as long as the ""signal"" can be separated from the ""noise"" . Others simply view information environment data as a direct proxy for disease transmission. Surveillance systems that are fast, inexpensive, decentralized, automated, and utilize the power of information technology seem to satisfy the need for a magic bullet in the digital era. Whether such systems work as expected, or are another example of ""big data hubris"" , remains an open question. ||| Title: A real-time spatio-temporal syndromic surveillance system with application to small co",faithfulness,gemini-3.7-flash,1.0,correct,1.0,1.0,1.0,
+ragbench-covidqa,engine_as_shipped,r0101,What compartments were the host animals divided into?,"Based on the provided facts, the host animals are divided into:
+- A compartment where hosts are free of the virus (and thus susceptible)
+- Various infectious compartments, where hosts are infected by a certain combination of viral forms.","Title: Host and viral traits predict zoonotic spillover from mammals
+Passage: Analyses were limited to terrestrial mammal species as defined by the IUCN Red List and we ran separate analyses for wild and domestic animals. As domestic animals made up a much smaller data set with a unique set of explanatory variables that differed from the wild species analyses, these models were fit separately. Domestic species results are also discussed separately as they are tangential to the primary findings. ||| Title: Endemicity and prevalence of multipartite viruses under heterogeneous between-host transmission
+Passage: As customary in compartmental models, we consider that hosts are either free of the virus, and thus susceptible , or infected by a certain combination of the viral forms, translating into various infectious compartments . The main assumption is that a host can be infected only by a c",faithfulness,gemini-3.7-flash,1.0,partial,0.5,1.0,1.0,
+multihoprag,engine_as_shipped,q0315,"Has the broadcasting platform for NFL 'Thursday Night Football' games for NFL fans across the United States as reported by Sporting News changed between the game featuring the Detroit Lions and Green Bay Packers on September 28, 2023, and the game featuring the Chicago Bears and Carolina Panthers on November 9, 2023?","Based on the supported facts, the game between the Chicago Bears and Carolina Panthers on Thursday, November 9 was aired on Amazon Prime Video for NFL fans across the United States. 
+
+However, the requested details regarding the broadcasting platform reported by Sporting News for the game featuring the Detroit Lions and Green Bay Packers on September 28, 2023, are missing from the evidence. Consequently, it cannot be determined whether the broadcasting platform changed between the two games.","9:25 p.m. — The Panthers will have 3rd & 3 out of the two-minute warning, just hoping to get in position for some points before halftime. They'll start the second half with the ball as well.
+
+Panthers 10, Bears 6
+
+9:19 p.m. FIELD GOAL — Bagent is fortunate just to hold onto a bad snap, but his pass is incomplete and brings out Cairo Santos. It's 10-6, Panthers.
+
+9:17 p.m. — A second big play by rookie Tyler Scott, who catches a 15-yard pass from Bagent to give the Bears a fresh set of downs. Chicago is into field goal range.
+
+Rookie-to-rookie for a key first down 👀#CARvsCHI on Prime Video
+
+Also available on #NFLPlus pic.twitter.com/nIw42qweEE — NFL (@NFL) November 10, 2023
+
+9:14 p.m. — Bagent hits Roschon Johnson for a first down to give the Bears some life. Chicago started with very strong field position, so this could quickly become a rare scoring opportunity.
+
+9:11 p.m. — A sack by Ju",faithfulness,gemini-3.7-flash,1.0,abstained,0.0,1.0,0.0,
+multihoprag,rrf_bge,q0211,"Does the article from FOX News - Entertainment suggest that Arnold Schwarzenegger and Reese Witherspoon advocate for a similar parenting style, as opposed to the article from The Independent - Life and Style which discusses the issue of parental controls with Roblox?","Yes. According to the FOX News - Entertainment article, both Arnold Schwarzenegger and Reese Witherspoon are highlighted as celebrity parents who use and advocate for a ""tough-love"" and ""firmer"" parenting approach centered around harsh lessons, resistance, and ""learning from failure."" 
+
+In contrast, the article from *The Independent - Life and Style* focuses on Sarah Michelle Gellar addressing the issue of Roblox's parental controls and assistance after her son's account was hacked.","Arnold Schwarzenegger, Reese Witherspoon parent with tough love: 'Learning from failure'
+
+FOX News - Entertainment (2023-10-10). Hollywood is a tough place to raise kids, prompting some celebrities to take a tough-love approach to parenting.
+
+Stars like Arnold Schwarzenegger, who admitted to being like a ""drill instructor"" when his kids were young, and Reese Witherspoon, who recently said she wants kids to deal with failure more directly, have shared their harsher parenting styles in interviews.
+
+Others, like Ashton Kutcher and Mila Kunis and Kristen Bell and Dax Shepard, are focused on keeping their kids grateful for growing up in famous families with wealth and privilege at their fingertips.
+
+Here's a look at a few celebrity parents focusing on firmer parenting.
+
+Arnold Schwarzenegger
+
+Arnold Schwarzenegger, who shares four children with ex-wife Maria Shriver and also shares a son with",faithfulness,gemini-3.7-flash,1.0,correct,1.0,1.0,1.0,
+docsqa,rrf_bge,d02,What full-pipeline Hit@5 did the GoT benchmark show before and after the 0.70/0.30 blend change?,"Based on the provided context, the full-pipeline Hit@5 on the 755-page GoT corpus showed:
+
+* **Before the change (0.60/0.40 blend):** 87.1%
+* **After the change (0.70/0.30 blend):** 61.3%","### Fixed: reranker blend regression (root cause identified and reverted)
+
+A later commit on this branch (`50fff08`) changed the reranker consensus blend from:
+
+```text
+0.60 * norm_rrf + 0.40 * norm_raw, consensus_boost = 0.15 for top-3
+```
+
+to:
+
+```text
+0.70 * norm_rrf + 0.30 * norm_raw, consensus_boost = 0.20 (top-3) / 0.08 (top-6)
+```
+
+On the identical 755-page GoT corpus and identical 36-query `tests/eval_dataset.json`,
+this dropped full-pipeline Hit@5 from **87.1% to 61.3%**, with these category-level
+losses:
+
+| Category | Before (0.60/0.40) | After (0.70/0.30) | Delta |
+|---|---:|---:|---:|
+| Direct Factual Hit@5 | 100.0% | 75.0% | -25 |
+| Citation/Appendix Hit@5 | 100.0% | 75.0% | -25 |
+| Multi-Hop Hit@5 | 87.5% | 62.5% | -25 |
+| Paraphrased Hit@5 | 66.7% | 16.7% | -50 |
+
+Generation-side faithfulness *improved* over the same period (43% -> 86.2%), which is
+why the retrieval regres",faithfulness,gemini-3.7-flash,1.0,correct,1.0,1.0,1.0,
+docsqa,engine_as_shipped,d10,"According to the reranker upgrade guide, what Hit@1 value shows where the heuristic reranker failed?","According to the reranker upgrade guide, the heuristic reranker failed at a Hit@1 value of 32.3%.","## 1. Why this change is needed
+
+Your latest eval (36 queries on Eval 1.pdf) shows the heuristic reranker has hit its ceiling:
+
+| Metric | Before fix | After fix | Signal |
+|---|---:|---:|---|
+| Hit@5 | 61.3% | 64.5% | Better recall |
+| Hit@1 | 41.9% | 32.3% | **Worse top-1 ranking** |
+| MRR | 0.504 | 0.455 | First correct answer moved down |
+| nDCG@5 | 0.329 | 0.347 | Slightly better ordering |
+| Faithfulness | 86.2% | 88.8% | Generation improved |
+| Factual F1 | 0.451 | 0.488 | Generation improved |
+
+**Diagnosis:** The heuristic can boost recall (more right chunks in top 5) but cannot rank precisely (Hit@1 and MRR dropped). It detects ""has the right words"" but not ""is the best semantic answer."" This is a structural ceiling — no amount of weight tuning fixes it.
+
+**Solution:** Swap the scoring signal from hand-written heuristics to a trained cross-encoder, while keeping your RRF blend a",faithfulness,gemini-3.7-flash,1.0,correct,1.0,1.0,1.0,
+docsqa,rrf_bge,m01,"After the blend regression, which config setting now holds the RRF weight and what is its default?","Based on the provided context, the setting added to `src/deep_context/core/config.py` that holds the RRF weight is `reranker_blend_rrf_weight`, and its default value is `0.60`.","### Fixed: reranker blend regression (root cause identified and reverted)
+
+A later commit on this branch (`50fff08`) changed the reranker consensus blend from:
+
+```text
+0.60 * norm_rrf + 0.40 * norm_raw, consensus_boost = 0.15 for top-3
+```
+
+to:
+
+```text
+0.70 * norm_rrf + 0.30 * norm_raw, consensus_boost = 0.20 (top-3) / 0.08 (top-6)
+```
+
+On the identical 755-page GoT corpus and identical 36-query `tests/eval_dataset.json`,
+this dropped full-pipeline Hit@5 from **87.1% to 61.3%**, with these category-level
+losses:
+
+| Category | Before (0.60/0.40) | After (0.70/0.30) | Delta |
+|---|---:|---:|---:|
+| Direct Factual Hit@5 | 100.0% | 75.0% | -25 |
+| Citation/Appendix Hit@5 | 100.0% | 75.0% | -25 |
+| Multi-Hop Hit@5 | 87.5% | 62.5% | -25 |
+| Paraphrased Hit@5 | 66.7% | 16.7% | -50 |
+
+Generation-side faithfulness *improved* over the same period (43% -> 86.2%), which is
+why the retrieval regres",faithfulness,gemini-3.7-flash,1.0,correct,1.0,1.0,1.0,
+ragbench-covidqa,rrf_bge,r0170,How can the 2019-nCov spread?,"Based on the provided context, the exact mechanism of how 2019-nCoV spreads is currently unclear, but evidence and observations indicate the following:
+
+* **Suspected Route:** It is suspected to be transmitted through contact with infected respiratory secretions, similar to other known coronaviruses [1]. Clinical observation shows it induces pneumonia through the respiratory tract [3].
+* **Close Contact / Person-to-Person:** Close contact with an infected person is considered a major factor in disease transmission, with sustained human-to-human transmission documented [1]. The CDC defines ""close contact"" as being within two meters of an area with a confirmed patient or being directly exposed to infectious secretions without appropriate PPE [1]. Healthcare facilities have also reported person-to-person spread [1].
+* **Timing of Spread:** The virus appears to spread from individuals much earlier in the course of their illness, and even from those with mild symptoms [6].
+* **Travel:** The virus has also spread internationally via travelers from Wuhan [5]. 
+
+*(Note: While general respiratory viruses can transmit via large respiratory droplets, fine particle aerosols, indirect transmission via fomites, or faecal-oral routes, the context identifies these as general characteristics of respiratory viruses or coronaviruses rather than definitive confirmed mechanisms specific to 2019-nCoV [2].)*","Title: 2019-nCoV: The Identify-Isolate-Inform (3I) Tool Applied to a Novel Emerging Coronavirus
+Passage: It is currently unclear how 2019-nCoV is spread, but it is suspected to be transmitted through contact with infected respiratory secretions, like other known coronaviruses. There are instances of sustained human-to-human transmission across generations of cases, especially near the epicenter in Wuhan City. 21 Current evidence suggests that close contact with an infected person is a major factor in disease transmission. CDC defines ""close contact"" 33 as being in or within two meters of an area with a confirmed patient or being directly exposed to infectious secretions without appropriate PPE. Healthcare facilities in China have reported spread from person to ||| Title: Epidemiological research priorities for public health control of the ongoing global novel coronavirus (2019-nCoV) outb",faithfulness,gemini-3.7-flash,1.0,correct,1.0,1.0,1.0,

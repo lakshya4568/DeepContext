@@ -1,0 +1,34 @@
+{"dataset": "ragbench-covidqa", "config": "rrf_bge_two_pass", "qid": "r0072", "faithfulness": 1.0, "correctness": 1.0, "note": "matches [1] verbatim", "labeller": "claude"}
+{"dataset": "docsqa", "config": "engine_as_shipped", "qid": "m08", "faithfulness": 1.0, "correctness": 1.0, "note": "two bugs in [1]", "labeller": "claude"}
+{"dataset": "multihoprag", "config": "rrf_bge", "qid": "q0161", "faithfulness": 1.0, "correctness": 0.0, "note": "refuses: only one TechCrunch article in evidence; reference Yes", "labeller": "claude"}
+{"dataset": "ragbench-covidqa", "config": "rrf_bge_two_pass", "qid": "r0164", "faithfulness": 0.5, "correctness": 0.5, "note": "anal swabs ok; stool only loosely supported [6]; misses blood", "labeller": "claude"}
+{"dataset": "multihoprag", "config": "rrf_bge", "qid": "q2309", "faithfulness": 1.0, "correctness": 1.0, "note": "SBF; Cohen quote in [2]", "labeller": "claude"}
+{"dataset": "multihoprag", "config": "rrf_bge_two_pass", "qid": "q2514", "faithfulness": 1.0, "correctness": 0.5, "note": "NYT part right and quoted in [1]; Sporting News half missing; no Yes", "labeller": "claude"}
+{"dataset": "multihoprag", "config": "engine_as_shipped", "qid": "q1068", "faithfulness": 1.0, "correctness": 0.5, "note": "both article facts in evidence; says comparison not supported; reference Yes", "labeller": "claude"}
+{"dataset": "docsqa", "config": "rrf_bge_two_pass", "qid": "d09", "faithfulness": 1.0, "correctness": 1.0, "note": "BGE reranker v2 m3 in [1]", "labeller": "claude"}
+{"dataset": "multihoprag", "config": "rrf_bge", "qid": "q1068", "faithfulness": 1.0, "correctness": 0.5, "note": "article facts correct; says comparison not stated; reference Yes", "labeller": "claude"}
+{"dataset": "ragbench-covidqa", "config": "rrf_bge_two_pass", "qid": "r0070", "faithfulness": 1.0, "correctness": 1.0, "note": "reservoirs/diversity/defenses supported by [1],[3]-[5]", "labeller": "claude"}
+{"dataset": "docsqa", "config": "rrf_bge", "qid": "m02", "faithfulness": 1.0, "correctness": 1.0, "note": "two layers + Ragas in [1]", "labeller": "claude"}
+{"dataset": "ragbench-covidqa", "config": "engine_as_shipped", "qid": "r0071", "faithfulness": 1.0, "correctness": 0.0, "note": "answer supported by [1] but not what reference/question (titering) asks", "labeller": "claude"}
+{"dataset": "ragbench-covidqa", "config": "rrf_bge_two_pass", "qid": "r0218", "faithfulness": 1.0, "correctness": 0.0, "note": "answer from nCoV paper; reference about ASLV subdomain (other paper)", "labeller": "claude"}
+{"dataset": "multihoprag", "config": "engine_as_shipped", "qid": "q2494", "faithfulness": 1.0, "correctness": 0.0, "note": "says the Gemini article is missing; reference Yes; claims about retrieved articles correct", "labeller": "claude"}
+{"dataset": "ragbench-covidqa", "config": "rrf_bge", "qid": "r0125", "faithfulness": 1.0, "correctness": 1.0, "note": "archazolid description in [1],[3]", "labeller": "claude"}
+{"dataset": "ragbench-covidqa", "config": "engine_as_shipped", "qid": "r0029", "faithfulness": 1.0, "correctness": 1.0, "note": "IFITM meshwork, restriction factors, TRIM79a all in [1]-[4]", "labeller": "claude"}
+{"dataset": "docsqa", "config": "rrf_bge_two_pass", "qid": "d13", "faithfulness": 1.0, "correctness": 1.0, "note": "10-20% in [1]", "labeller": "claude"}
+{"dataset": "multihoprag", "config": "rrf_bge_two_pass", "qid": "q0079", "faithfulness": 1.0, "correctness": 0.5, "note": "facts right; rebuts winning streak but never states no", "labeller": "claude"}
+{"dataset": "docsqa", "config": "rrf_bge", "qid": "m04", "faithfulness": 1.0, "correctness": 1.0, "note": "ecohash/BGE calibrated probs in [2]", "labeller": "claude"}
+{"dataset": "ragbench-covidqa", "config": "rrf_bge", "qid": "r0201", "faithfulness": 1.0, "correctness": 1.0, "note": "1.5-1.6x in [1]; flu note in [2]", "labeller": "claude"}
+{"dataset": "docsqa", "config": "rrf_bge", "qid": "d08", "faithfulness": 1.0, "correctness": 1.0, "note": "12,000 chars (~3,000 tokens) in [2]", "labeller": "claude"}
+{"dataset": "ragbench-covidqa", "config": "rrf_bge", "qid": "r0062", "faithfulness": 1.0, "correctness": 1.0, "note": "examples supported [1]-[3],[5]; valid examples, subset of reference", "labeller": "claude"}
+{"dataset": "multihoprag", "config": "rrf_bge_two_pass", "qid": "q1817", "faithfulness": 1.0, "correctness": 1.0, "note": "Beeper Mini, free temporarily (TechCrunch 12-11)", "labeller": "claude"}
+{"dataset": "docsqa", "config": "rrf_bge", "qid": "m05", "faithfulness": 1.0, "correctness": 1.0, "note": "memory_policy/memory_episode in [1]", "labeller": "claude"}
+{"dataset": "multihoprag", "config": "rrf_bge_two_pass", "qid": "q2409", "faithfulness": 1.0, "correctness": 0.0, "note": "says comparison cannot be determined; reference Similar", "labeller": "claude"}
+{"dataset": "multihoprag", "config": "rrf_bge_two_pass", "qid": "q0500", "faithfulness": 1.0, "correctness": 0.0, "note": "facts right but no conclusion; reference no", "labeller": "claude"}
+{"dataset": "ragbench-covidqa", "config": "engine_as_shipped", "qid": "r0055", "faithfulness": 1.0, "correctness": 1.0, "note": "uses of surveillance all in [1]-[4]", "labeller": "claude"}
+{"dataset": "ragbench-covidqa", "config": "engine_as_shipped", "qid": "r0101", "faithfulness": 1.0, "correctness": 1.0, "note": "susceptible + infectious compartments in [2]", "labeller": "claude"}
+{"dataset": "multihoprag", "config": "engine_as_shipped", "qid": "q0315", "faithfulness": 1.0, "correctness": 0.0, "note": "Nov 9 Prime Video right; says Sept 28 platform missing; reference No", "labeller": "claude"}
+{"dataset": "multihoprag", "config": "rrf_bge", "qid": "q0211", "faithfulness": 1.0, "correctness": 1.0, "note": "Yes; FOX tough-love vs Independent Roblox, both in evidence", "labeller": "claude"}
+{"dataset": "docsqa", "config": "rrf_bge", "qid": "d02", "faithfulness": 1.0, "correctness": 1.0, "note": "87.1 to 61.3 in [1]", "labeller": "claude"}
+{"dataset": "docsqa", "config": "engine_as_shipped", "qid": "d10", "faithfulness": 1.0, "correctness": 1.0, "note": "32.3% in [1],[2]", "labeller": "claude"}
+{"dataset": "docsqa", "config": "rrf_bge", "qid": "m01", "faithfulness": 1.0, "correctness": 1.0, "note": "reranker_blend_rrf_weight 0.60 in [1]", "labeller": "claude"}
+{"dataset": "ragbench-covidqa", "config": "rrf_bge", "qid": "r0170", "faithfulness": 1.0, "correctness": 1.0, "note": "all supported by [1]-[3],[5],[6]", "labeller": "claude"}

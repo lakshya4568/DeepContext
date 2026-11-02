@@ -1,0 +1,1 @@
+{"judge_model": "gemini-3.7-flash", "rows_scored": 146, "calls": 1899, "live_calls": 1285, "live_in_tokens": 1609400, "live_out_tokens": 506687, "est_list_price_usd": 3.10712625, "source": "score_ragas runtime ledger"}

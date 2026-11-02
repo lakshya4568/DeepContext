@@ -1,0 +1,169 @@
+diff --git a/src/deep_context/core/config.py b/src/deep_context/core/config.py
+index f13e7ea..d82f060 100644
+--- a/src/deep_context/core/config.py
++++ b/src/deep_context/core/config.py
+@@ -176,6 +176,9 @@ class Settings(BaseSettings):
+     default_retrieval_mode: str = Field(default="hybrid", alias="DEFAULT_RETRIEVAL_MODE")
+     reranker_model: str = Field(default="ecohash_hybrid", alias="RERANKER_MODEL")
+     rrf_k: int = Field(default=60, alias="RRF_K")
++    # Votes of the keyword list and the dense list in RRF; 1.0 each is the plain, equal-vote fusion.
++    rrf_weight_lexical: float = Field(default=1.0, alias="RRF_WEIGHT_LEXICAL")
++    rrf_weight_dense: float = Field(default=1.0, alias="RRF_WEIGHT_DENSE")
+     default_top_k: int = Field(default=8, alias="DEFAULT_TOP_K")
+     first_stage_limit: int = Field(default=100, alias="FIRST_STAGE_LIMIT")
+     max_retrieval_retries: int = Field(default=1, alias="MAX_RETRIEVAL_RETRIES")
+diff --git a/src/deep_context/retrieval/hybrid.py b/src/deep_context/retrieval/hybrid.py
+index 63533ba..de5acd4 100644
+--- a/src/deep_context/retrieval/hybrid.py
++++ b/src/deep_context/retrieval/hybrid.py
+@@ -14,16 +14,22 @@ from deep_context.storage.base import StorageInterface
+ def reciprocal_rank_fusion(
+     ranked_lists: list[list[dict[str, Any]]],
+     k: int = 60,
++    weights: list[float] | None = None,
+ ) -> list[tuple[str, float]]:
+     """
+     Combines multiple ranked lists into a single ranking using Reciprocal Rank Fusion.
+-    Score = sum(1.0 / (k + rank)) across all lists where the item appears.
++    Score = sum(weight / (k + rank)) across all lists where the item appears.
++    ``weights`` gives each list its own vote (one per list); the default is an equal vote of 1.0.
+     """
++    if weights is None:
++        weights = [1.0] * len(ranked_lists)
++    if len(weights) != len(ranked_lists):
++        raise ValueError(f"expected {len(ranked_lists)} weights (one per list), got {len(weights)}")
+     scores: dict[str, float] = {}
+-    for ranked_list in ranked_lists:
++    for weight, ranked_list in zip(weights, ranked_lists, strict=True):
+         for rank, item in enumerate(ranked_list, start=1):
+             cid = item["id"]
+-            scores[cid] = scores.get(cid, 0.0) + 1.0 / (k + rank)
++            scores[cid] = scores.get(cid, 0.0) + weight / (k + rank)
+ 
+     return sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
+ 
+@@ -103,7 +109,12 @@ class HybridRetriever:
+         bm25_lists = ranked_lists[:n_queries]
+         vector_lists = ranked_lists[n_queries:]
+ 
+-        fused = reciprocal_rank_fusion(ranked_lists, k=settings.rrf_k)
++        fused = reciprocal_rank_fusion(
++            ranked_lists,
++            k=settings.rrf_k,
++            weights=[settings.rrf_weight_lexical] * n_queries
++            + [settings.rrf_weight_dense] * n_queries,
++        )
+         fused_score_map = {cid: score for cid, score in fused}
+         fused_ids = [cid for cid, _ in fused[:limit]]
+ 
+@@ -181,7 +192,11 @@ async def hybrid_search(
+     if query_embedding is not None:
+         bm25_hits = await storage.search_bm25(query, filters=target_filters, limit=k)
+         vec_hits = await storage.search_vector(query_embedding, filters=target_filters, limit=k)
+-        fused = reciprocal_rank_fusion([bm25_hits, vec_hits], k=settings.rrf_k)
++        fused = reciprocal_rank_fusion(
++            [bm25_hits, vec_hits],
++            k=settings.rrf_k,
++            weights=[settings.rrf_weight_lexical, settings.rrf_weight_dense],
++        )
+         fused_score_map = {cid: score for cid, score in fused}
+         fused_ids = [cid for cid, _ in fused[:k]]
+         all_hits = {h["id"]: h for h in (bm25_hits + vec_hits)}
+diff --git a/tests/test_weighted_rrf.py b/tests/test_weighted_rrf.py
+new file mode 100644
+index 0000000..f678542
+--- /dev/null
++++ b/tests/test_weighted_rrf.py
+@@ -0,0 +1,92 @@
++"""Weighted Reciprocal Rank Fusion: each ranked list can carry its own vote (default: equal, as before)."""
++
++from __future__ import annotations
++
++from typing import Any
++
++import pytest
++
++from deep_context.core.config import settings
++from deep_context.core.types import RetrievalFilters
++from deep_context.retrieval import hybrid
++from deep_context.retrieval.hybrid import HybridRetriever, reciprocal_rank_fusion
++
++
++def _items(*ids: str) -> list[dict[str, Any]]:
++    return [{"id": i} for i in ids]
++
++
++def test_default_weights_are_plain_rrf() -> None:
++    fused = dict(reciprocal_rank_fusion([_items("a", "b"), _items("b", "c")], k=60))
++    assert fused["a"] == pytest.approx(1 / 61)
++    assert fused["b"] == pytest.approx(1 / 62 + 1 / 61)
++    assert fused["c"] == pytest.approx(1 / 62)
++
++
++def test_explicit_equal_weights_give_exactly_the_default_result() -> None:
++    lists = [_items("a", "b", "c"), _items("c", "a", "d")]
++    assert reciprocal_rank_fusion(lists, k=60, weights=[1.0, 1.0]) == reciprocal_rank_fusion(
++        lists, k=60
++    )
++
++
++def test_each_list_contributes_its_weight_times_the_reciprocal_rank() -> None:
++    fused = dict(reciprocal_rank_fusion([_items("a"), _items("a", "b")], k=60, weights=[0.1, 1.0]))
++    assert fused["a"] == pytest.approx(0.1 / 61 + 1 / 61)
++    assert fused["b"] == pytest.approx(1 / 62)
++
++
++def test_a_small_vote_lets_the_other_list_decide_the_order() -> None:
++    keyword, dense = _items("a", "b", "c"), _items("b", "c", "a")
++    equal = [cid for cid, _ in reciprocal_rank_fusion([keyword, dense], k=60)]
++    dense_led = [
++        cid for cid, _ in reciprocal_rank_fusion([keyword, dense], k=60, weights=[0.01, 1.0])
++    ]
++    assert equal == ["b", "a", "c"]
++    assert dense_led == ["b", "c", "a"]
++
++
++def test_a_zero_vote_adds_nothing_and_its_unique_items_rank_last() -> None:
++    fused = reciprocal_rank_fusion([_items("x"), _items("a", "b")], k=60, weights=[0.0, 1.0])
++    assert [cid for cid, _ in fused] == ["a", "b", "x"]
++    assert dict(fused)["x"] == 0.0
++
++
++def test_the_number_of_weights_must_match_the_number_of_lists() -> None:
++    with pytest.raises(ValueError, match="weights"):
++        reciprocal_rank_fusion([_items("a"), _items("b")], weights=[1.0])
++
++
++class _FakeStorage:
++    """Keyword list a, b, c and dense list b, c, a; contents differ so nothing is treated as a duplicate."""
++
++    @staticmethod
++    def _row(cid: str) -> dict[str, Any]:
++        return {"id": cid, "content": f"unique passage {cid} " * 5, "document_id": "d"}
++
++    async def search_bm25(self, query: str, filters: Any, limit: int = 100) -> list[dict[str, Any]]:
++        return [self._row(c) for c in ("a", "b", "c")]
++
++    async def search_vector(self, emb: Any, filters: Any, limit: int = 100) -> list[dict[str, Any]]:
++        return [self._row(c) for c in ("b", "c", "a")]
++
++
++async def _order(monkeypatch: pytest.MonkeyPatch, lexical: float, dense: float) -> list[str]:
++    async def fake_embeddings(texts: list[str], **_: Any) -> list[list[float]]:
++        return [[0.0, 0.0, 0.0, 1.0] for _ in texts]
++
++    monkeypatch.setattr(hybrid.llm_client, "get_embeddings", fake_embeddings)
++    monkeypatch.setattr(settings, "rrf_weight_lexical", lexical)
++    monkeypatch.setattr(settings, "rrf_weight_dense", dense)
++    candidates = await HybridRetriever(_FakeStorage()).retrieve_candidates(  # type: ignore[arg-type]
++        ["a question"], RetrievalFilters(), limit=10
++    )
++    return [c["id"] for c in candidates]
++
++
++async def test_the_retriever_defaults_to_equal_votes(monkeypatch: pytest.MonkeyPatch) -> None:
++    assert await _order(monkeypatch, 1.0, 1.0) == ["b", "a", "c"]
++
++
++async def test_the_retriever_uses_the_configured_votes(monkeypatch: pytest.MonkeyPatch) -> None:
++    assert await _order(monkeypatch, 0.01, 1.0) == ["b", "c", "a"]
